@@ -1,6 +1,6 @@
 # Bacon — Investment Research Tool
 
-> **Status:** Phase 1 scaffold complete + first Phase 2 slice (**Analyze**) live. See [Phase 2 TODO](#phase-2-todo).
+> **Status:** Phase 1 scaffold complete + Phase 2 **Analyze** and **Radar** slices live. See [Phase 2 TODO](#phase-2-todo).
 
 Multi-asset investment research through six independent professional lenses — Fundamental, Technical, Factor, Macro/Regulatory, Smart Money/Signals, and Risk. Conviction comes from **convergence** across lenses, never a single indicator.
 
@@ -22,9 +22,10 @@ Multi-asset investment research through six independent professional lenses — 
 
 - **Auth:** Supabase magic-link login → session → protected app shell. Session refresh + route protection in `proxy.ts` (Next 16's renamed middleware).
 - **Shell:** the full "Bacon look" — left rail nav, status bar, six-lens spectrum, bacon-rasher logo.
-- **Analyze (Phase 2 slice):** run any asset through the six-lens cockpit. Calls `/api/analyze` → live web search → parsed briefing with per-lens stances, a convergence gauge, summary + bottom line. **Bull vs Bear** runs `/api/debate`. **Save to radar** persists to your Supabase `watchlist`.
+- **Radar (Phase 2 slice, home view):** a Scout + Tracking dashboard. **Tracking** lists your names with qualitative monitoring updates (`/api/track-update`) and editable thesis / conviction / note — all persisted to `watchlist`. **Scout** runs `/api/scout` on your saved `themes` to surface timely candidates; track a pick or jump straight into its lenses.
+- **Analyze (Phase 2 slice):** run any asset through the six-lens cockpit. Calls `/api/analyze` → live web search → parsed briefing with per-lens stances, a convergence gauge, summary + bottom line. **Bull vs Bear** runs `/api/debate`. **Save to radar** persists to `watchlist`.
 - **Health:** `/api/health` probes Anthropic server-side and returns `{ ok, model }`.
-- **Radar / News / Frameworks / Sizer:** present as placeholders in the shell; ported in later slices.
+- **News / Frameworks / Sizer:** present as placeholders in the shell; ported in later slices.
 
 ## Setup
 
@@ -86,14 +87,19 @@ app/
 ├─ layout.tsx            ← root layout
 ├─ globals.css           ← design system (verbatim port) + base reset + login styles
 └─ api/
-   ├─ health/route.ts    ← Anthropic probe
-   ├─ analyze/route.ts   ← six-lens briefing  (auth → prompt → ask → parse)
-   ├─ debate/route.ts    ← bull-vs-bear debate
-   ├─ watchlist/route.ts ← "save to radar" (insert into watchlist, RLS-scoped)
-   └─ auth/              ← Supabase auth callback + signout
+   ├─ health/route.ts        ← Anthropic probe
+   ├─ analyze/route.ts       ← six-lens briefing  (auth → prompt → ask → parse)
+   ├─ debate/route.ts        ← bull-vs-bear debate
+   ├─ scout/route.ts         ← theme-based idea scout
+   ├─ track-update/route.ts  ← per-name monitoring update (persists to watchlist)
+   ├─ themes/route.ts        ← scout themes CRUD
+   ├─ watchlist/route.ts     ← list + add tracked names (RLS-scoped)
+   ├─ watchlist/[id]/route.ts← edit (thesis/conviction/note) + delete
+   └─ auth/                  ← Supabase auth callback + signout
 
 components/
 ├─ AppShell.tsx          ← rail nav + status bar + view switching (client)
+├─ RadarView.tsx         ← Scout + Tracking dashboard (client)
 ├─ AnalyzeView.tsx       ← six-lens cockpit + Bull/Bear (client)
 ├─ ConvictionRadar.tsx   ← SVG convergence gauge
 ├─ BaconMark.tsx · Spectrum.tsx · TVLink.tsx
@@ -103,6 +109,7 @@ lib/
 ├─ prompts.ts            ← prompt builders (ported verbatim from the artifact)
 ├─ parsers.ts            ← response parsers (ported verbatim, typed)
 ├─ lenses.ts             ← LENSES, STANCES, ASSET_CLASSES, FRAMEWORKS + helpers
+├─ types.ts              ← shared DB row shapes (WatchRow, ThemeRow)
 └─ supabase/             ← client / server / admin (service-role) clients
 
 proxy.ts                 ← session refresh + route protection (was middleware.ts)
@@ -128,7 +135,7 @@ Feature port from [`reference/bacon-artifact.jsx`](reference/bacon-artifact.jsx)
 
 - [x] `lib/lenses.ts`, `lib/prompts.ts`, `lib/parsers.ts` — constants + prompt builders + parsers, ported verbatim
 - [x] **Analyze** — six-lens cockpit + convergence gauge + Bull/Bear (`/api/analyze`, `/api/debate`, `AnalyzeView`) + save-to-watchlist
-- [ ] **Radar** — watchlist CRUD + Scout (`/api/scout`, `scout_picks`, themes, `RadarView`); move scout cadence/last-sweep into `settings`
+- [x] **Radar** — watchlist CRUD + per-name tracking updates + Scout with persisted themes (`/api/watchlist`, `/api/track-update`, `/api/scout`, `/api/themes`, `RadarView`). _Remaining:_ in-tab/background auto-sweep cadence in `settings` (folds into the cron slice) and caching scout results into `scout_picks`.
 - [ ] **News** — paraphrase + attribute (`/api/news`, `news_items`, `NewsView`)
 - [ ] **Discuss** — streaming chat (`/api/chat`, `chat_messages`, `ChatPanel`)
 - [ ] **Sizer + Frameworks** — mostly static ports (`FRAMEWORKS` data already in `lib/lenses.ts`)
