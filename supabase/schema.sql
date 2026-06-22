@@ -87,14 +87,24 @@ alter table scout_picks   enable row level security;
 alter table news_items    enable row level security;
 alter table chat_messages enable row level security;
 
--- policy template: each user sees only their rows
+-- policy template: each user sees only their rows.
+-- Postgres has no "create policy if not exists", so drop-then-create keeps this
+-- script idempotent (safe to re-run).
+drop policy if exists "own profile"  on profiles;
+drop policy if exists "own settings" on settings;
+drop policy if exists "own watch"    on watchlist;
+drop policy if exists "own themes"   on themes;
+drop policy if exists "own picks"    on scout_picks;
+drop policy if exists "own news"     on news_items;
+drop policy if exists "own chat"     on chat_messages;
+
 create policy "own profile"   on profiles      for all using (auth.uid() = id)       with check (auth.uid() = id);
 create policy "own settings"  on settings      for all using (auth.uid() = user_id)  with check (auth.uid() = user_id);
 create policy "own watch"     on watchlist     for all using (auth.uid() = user_id)  with check (auth.uid() = user_id);
 create policy "own themes"    on themes        for all using (auth.uid() = user_id)  with check (auth.uid() = user_id);
-create policy "own picks"    on scout_picks   for all using (auth.uid() = user_id)  with check (auth.uid() = user_id);
-create policy "own news"     on news_items    for all using (auth.uid() = user_id)  with check (auth.uid() = user_id);
-create policy "own chat"     on chat_messages for all using (auth.uid() = user_id)  with check (auth.uid() = user_id);
+create policy "own picks"     on scout_picks   for all using (auth.uid() = user_id)  with check (auth.uid() = user_id);
+create policy "own news"      on news_items    for all using (auth.uid() = user_id)  with check (auth.uid() = user_id);
+create policy "own chat"      on chat_messages for all using (auth.uid() = user_id)  with check (auth.uid() = user_id);
 
 -- auto-create profile + settings on signup
 create or replace function public.handle_new_user()
