@@ -1,6 +1,6 @@
 # Bacon — Investment Research Tool
 
-> **Status:** Phase 1 complete + Phase 2 **feature-complete** — Analyze, Radar, Background Sweep, Macro, Markets (live charts), News, Discuss (chat), Frameworks, Sizer, and password/account auth. See [Phase 2 TODO](#phase-2-todo) for the remaining nice-to-haves.
+> **Status:** Phase 1 + Phase 2 **complete**, plus extras. Every artifact feature is ported (Radar, News, Analyze, Frameworks, Sizer, Discuss, command-line + boot) on top of the self-hosting upgrades (server routes, Supabase auth, daily background sweep, real macro/movers data, embedded live charts). Extras: persona lenses, DCF + Sharpe/VaR, password/account auth, error pages, a health diagnostic, and a Vitest suite (28 tests) with CI.
 
 Multi-asset investment research through six independent professional lenses — Fundamental, Technical, Factor, Macro/Regulatory, Smart Money/Signals, and Risk. Conviction comes from **convergence** across lenses, never a single indicator.
 
@@ -16,7 +16,9 @@ Multi-asset investment research through six independent professional lenses — 
 | AI | Anthropic Messages API + `web_search` server tool, **server-side only** (`@anthropic-ai/sdk`) |
 | Icons | `lucide-react` |
 | Charts | Embedded TradingView Advanced Chart (`TradingViewChart`) on the Markets tab + Analyze; `TVLink` deep-links as fallback |
-| Hosting | Vercel (+ Vercel Cron, wired in a later slice) |
+| Hosting | Vercel + Vercel Cron (daily background sweep) |
+| Data | Alpha Vantage (movers) · FRED (macro) — the only real-number sources; the model never fabricates figures |
+| Tests / CI | Vitest (parsers, helpers, financial math) · GitHub Actions (lint + test + build) |
 
 ## What works today
 
@@ -158,7 +160,12 @@ Feature port from [`reference/bacon-artifact.jsx`](reference/bacon-artifact.jsx)
 - [x] **TradingView widgets** — embedded Advanced Chart on a **Markets** tab + inside Analyze (`TradingViewChart`); attribution kept; `TVLink` fallback retained
 - [x] **Real data layer** — Alpha Vantage movers (`lib/market.ts`) + FRED macro (`lib/macro.ts`, `/api/macro`, `MacroBackdrop`). _Next connectors (own code, public APIs):_ World Bank / IMF macro, sector movers, crypto movers.
 - [ ] **News** auto-refresh into the sweep (paraphrased headlines → `news_items`)
-- [ ] **Command line + boot screen** — nice-to-have, port last
+- [x] **Command line + boot screen** — terminal-style command bar (type a ticker / `RADAR`/`NEWS`/`MARKETS`/…), `/` + 1–7 + `?` shortcuts, boot animation
+- [x] **Persona lenses** — Buffett/Graham/Lynch/Burry "Investor takes" on Analyze
+- [x] **DCF + Sharpe/VaR** in the Sizer (`lib/calc.ts`, tested)
+- [x] **Tests + CI** — Vitest suite + GitHub Actions
+
+Open ideas (need a decision/key): more data connectors (World Bank/IMF, sector & crypto movers), sub-daily sweep (Vercel Pro), custom SMTP for reliable auth emails.
 
 Full spec: [`BACON_BUILD.md`](BACON_BUILD.md).
 
