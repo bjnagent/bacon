@@ -100,6 +100,9 @@ export default function AnalyzeView({ target, onDiscuss }: { target?: { asset: s
   const stances: Partial<Record<LensKey, StanceKey>> = {};
   if (hasBriefing) LENSES.forEach((l) => { stances[l.key] = briefing!.lenses[l.key]?.stance || "mixed"; });
   const lean = hasBriefing ? overallLean(stances) : null;
+  const analysisNotes = hasBriefing && briefing
+    ? [briefing.SUMMARY && `Summary: ${briefing.SUMMARY}`, `Lens leans — ${LENSES.map((l) => `${l.name}: ${briefing.lenses[l.key]?.stance || "mixed"}`).join("; ")}`, briefing.BOTTOMLINE && `Bottom line: ${briefing.BOTTOMLINE}`].filter(Boolean).join("\n")
+    : undefined;
 
   return (
     <div className="pr-view">
@@ -144,7 +147,7 @@ export default function AnalyzeView({ target, onDiscuss }: { target?: { asset: s
               <div className="pr-readout-leannote">synthesis of the six stances — not a rating or signal</div>
             </div>
             <TVLink sym={analyzed} square />
-            <button className="pr-readout-discuss" onClick={() => onDiscuss({ kind: "asset", asset: analyzed, cls: assetClass, title: analyzed.toUpperCase(), sub: "six-lens analysis" })} title="Discuss this asset"><MessageCircle size={16} /></button>
+            <button className="pr-readout-discuss" onClick={() => onDiscuss({ kind: "asset", asset: analyzed, cls: assetClass, title: analyzed.toUpperCase(), sub: "six-lens analysis", notes: analysisNotes })} title="Discuss this asset"><MessageCircle size={16} /></button>
             <button className={`pr-readout-save ${saved ? "is-saved" : ""}`} onClick={save} disabled={saved} title={saved ? "On radar" : "Track on radar"}><Bookmark size={16} /></button>
           </div>
 

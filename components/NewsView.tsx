@@ -113,7 +113,7 @@ export default function NewsView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { as
                       ) : (
                         <span className="pr-news-macro">macro / no single ticker</span>
                       )}
-                      <button className="pr-news-discuss" onClick={() => onDiscuss({ kind: "news", headline: n.head, ticker: hasTk ? n.ticker : undefined, cls: n.cls, title: hasTk ? n.ticker : "Headline", sub: "news item" })} title="Discuss this headline"><MessageCircle size={13} /></button>
+                      <button className="pr-news-discuss" onClick={() => onDiscuss({ kind: "news", headline: n.head, ticker: hasTk ? n.ticker : undefined, cls: n.cls, title: hasTk ? n.ticker : "Headline", sub: "news item", notes: n.why ? `Why it matters: ${n.why}` : undefined })} title="Discuss this headline"><MessageCircle size={13} /></button>
                     </div>
                   </div>
                 );

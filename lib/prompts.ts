@@ -17,6 +17,7 @@ export interface ChatContext {
   ticker?: string;
   title?: string;
   sub?: string;
+  notes?: string; // grounding from what the user is viewing (e.g. the lens read)
 }
 
 export function analysisPrompt(): string {
@@ -184,7 +185,8 @@ export function chatSystemPrompt(ctx: ChatContext | null): string {
     else if (ctx.kind === "frameworks") focus = `The user is studying the six analytical lenses (fundamental, technical, factor, macro, smart-money, risk). Help them understand and apply the methodology.`;
     else if (ctx.kind === "sizing") focus = `The user is thinking about position sizing and risk. Reason about sizing, fractional Kelly, correlation and risk budgets — always as math on their own inputs, never a specific bet recommendation.`;
   }
-  return `You are BACON, a sharp, honest research partner for a serious individual investor — like a thoughtful colleague on a multi-strategy desk. You are having a conversation. ${focus}
+  const grounding = ctx?.notes ? `\n\nWhat the user is currently looking at (use it as grounding — build on it, don't just repeat it, and still point them to verify):\n${ctx.notes}` : "";
+  return `You are BACON, a sharp, honest research partner for a serious individual investor — like a thoughtful colleague on a multi-strategy desk. You are having a conversation. ${focus}${grounding}
 
 Principles you never break:
 - You are NOT a financial advisor. Never say "buy" or "sell", never state price targets as fact, never guarantee outcomes. Help the user THINK: surface what each lens looks at, steelman both sides, name what would confirm or break a thesis, and flag what to verify independently.
