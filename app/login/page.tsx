@@ -5,7 +5,7 @@ import BaconMark from "@/components/BaconMark";
 
 export const dynamic = "force-dynamic";
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ sent?: string; error?: string }> }) {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ sent?: string; error?: string; reason?: string }> }) {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (user) redirect("/");
@@ -26,7 +26,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       email,
       options: { emailRedirectTo: `${origin}/api/auth/callback` },
     });
-    redirect(error ? "/login?error=1" : "/login?sent=1");
+    redirect(error ? `/login?error=send&reason=${encodeURIComponent(error.message)}` : "/login?sent=1");
   }
 
   return (
@@ -37,8 +37,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <div className="pr-login-name">BACON</div>
           <div className="pr-login-tag">research radar</div>
           <p className="pr-login-sub">Multi-lens investment research. Convergence builds conviction — never a single indicator.</p>
-          {sp.sent && <p className="pr-login-msg">Check your email for a magic sign-in link.</p>}
-          {sp.error && <p className="pr-login-msg is-err">Couldn&apos;t send the link. Check the address and try again.</p>}
+          {sp.sent && <p className="pr-login-msg">Check your email for a magic sign-in link — open it in this browser.</p>}
+          {sp.error === "auth" && <p className="pr-login-msg is-err">Couldn&apos;t verify that link. Open the most recent link in the same browser you requested it from — older links and other browsers won&apos;t match.{sp.reason ? ` (${sp.reason})` : ""}</p>}
+          {sp.error && sp.error !== "auth" && <p className="pr-login-msg is-err">Couldn&apos;t send the link{sp.reason ? `: ${sp.reason}` : ""}. If you&apos;ve tried several times, you may be hitting Supabase&apos;s email rate limit — wait a minute and retry.</p>}
           <form action={handleLogin} className="pr-login-form">
             <input name="email" type="email" required placeholder="your@email.com" autoComplete="email" className="pr-login-input" />
             <button type="submit" className="pr-login-btn">Send magic link</button>
