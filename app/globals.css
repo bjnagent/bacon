@@ -523,3 +523,16 @@ body { background: #EBE8E0; color: #1A1712; }
 .pr-macro-val{font-family:var(--fm);font-weight:600;font-size:15px;color:var(--ink)}
 .pr-macro-chg{font-family:var(--fm);font-size:9.5px;color:var(--muted2)}
 .pr-macro-foot{font-family:var(--fm);font-size:9px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.05em;margin-top:10px}
+
+/* Account tab */
+.pr-acct-field{display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--line2);border-radius:8px;padding:13px 16px;max-width:480px}
+.pr-acct-label{font-family:var(--fm);font-size:9.5px;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted2)}
+.pr-acct-val{font-family:var(--fm);font-size:14px;color:var(--ink)}
+.pr-acct-form{display:flex;flex-direction:column;gap:11px;max-width:360px;margin-top:14px}
+.pr-acct-input{width:100%;background:var(--paper2);border:1px solid var(--line2);border-radius:8px;color:var(--ink);font-family:var(--fm);font-size:14px;padding:11px 14px;outline:none}
+.pr-acct-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(238,67,16,0.14)}
+.pr-acct-input::placeholder{color:var(--muted2)}
+.pr-acct-msg{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;margin-top:2px}
+.pr-acct-msg.is-ok{color:var(--good)}
+.pr-acct-msg.is-err{color:var(--bad)}
+.pr-acct-note{font-size:12px;color:var(--muted);margin-top:14px;line-height:1.6;max-width:420px}

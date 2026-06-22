@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search, Newspaper, Radar as RadarIcon, BookOpen, Calculator, LogOut, type LucideIcon } from "lucide-react";
+import { Search, Newspaper, Radar as RadarIcon, BookOpen, Calculator, LogOut, User, type LucideIcon } from "lucide-react";
 import BaconMark from "./BaconMark";
 import AnalyzeView from "./AnalyzeView";
 import RadarView from "./RadarView";
+import AccountView from "./AccountView";
 
-type ViewKey = "radar" | "news" | "analyze" | "frameworks" | "sizer";
+type ViewKey = "radar" | "news" | "analyze" | "frameworks" | "sizer" | "account";
 
 const NAV: { key: ViewKey; label: string; Icon: LucideIcon }[] = [
   { key: "radar", label: "Radar", Icon: RadarIcon },
@@ -14,6 +15,7 @@ const NAV: { key: ViewKey; label: string; Icon: LucideIcon }[] = [
   { key: "analyze", label: "Analyze", Icon: Search },
   { key: "frameworks", label: "Frameworks", Icon: BookOpen },
   { key: "sizer", label: "Sizer", Icon: Calculator },
+  { key: "account", label: "Account", Icon: User },
 ];
 
 const PLACEHOLDERS: Record<"news" | "frameworks" | "sizer", { title: string; sub: string }> = {
@@ -100,6 +102,8 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
               <RadarView onAnalyze={openAnalyze} />
             ) : active === "analyze" ? (
               <AnalyzeView target={analyzeTarget} />
+            ) : active === "account" ? (
+              <AccountView email={userEmail} />
             ) : (
               <div className="pr-placeholder">
                 <BaconMark size={64} />
