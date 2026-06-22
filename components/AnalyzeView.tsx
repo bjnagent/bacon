@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Loader2, ArrowRight, ArrowUpRight, AlertTriangle, Scale, LayoutGrid, Bookmark, MessageCircle } from "lucide-react";
-import { LENSES, STANCES, ASSET_CLASSES, overallLean, type LensKey, type StanceKey } from "@/lib/lenses";
+import { Loader2, ArrowRight, ArrowUpRight, AlertTriangle, Scale, LayoutGrid, Bookmark, MessageCircle, Users } from "lucide-react";
+import { LENSES, STANCES, ASSET_CLASSES, PERSONAS, overallLean, type LensKey, type StanceKey } from "@/lib/lenses";
 import { toPoints, type Briefing, type Debate } from "@/lib/parsers";
 import type { ChatContext } from "@/lib/prompts";
 import Spectrum from "./Spectrum";
@@ -22,11 +22,14 @@ export default function AnalyzeView({ target, onDiscuss }: { target?: { asset: s
   const [rawFallback, setRawFallback] = useState<string | null>(null);
   const [analyzed, setAnalyzed] = useState("");
   const [ranAt, setRanAt] = useState("");
-  const [subView, setSubView] = useState<"lenses" | "debate">("lenses");
+  const [subView, setSubView] = useState<"lenses" | "debate" | "personas">("lenses");
   const [saved, setSaved] = useState(false);
   const [debate, setDebate] = useState<Debate | null>(null);
   const [debateLoading, setDebateLoading] = useState(false);
   const [debateError, setDebateError] = useState<string | null>(null);
+  const [personas, setPersonas] = useState<Record<string, string> | null>(null);
+  const [personasLoading, setPersonasLoading] = useState(false);
+  const [personasError, setPersonasError] = useState<string | null>(null);
   const prevToken = useRef(0);
 
   const run = async (assetArg?: string, clsArg?: string) => {
@@ -34,7 +37,7 @@ export default function AnalyzeView({ target, onDiscuss }: { target?: { asset: s
     const klass = clsArg ?? assetClass;
     if (!asset || loading) return;
     setLoading(true); setError(null); setBriefing(null); setRawFallback(null);
-    setSaved(false); setSubView("lenses"); setDebate(null); setDebateError(null);
+    setSaved(false); setSubView("lenses"); setDebate(null); setDebateError(null); setPersonas(null); setPersonasError(null);
     try {
       const res = await fetch("/api/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ asset, assetClass: klass }) });
       const data = await res.json();
@@ -59,6 +62,19 @@ export default function AnalyzeView({ target, onDiscuss }: { target?: { asset: s
       setDebate(data.debate as Debate);
     } catch (err) { setDebateError(err instanceof Error ? err.message : "Something went wrong"); }
     finally { setDebateLoading(false); }
+  };
+
+  const openPersonas = async () => {
+    setSubView("personas");
+    if (personas || personasLoading || !analyzed) return;
+    setPersonasLoading(true); setPersonasError(null);
+    try {
+      const res = await fetch("/api/personas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ asset: analyzed, assetClass }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+      setPersonas(data.personas as Record<string, string>);
+    } catch (err) { setPersonasError(err instanceof Error ? err.message : "Something went wrong"); }
+    finally { setPersonasLoading(false); }
   };
 
   const save = async () => {
@@ -137,6 +153,7 @@ export default function AnalyzeView({ target, onDiscuss }: { target?: { asset: s
           <div className="pr-subnav">
             <button className={`pr-subnav-btn ${subView === "lenses" ? "is-active" : ""}`} onClick={() => setSubView("lenses")}><LayoutGrid size={14} /> Lens cockpit</button>
             <button className={`pr-subnav-btn ${subView === "debate" ? "is-active" : ""}`} onClick={openDebate}><Scale size={14} /> Bull vs Bear</button>
+            <button className={`pr-subnav-btn ${subView === "personas" ? "is-active" : ""}`} onClick={openPersonas}><Users size={14} /> Investor takes</button>
           </div>
 
           {subView === "lenses" && (
@@ -189,6 +206,29 @@ export default function AnalyzeView({ target, onDiscuss }: { target?: { asset: s
                   </div>
                   {debate.SYNTHESIS && <div className="pr-bottomline"><div className="pr-bottomline-label">Where it hinges</div>{debate.SYNTHESIS}</div>}
                   <div className="pr-disclaimer">This steelmans both sides from public information to expose the real disagreement. It is not a recommendation — a convincing argument is not the same as a correct one.</div>
+                </>
+              )}
+            </div>
+          )}
+
+          {subView === "personas" && (
+            <div className="pr-debate">
+              {personasLoading && <div className="pr-loading"><div className="pr-loading-text"><Loader2 size={16} className="pr-spin" style={{ verticalAlign: "-3px", marginRight: 8 }} />Reading the asset through four investor disciplines…</div></div>}
+              {personasError && <div className="pr-error"><AlertTriangle size={18} /><div><strong>Couldn&apos;t run the takes.</strong><div className="pr-error-detail">{personasError}. Try again.</div></div></div>}
+              {personas && (
+                <>
+                  <div className="pr-grid">
+                    {PERSONAS.map((p) => (
+                      <div key={p.key} className="pr-panel" style={{ "--h": p.hue } as React.CSSProperties}>
+                        <div className="pr-panel-top">
+                          <span className="pr-panel-name" style={{ color: p.hue }}>{p.name}</span>
+                          <span className="pr-panel-stance" style={{ color: p.hue, borderColor: p.hue }}>{p.lens}</span>
+                        </div>
+                        <p className="pr-panel-body">{personas[p.key] || "No read returned."}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="pr-disclaimer">Stylized analytical lenses in the spirit of well-known disciplines — not the actual views of any person, and not advice. Steelman each, then verify independently.</div>
                 </>
               )}
             </div>

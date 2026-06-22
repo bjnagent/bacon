@@ -89,6 +89,16 @@ export function relTime(iso: string | null | undefined): string | null {
 
 export const PHILOSOPHY = "No serious desk relies on one method. They build a latticework — independent lenses that, when they agree, create conviction. Convergence across lenses is the signal; a single lens rarely is. And every public edge decays as it gets crowded, so process and risk control matter more than any one indicator.";
 
+// Stylized investor disciplines (NOT impersonations of the real people) — a
+// spread of philosophies to pressure-test an idea from different angles.
+export interface Persona { key: string; name: string; lens: string; hue: string }
+export const PERSONAS: Persona[] = [
+  { key: "BUFFETT", name: "Buffett-style", lens: "Quality & moat, fair price", hue: "#E0A33E" },
+  { key: "GRAHAM",  name: "Graham-style",  lens: "Deep value, margin of safety", hue: "#5FB97E" },
+  { key: "LYNCH",   name: "Lynch-style",   lens: "Growth you understand (GARP)", hue: "#38B6C4" },
+  { key: "BURRY",   name: "Burry-style",   lens: "Contrarian — what breaks it", hue: "#E2685C" },
+];
+
 export interface Framework {
   key: LensKey;
   name: string;
