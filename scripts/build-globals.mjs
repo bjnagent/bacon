@@ -67,6 +67,16 @@ const login = `
 /* Radar fresh-finds extras (auto-sweep movers) */
 .pr-pick-move{font-family:var(--fm);font-size:11px;font-weight:600;color:var(--good);background:rgba(30,142,76,0.1);border:1px solid rgba(30,142,76,0.3);padding:2px 7px;border-radius:3px}
 .pr-pick-src{font-family:var(--fm);font-size:9.5px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:10px}
+
+/* Macro backdrop strip (real FRED indicators) */
+.pr-macro{background:var(--card);border:1px solid var(--line2);border-radius:9px;padding:13px 16px;margin-bottom:22px}
+.pr-macro-head{font-family:var(--fm);font-size:9.5px;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted2);margin-bottom:10px}
+.pr-macro-strip{display:flex;flex-wrap:wrap;gap:9px}
+.pr-macro-item{display:flex;flex-direction:column;gap:2px;background:var(--paper2);border:1px solid var(--line);border-radius:6px;padding:8px 12px;min-width:92px}
+.pr-macro-lbl{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted)}
+.pr-macro-val{font-family:var(--fm);font-weight:600;font-size:15px;color:var(--ink)}
+.pr-macro-chg{font-family:var(--fm);font-size:9.5px;color:var(--muted2)}
+.pr-macro-foot{font-family:var(--fm);font-size:9px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.05em;margin-top:10px}
 `;
 
 const out = (importLine ? importLine + "\n\n" : "") + base + css + login;

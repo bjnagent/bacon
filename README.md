@@ -25,6 +25,7 @@ Multi-asset investment research through six independent professional lenses — 
 - **Radar (Phase 2 slice, home view):** a Scout + Tracking dashboard. **Tracking** lists your names with qualitative monitoring updates (`/api/track-update`) and editable thesis / conviction / note — all persisted to `watchlist`. **Scout** runs `/api/scout` on your saved `themes` to surface timely candidates; track a pick or jump straight into its lenses.
 - **Analyze (Phase 2 slice):** run any asset through the six-lens cockpit. Calls `/api/analyze` → live web search → parsed briefing with per-lens stances, a convergence gauge, summary + bottom line. **Bull vs Bear** runs `/api/debate`. **Save to radar** persists to `watchlist`.
 - **Background Sweep (auto-scout):** a daily Vercel Cron (`/api/cron/sweep`) that, per user who's enabled it, surfaces a **"fresh finds"** feed — **today's real top movers** (via a market-data provider, the one place real numbers are allowed) enriched with a qualitative "why it's moving / verify" read, plus theme-scout matches — and refreshes tracked names. Toggle it on the Radar; new finds are waiting when you return. No fabricated prices: the % move is attributed to the provider, the rest is grounded by web search.
+- **Macro backdrop (real data):** the Radar home opens with a strip of live macro indicators — Fed funds, 10Y/2Y, the 10Y–2Y curve, CPI YoY, unemployment, VIX — from **FRED** (`/api/macro`, cached). The same snapshot is fed into the Analyze **Macro lens** so it reasons against real rates/inflation, not guesses. Real numbers, attributed; neutral direction arrows (no buy/sell signal).
 - **Health:** `/api/health` probes Anthropic server-side and returns `{ ok, model }`.
 - **News / Frameworks / Sizer:** present as placeholders in the shell; ported in later slices.
 
@@ -68,6 +69,10 @@ SUPABASE_SERVICE_ROLE_KEY=eyJ...       # SERVER ONLY — never expose
 # alphavantage.co/support). Optional: without it the sweep still runs the
 # qualitative theme scout.
 MARKET_DATA_API_KEY=...
+
+# Macro backdrop — FRED (free key at fredaccount.stlouisfed.org/apikeys).
+# Optional: the macro strip hides itself if unset.
+FRED_API_KEY=...
 
 # App
 NEXT_PUBLIC_SITE_URL=http://localhost:3000   # set to the Vercel URL in prod
@@ -147,6 +152,7 @@ Feature port from [`reference/bacon-artifact.jsx`](reference/bacon-artifact.jsx)
 - [ ] **Discuss** — streaming chat (`/api/chat`, `chat_messages`, `ChatPanel`)
 - [ ] **Sizer + Frameworks** — mostly static ports (`FRAMEWORKS` data already in `lib/lenses.ts`)
 - [ ] **TradingView widgets** — embed Advanced Chart + Mini Symbol; keep attribution; keep `TVLink` fallback
+- [x] **Real data layer** — Alpha Vantage movers (`lib/market.ts`) + FRED macro (`lib/macro.ts`, `/api/macro`, `MacroBackdrop`). _Next connectors (own code, public APIs):_ World Bank / IMF macro, sector movers, crypto movers.
 - [ ] **News** auto-refresh into the sweep (paraphrased headlines → `news_items`)
 - [ ] **Command line + boot screen** — nice-to-have, port last
 
