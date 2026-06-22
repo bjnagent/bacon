@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Search, Newspaper, Radar as RadarIcon, BookOpen, Calculator, LogOut, type LucideIcon } from "lucide-react";
 import BaconMark from "./BaconMark";
 import AnalyzeView from "./AnalyzeView";
+import RadarView from "./RadarView";
 
 type ViewKey = "radar" | "news" | "analyze" | "frameworks" | "sizer";
 
@@ -15,8 +16,7 @@ const NAV: { key: ViewKey; label: string; Icon: LucideIcon }[] = [
   { key: "sizer", label: "Sizer", Icon: Calculator },
 ];
 
-const PLACEHOLDERS: Record<Exclude<ViewKey, "analyze">, { title: string; sub: string }> = {
-  radar: { title: "Radar — Scout & Tracking", sub: "Auto-scout fresh ideas by theme and watch how each name's story evolves. Coming in the next Phase 2 slice; persists to your Supabase watchlist + themes." },
+const PLACEHOLDERS: Record<"news" | "frameworks" | "sizer", { title: string; sub: string }> = {
   news: { title: "News", sub: "Paraphrased, attributed business headlines as signals — never an outlet's exact words. Coming in a later Phase 2 slice." },
   frameworks: { title: "Frameworks — the latticework", sub: "A reference for the six lenses: playbooks, terms, and caveats. A straight static port, coming next." },
   sizer: { title: "Sizer", sub: "Position sizing and fractional-Kelly math on your own inputs — never a specific bet. Coming in a later Phase 2 slice." },
@@ -56,8 +56,14 @@ function StatusBar({ module }: { module: string }) {
 }
 
 export default function AppShell({ userEmail }: { userEmail: string }) {
-  const [active, setActive] = useState<ViewKey>("analyze");
+  const [active, setActive] = useState<ViewKey>("radar");
+  const [analyzeTarget, setAnalyzeTarget] = useState<{ asset: string; cls: string; token: number } | undefined>(undefined);
   const activeLabel = NAV.find((n) => n.key === active)!.label;
+
+  const openAnalyze = (t: { asset: string; cls: string }) => {
+    setAnalyzeTarget({ ...t, token: Date.now() });
+    setActive("analyze");
+  };
 
   return (
     <div className="pr-app">
@@ -90,13 +96,15 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
         <main className="pr-main">
           <div className="pr-head"><StatusBar module={`MODULE · ${activeLabel}`} /></div>
           <div className="pr-canvas">
-            {active === "analyze" ? (
-              <AnalyzeView />
+            {active === "radar" ? (
+              <RadarView onAnalyze={openAnalyze} />
+            ) : active === "analyze" ? (
+              <AnalyzeView target={analyzeTarget} />
             ) : (
               <div className="pr-placeholder">
                 <BaconMark size={64} />
-                <div className="pr-placeholder-title">{PLACEHOLDERS[active].title}</div>
-                <div className="pr-placeholder-sub">{PLACEHOLDERS[active].sub}</div>
+                <div className="pr-placeholder-title">{PLACEHOLDERS[active as keyof typeof PLACEHOLDERS].title}</div>
+                <div className="pr-placeholder-sub">{PLACEHOLDERS[active as keyof typeof PLACEHOLDERS].sub}</div>
               </div>
             )}
           </div>

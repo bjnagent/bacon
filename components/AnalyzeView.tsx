@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Loader2, ArrowRight, ArrowUpRight, AlertTriangle, Scale, LayoutGrid, Bookmark } from "lucide-react";
 import { LENSES, STANCES, ASSET_CLASSES, overallLean, type LensKey, type StanceKey } from "@/lib/lenses";
 import { toPoints, type Briefing, type Debate } from "@/lib/parsers";
@@ -11,7 +11,7 @@ import TVLink from "./TVLink";
 // Six-lens cockpit + convergence gauge + Bull/Bear debate. Ported from the
 // artifact's AnalyzeView; the in-browser Anthropic calls are replaced by our
 // server routes (/api/analyze, /api/debate) and "save" persists to Supabase.
-export default function AnalyzeView() {
+export default function AnalyzeView({ target }: { target?: { asset: string; cls: string; token: number } }) {
   const [query, setQuery] = useState("");
   const [assetClass, setAssetClass] = useState(ASSET_CLASSES[0]);
   const [loading, setLoading] = useState(false);
@@ -25,10 +25,11 @@ export default function AnalyzeView() {
   const [debate, setDebate] = useState<Debate | null>(null);
   const [debateLoading, setDebateLoading] = useState(false);
   const [debateError, setDebateError] = useState<string | null>(null);
+  const prevToken = useRef(0);
 
-  const run = async () => {
-    const asset = query.trim();
-    const klass = assetClass;
+  const run = async (assetArg?: string, clsArg?: string) => {
+    const asset = (assetArg ?? query).trim();
+    const klass = clsArg ?? assetClass;
     if (!asset || loading) return;
     setLoading(true); setError(null); setBriefing(null); setRawFallback(null);
     setSaved(false); setSubView("lenses"); setDebate(null); setDebateError(null);
@@ -65,6 +66,17 @@ export default function AnalyzeView() {
       if (res.ok) setSaved(true);
     } catch { /* leave unsaved; user can retry */ }
   };
+
+  // When opened from Radar/Scout with a target, auto-run that asset. setState is
+  // deferred into a timeout so it doesn't fire synchronously inside the effect.
+  useEffect(() => {
+    if (!target?.token || target.token === prevToken.current) return;
+    prevToken.current = target.token;
+    const asset = target.asset, cls = target.cls;
+    const id = setTimeout(() => { setQuery(asset); setAssetClass(cls); run(asset, cls); }, 0);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target?.token]);
 
   const hasBriefing = !!briefing;
   const stances: Partial<Record<LensKey, StanceKey>> = {};
