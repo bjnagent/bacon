@@ -21,6 +21,8 @@ export default function ChatPanel({ open, context, onClose }: { open: boolean; c
   const [text, setText] = useState("");
   const [conversationId, setConversationId] = useState(() => crypto.randomUUID());
   const endRef = useRef<HTMLDivElement>(null);
+  const taRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => { if (open) taRef.current?.focus(); }, [open]);
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [messages, loading]);
   useEffect(() => {
@@ -102,7 +104,7 @@ export default function ChatPanel({ open, context, onClose }: { open: boolean; c
           <div ref={endRef} />
         </div>
         <div className="pr-chat-input">
-          <textarea value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(text); } }} placeholder="Ask about what you're viewing…" rows={1} aria-label="Chat message" />
+          <textarea ref={taRef} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(text); } }} placeholder="Ask about what you're viewing…" rows={1} aria-label="Chat message" />
           <button onClick={() => send(text)} disabled={!text.trim() || loading} className="pr-chat-send" aria-label="Send"><ArrowRight size={16} /></button>
         </div>
         <div className="pr-chat-foot">Live web search · qualitative · not financial advice</div>

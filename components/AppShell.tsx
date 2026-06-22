@@ -153,7 +153,7 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
           </div>
           <div className="pr-railnav">
             {NAV.map((n, i) => (
-              <button key={n.key} className={`pr-railbtn ${active === n.key ? "is-active" : ""}`} onClick={() => setActive(n.key)}>
+              <button key={n.key} className={`pr-railbtn ${active === n.key ? "is-active" : ""}`} aria-current={active === n.key ? "page" : undefined} onClick={() => setActive(n.key)}>
                 <span className="pr-railidx">{String(i + 1).padStart(2, "0")}</span>
                 <n.Icon size={17} />
                 <span className="lbl">{n.label}</span>
