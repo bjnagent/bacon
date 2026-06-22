@@ -11,23 +11,60 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   if (user) redirect("/");
   const sp = await searchParams;
 
-  async function handleLogin(formData: FormData) {
+  async function originFromHeaders() {
     "use server";
-    const email = String(formData.get("email") || "").trim();
-    // Prefer an explicit canonical URL, but fall back to the actual request host
-    // so magic links work on whatever domain serves the app — even if
-    // NEXT_PUBLIC_SITE_URL isn't set on the deployment.
     const h = await headers();
     const host = h.get("x-forwarded-host") ?? h.get("host");
     const proto = h.get("x-forwarded-proto") ?? "https";
-    const origin = process.env.NEXT_PUBLIC_SITE_URL || (host ? `${proto}://${host}` : "");
+    return process.env.NEXT_PUBLIC_SITE_URL || (host ? `${proto}://${host}` : "");
+  }
+
+  async function signIn(formData: FormData) {
+    "use server";
+    const email = String(formData.get("email") || "").trim();
+    const password = String(formData.get("password") || "");
+    if (!email || !password) redirect("/login?error=signin&reason=Enter%20your%20email%20and%20password");
+    const sb = await createClient();
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) redirect(`/login?error=signin&reason=${encodeURIComponent(error.message)}`);
+    redirect("/");
+  }
+
+  async function signUp(formData: FormData) {
+    "use server";
+    const email = String(formData.get("email") || "").trim();
+    const password = String(formData.get("password") || "");
+    if (!email || password.length < 6) redirect("/login?error=signup&reason=Use%20a%20password%20of%20at%20least%206%20characters");
+    const sb = await createClient();
+    const { data, error } = await sb.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: `${await originFromHeaders()}/api/auth/callback` },
+    });
+    if (error) redirect(`/login?error=signup&reason=${encodeURIComponent(error.message)}`);
+    if (data.session) redirect("/");        // email confirmation disabled → signed straight in
+    redirect("/login?sent=confirm");        // confirmation email sent
+  }
+
+  async function magicLink(formData: FormData) {
+    "use server";
+    const email = String(formData.get("email") || "").trim();
+    if (!email) redirect("/login?error=send&reason=Enter%20your%20email");
     const sb = await createClient();
     const { error } = await sb.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: `${origin}/api/auth/callback` },
+      options: { emailRedirectTo: `${await originFromHeaders()}/api/auth/callback` },
     });
     redirect(error ? `/login?error=send&reason=${encodeURIComponent(error.message)}` : "/login?sent=1");
   }
+
+  let msg: { cls: string; text: string } | null = null;
+  if (sp.sent === "1") msg = { cls: "", text: "Check your email for a magic sign-in link — open it in this browser." };
+  else if (sp.sent === "confirm") msg = { cls: "", text: "Account created. If email confirmation is on in Supabase, confirm via the email, then sign in — otherwise just sign in now." };
+  else if (sp.error === "signin") msg = { cls: "is-err", text: `Couldn't sign in${sp.reason ? `: ${sp.reason}` : ""}.` };
+  else if (sp.error === "signup") msg = { cls: "is-err", text: `Couldn't create the account${sp.reason ? `: ${sp.reason}` : ""}.` };
+  else if (sp.error === "auth") msg = { cls: "is-err", text: `Couldn't verify that link${sp.reason ? `: ${sp.reason}` : ""}. Open the most recent link in the same browser.` };
+  else if (sp.error) msg = { cls: "is-err", text: `Couldn't send the link${sp.reason ? `: ${sp.reason}` : ""}.` };
 
   return (
     <div className="pr-app">
@@ -37,12 +74,13 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <div className="pr-login-name">BACON</div>
           <div className="pr-login-tag">research radar</div>
           <p className="pr-login-sub">Multi-lens investment research. Convergence builds conviction — never a single indicator.</p>
-          {sp.sent && <p className="pr-login-msg">Check your email for a magic sign-in link — open it in this browser.</p>}
-          {sp.error === "auth" && <p className="pr-login-msg is-err">Couldn&apos;t verify that link. Open the most recent link in the same browser you requested it from — older links and other browsers won&apos;t match.{sp.reason ? ` (${sp.reason})` : ""}</p>}
-          {sp.error && sp.error !== "auth" && <p className="pr-login-msg is-err">Couldn&apos;t send the link{sp.reason ? `: ${sp.reason}` : ""}. If you&apos;ve tried several times, you may be hitting Supabase&apos;s email rate limit — wait a minute and retry.</p>}
-          <form action={handleLogin} className="pr-login-form">
+          {msg && <p className={`pr-login-msg ${msg.cls}`}>{msg.text}</p>}
+          <form className="pr-login-form">
             <input name="email" type="email" required placeholder="your@email.com" autoComplete="email" className="pr-login-input" />
-            <button type="submit" className="pr-login-btn">Send magic link</button>
+            <input name="password" type="password" minLength={6} placeholder="password (6+ characters)" autoComplete="current-password" className="pr-login-input" />
+            <button type="submit" formAction={signIn} className="pr-login-btn">Sign in</button>
+            <button type="submit" formAction={signUp} className="pr-login-btn pr-login-btn-alt">Create account</button>
+            <button type="submit" formAction={magicLink} className="pr-login-link">Email me a magic link instead</button>
           </form>
           <p className="pr-login-note">Verify yourself · Not financial advice</p>
         </div>

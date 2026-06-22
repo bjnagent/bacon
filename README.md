@@ -20,7 +20,7 @@ Multi-asset investment research through six independent professional lenses — 
 
 ## What works today
 
-- **Auth:** Supabase magic-link login → session → protected app shell. Session refresh + route protection in `proxy.ts` (Next 16's renamed middleware).
+- **Auth:** Supabase **email + password** (sign in / create account) with **magic-link** as a fallback → session → protected app shell. Session refresh + route protection in `proxy.ts` (Next 16's renamed middleware). Password sign-up is instant when "Confirm email" is off in Supabase.
 - **Shell:** the full "Bacon look" — left rail nav, status bar, six-lens spectrum, bacon-rasher logo.
 - **Radar (Phase 2 slice, home view):** a Scout + Tracking dashboard. **Tracking** lists your names with qualitative monitoring updates (`/api/track-update`) and editable thesis / conviction / note — all persisted to `watchlist`. **Scout** runs `/api/scout` on your saved `themes` to surface timely candidates; track a pick or jump straight into its lenses.
 - **Analyze (Phase 2 slice):** run any asset through the six-lens cockpit. Calls `/api/analyze` → live web search → parsed briefing with per-lens stances, a convergence gauge, summary + bottom line. **Bull vs Bear** runs `/api/debate`. **Save to radar** persists to `watchlist`.
