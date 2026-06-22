@@ -15,9 +15,9 @@ export async function POST(req: Request) {
 
   let body: { id?: string; symbol?: string; assetClass?: string };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Bad request" }, { status: 400 }); }
-  const id = String(body.id || "").trim();
-  const symbol = String(body.symbol || "").trim();
-  const assetClass = String(body.assetClass || "").trim();
+  const id = String(body.id || "").trim().slice(0, 64);
+  const symbol = String(body.symbol || "").trim().slice(0, 120);
+  const assetClass = String(body.assetClass || "").trim().slice(0, 60);
   if (!id || !symbol) return NextResponse.json({ error: "Missing id or symbol" }, { status: 400 });
 
   try {

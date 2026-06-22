@@ -19,7 +19,7 @@ export async function POST(req: Request) {
 
   let body: { label?: string };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Bad request" }, { status: 400 }); }
-  const label = String(body.label || "").trim();
+  const label = String(body.label || "").trim().slice(0, 80);
   if (!label) return NextResponse.json({ error: "Missing label" }, { status: 400 });
 
   // Skip case-insensitive duplicates for this user.

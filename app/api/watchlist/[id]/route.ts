@@ -13,8 +13,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Bad request" }, { status: 400 }); }
 
   const patch: Record<string, string | number> = {};
-  if (typeof body.thesis === "string") patch.thesis = body.thesis;
-  if (typeof body.note === "string") patch.note = body.note;
+  if (typeof body.thesis === "string") patch.thesis = body.thesis.slice(0, 2000);
+  if (typeof body.note === "string") patch.note = body.note.slice(0, 500);
   if (typeof body.conviction === "number") patch.conviction = Math.max(0, Math.min(5, Math.round(body.conviction)));
   if (Object.keys(patch).length === 0) return NextResponse.json({ error: "No editable fields" }, { status: 400 });
 

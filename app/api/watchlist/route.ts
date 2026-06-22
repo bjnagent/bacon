@@ -21,7 +21,7 @@ export async function POST(req: Request) {
 
   let body: { symbol?: string; asset_class?: string };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Bad request" }, { status: 400 }); }
-  const symbol = String(body.symbol || "").trim().toUpperCase();
+  const symbol = String(body.symbol || "").trim().toUpperCase().slice(0, 40);
   if (!symbol) return NextResponse.json({ error: "Missing symbol" }, { status: 400 });
   const asset_class = mapClass(body.asset_class);
 

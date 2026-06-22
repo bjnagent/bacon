@@ -26,8 +26,8 @@ export async function POST(req: Request) {
 
   let body: { source?: string; focus?: string };
   try { body = await req.json(); } catch { body = {}; }
-  const source = String(body.source || "All");
-  const focus = String(body.focus || "").trim();
+  const source = String(body.source || "All").slice(0, 60);
+  const focus = String(body.focus || "").trim().slice(0, 200);
 
   try {
     const text = await ask(

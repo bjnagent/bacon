@@ -27,7 +27,7 @@ export async function POST(req: Request) {
 
   let body: { themes?: string[] };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Bad request" }, { status: 400 }); }
-  const themes = Array.isArray(body.themes) ? body.themes.map((t) => String(t)).filter(Boolean) : [];
+  const themes = Array.isArray(body.themes) ? body.themes.map((t) => String(t).slice(0, 80)).filter(Boolean).slice(0, 20) : [];
 
   try {
     const text = await ask(

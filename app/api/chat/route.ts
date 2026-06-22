@@ -13,7 +13,10 @@ export async function POST(req: Request) {
 
   let body: { messages?: { role: "user" | "assistant"; content: string }[]; context?: ChatContext | null; conversationId?: string };
   try { body = await req.json(); } catch { return new Response("Bad request", { status: 400 }); }
-  const messages = Array.isArray(body.messages) ? body.messages : [];
+  // Clamp to recent turns and cap each message to keep prompts bounded.
+  const messages = (Array.isArray(body.messages) ? body.messages : [])
+    .slice(-24)
+    .map((m) => ({ role: m.role === "assistant" ? ("assistant" as const) : ("user" as const), content: String(m.content).slice(0, 6000) }));
   const context = body.context ?? null;
   const conversationId = body.conversationId || crypto.randomUUID();
   if (!messages.length) return new Response("No messages", { status: 400 });
