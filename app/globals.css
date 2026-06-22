@@ -505,3 +505,7 @@ body { background: #EBE8E0; color: #1A1712; }
 .pr-placeholder-title{font-family:var(--fd);font-weight:700;font-size:22px;color:var(--ink)}
 .pr-placeholder-sub{font-size:13.5px;line-height:1.65;max-width:440px;color:var(--muted)}
 .pr-placeholder .pr-prism{opacity:0.9}
+
+/* Radar fresh-finds extras (auto-sweep movers) */
+.pr-pick-move{font-family:var(--fm);font-size:11px;font-weight:600;color:var(--good);background:rgba(30,142,76,0.1);border:1px solid rgba(30,142,76,0.3);padding:2px 7px;border-radius:3px}
+.pr-pick-src{font-family:var(--fm);font-size:9.5px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:10px}

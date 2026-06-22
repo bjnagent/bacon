@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2, RefreshCw, Radar as RadarIcon, Compass, Plus, X, Trash2, ChevronRight, LayoutGrid, AlertTriangle, ArrowRight } from "lucide-react";
 import { ASSET_CLASSES, SUGGESTED_THEMES, STANCES, mapClass, relTime, type StanceKey } from "@/lib/lenses";
-import type { WatchRow, ThemeRow } from "@/lib/types";
+import type { WatchRow, ThemeRow, ScoutPickRow } from "@/lib/types";
 import type { ScoutResult } from "@/lib/parsers";
 import BaconMark from "./BaconMark";
 import TVLink from "./TVLink";
@@ -26,18 +26,26 @@ export default function RadarView({ onAnalyze }: { onAnalyze: (t: { asset: strin
   const [scout, setScout] = useState<ScoutResult | null>(null);
   const [scoutLoading, setScoutLoading] = useState(false);
   const [scoutError, setScoutError] = useState<string | null>(null);
+  const [freshFinds, setFreshFinds] = useState<ScoutPickRow[]>([]);
+  const [autoOn, setAutoOn] = useState(false);
+  const [lastSweepAt, setLastSweepAt] = useState<string | null>(null);
+  const [savingAuto, setSavingAuto] = useState(false);
   const scanRef = useRef<Record<string, boolean>>({});
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [w, t] = await Promise.all([fetch("/api/watchlist"), fetch("/api/themes")]);
-        const wd = await w.json();
-        const td = await t.json();
+        const [w, t, s, st] = await Promise.all([
+          fetch("/api/watchlist"), fetch("/api/themes"), fetch("/api/scout"), fetch("/api/settings"),
+        ]);
+        const wd = await w.json(); const td = await t.json();
+        const sd = await s.json(); const std = await st.json();
         if (cancelled) return;
         if (Array.isArray(wd.items)) setItems(wd.items);
         if (Array.isArray(td.themes)) setThemes(td.themes);
+        if (Array.isArray(sd.picks)) setFreshFinds(sd.picks);
+        if (std.settings) { setAutoOn((std.settings.scout_interval_minutes || 0) > 0); setLastSweepAt(std.settings.last_sweep_at ?? null); }
       } catch { /* leave empty; user can retry actions */ }
     })();
     return () => { cancelled = true; };
@@ -114,6 +122,15 @@ export default function RadarView({ onAnalyze }: { onAnalyze: (t: { asset: strin
       setScout(data.result as ScoutResult);
     } catch (err) { setScoutError(err instanceof Error ? err.message : "Something went wrong"); }
     finally { setScoutLoading(false); }
+  };
+
+  const toggleAuto = async () => {
+    if (savingAuto) return;
+    const next = autoOn ? 0 : 1440; // daily; the cron honors per-user cadence
+    setSavingAuto(true); setAutoOn(!autoOn);
+    try { await fetch("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scout_interval_minutes: next }) }); }
+    catch { setAutoOn(autoOn); }
+    finally { setSavingAuto(false); }
   };
 
   const isTracked = (a: string) => items.some((it) => it.symbol.toUpperCase() === (a || "").toUpperCase());
@@ -207,9 +224,42 @@ export default function RadarView({ onAnalyze }: { onAnalyze: (t: { asset: strin
         <div className="pr-sec-head">
           <h2 className="pr-section-title">Scout</h2>
           <div className="pr-sec-actions">
+            <div className="pr-auto">
+              <span className={`pr-auto-lbl ${autoOn ? "is-on" : ""}`}>{autoOn ? (lastSweepAt ? `● daily · swept ${relTime(lastSweepAt)}` : "● daily auto-sweep on") : "auto-sweep off"}</span>
+              <button className="pr-btn-sm" onClick={toggleAuto} disabled={savingAuto}>{autoOn ? "Turn off" : "Auto-sweep daily"}</button>
+            </div>
             <button className="pr-btn" onClick={runScout} disabled={scoutLoading}>{scoutLoading ? <><Loader2 size={14} className="pr-spin" /> SCOUTING</> : <><RadarIcon size={14} /> SCOUT NOW</>}</button>
           </div>
         </div>
+
+        {freshFinds.length > 0 && (
+          <>
+            <div className="pr-summary">Fresh finds from your last automatic sweep — today&apos;s market movers and theme matches. Momentum decays; verify before acting.</div>
+            <div className="pr-pick-grid">
+              {freshFinds.map((p) => {
+                const sym = (p.symbol && p.symbol !== "—") ? p.symbol : p.name;
+                const tracked = isTracked(sym);
+                return (
+                  <div key={p.id} className="pr-pick">
+                    <div className="pr-pick-head">
+                      <div className="pr-pick-name">{p.name}{p.symbol && p.symbol !== "—" && <span className="pr-pick-ticker">{p.symbol}</span>}{p.kind === "mover" && p.change_pct && <span className="pr-pick-move">▲ {p.change_pct}</span>}</div>
+                      <span className="pr-pick-class">{p.asset_class}</span>
+                    </div>
+                    <div className="pr-pick-why">{p.why}</div>
+                    {p.now_catalyst && <div className="pr-pick-now"><span>NOW ▸</span> {p.now_catalyst}</div>}
+                    {p.check_text && <div className="pr-pick-check"><span>CHECK</span> {p.check_text}</div>}
+                    {p.data_source && <div className="pr-pick-src">% move via {p.data_source} · verify at source</div>}
+                    <div className="pr-pick-actions">
+                      <button className={`pr-pick-track ${tracked ? "is-on" : ""}`} onClick={() => addTracked(sym, mapClass(p.asset_class))} disabled={tracked}>{tracked ? <>✓ Tracking</> : <><Plus size={13} /> Track</>}</button>
+                      <button className="pr-pick-lenses" onClick={() => onAnalyze({ asset: sym, cls: mapClass(p.asset_class) })}>Run lenses <ArrowRight size={13} /></button>
+                      {p.symbol && p.symbol !== "—" && <TVLink sym={p.symbol} label={false} />}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
 
         <div className="pr-scout-themes">
           <span className="pr-scout-lbl">themes</span>

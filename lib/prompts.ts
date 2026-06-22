@@ -2,6 +2,8 @@
 // These strings ARE the product behaviour (honesty + copyright + attribution
 // constraints are baked into the prompts). Keep them in sync with the artifact.
 
+import type { Mover } from "./market";
+
 export type ChatKind = "asset" | "tracked" | "radar" | "news" | "news-feed" | "frameworks" | "sizing" | "general";
 
 export interface ChatContext {
@@ -92,6 +94,31 @@ now: ...
 check: ...
 ===CAVEAT===
 <one line: surfaced from public sources as research starting points, not recommendations; run each through the lenses and verify>`;
+}
+
+export function moversScoutPrompt(movers: Mover[]): string {
+  const list = movers.map((m) => `- ${m.ticker} (${m.changePct} today)`).join("\n");
+  return `You are BACON, a research SCOUT. The names below are among TODAY'S top price gainers; their real percentage move is provided by a market-data provider:
+${list}
+
+For EACH name, use web_search to explain WHY it is moving right now (earnings, news, catalyst) and the first thing to verify. These are momentum-driven STARTING POINTS for the user's own six-lens analysis — NOT recommendations, and momentum decays fast.
+
+CRITICAL: Do NOT invent or estimate any prices, targets, levels or figures. The percentage move is already given; every other claim must be grounded via web_search or omitted. Stay qualitative.
+
+Output ONLY in this exact format:
+===INTRO===
+<one sentence: these are today's notable movers and what to check>
+@@PICK@@
+name: <company name>
+ticker: <ticker>
+class: Equity
+why: <one line: what the company does / why it's notable>
+now: <one line: the catalyst behind today's move, grounded in current reporting>
+check: <one line: the first thing to verify before acting>
+@@PICK@@
+...
+===CAVEAT===
+<one line: surfaced from real movers + public reporting as research starting points, not recommendations; momentum decays — verify and run the lenses>`;
 }
 
 export function trackingUpdatePrompt(): string {

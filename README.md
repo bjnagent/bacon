@@ -1,6 +1,6 @@
 # Bacon — Investment Research Tool
 
-> **Status:** Phase 1 scaffold complete + Phase 2 **Analyze** and **Radar** slices live. See [Phase 2 TODO](#phase-2-todo).
+> **Status:** Phase 1 complete + Phase 2 **Analyze**, **Radar**, and **Background Sweep** (auto-scout) slices live. See [Phase 2 TODO](#phase-2-todo).
 
 Multi-asset investment research through six independent professional lenses — Fundamental, Technical, Factor, Macro/Regulatory, Smart Money/Signals, and Risk. Conviction comes from **convergence** across lenses, never a single indicator.
 
@@ -24,6 +24,7 @@ Multi-asset investment research through six independent professional lenses — 
 - **Shell:** the full "Bacon look" — left rail nav, status bar, six-lens spectrum, bacon-rasher logo.
 - **Radar (Phase 2 slice, home view):** a Scout + Tracking dashboard. **Tracking** lists your names with qualitative monitoring updates (`/api/track-update`) and editable thesis / conviction / note — all persisted to `watchlist`. **Scout** runs `/api/scout` on your saved `themes` to surface timely candidates; track a pick or jump straight into its lenses.
 - **Analyze (Phase 2 slice):** run any asset through the six-lens cockpit. Calls `/api/analyze` → live web search → parsed briefing with per-lens stances, a convergence gauge, summary + bottom line. **Bull vs Bear** runs `/api/debate`. **Save to radar** persists to `watchlist`.
+- **Background Sweep (auto-scout):** a daily Vercel Cron (`/api/cron/sweep`) that, per user who's enabled it, surfaces a **"fresh finds"** feed — **today's real top movers** (via a market-data provider, the one place real numbers are allowed) enriched with a qualitative "why it's moving / verify" read, plus theme-scout matches — and refreshes tracked names. Toggle it on the Radar; new finds are waiting when you return. No fabricated prices: the % move is attributed to the provider, the rest is grounded by web search.
 - **Health:** `/api/health` probes Anthropic server-side and returns `{ ok, model }`.
 - **News / Frameworks / Sizer:** present as placeholders in the shell; ported in later slices.
 
@@ -63,9 +64,14 @@ NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 SUPABASE_SERVICE_ROLE_KEY=eyJ...       # SERVER ONLY — never expose
 
+# Market data — real movers for the background sweep (free key at
+# alphavantage.co/support). Optional: without it the sweep still runs the
+# qualitative theme scout.
+MARKET_DATA_API_KEY=...
+
 # App
 NEXT_PUBLIC_SITE_URL=http://localhost:3000   # set to the Vercel URL in prod
-CRON_SECRET=<random>                   # openssl rand -hex 32 (for the later cron slice)
+CRON_SECRET=<random>                   # openssl rand -hex 32; protects /api/cron/*
 ```
 
 > **Never commit `.env.local`.** It's in `.gitignore`.
@@ -135,12 +141,13 @@ Feature port from [`reference/bacon-artifact.jsx`](reference/bacon-artifact.jsx)
 
 - [x] `lib/lenses.ts`, `lib/prompts.ts`, `lib/parsers.ts` — constants + prompt builders + parsers, ported verbatim
 - [x] **Analyze** — six-lens cockpit + convergence gauge + Bull/Bear (`/api/analyze`, `/api/debate`, `AnalyzeView`) + save-to-watchlist
-- [x] **Radar** — watchlist CRUD + per-name tracking updates + Scout with persisted themes (`/api/watchlist`, `/api/track-update`, `/api/scout`, `/api/themes`, `RadarView`). _Remaining:_ in-tab/background auto-sweep cadence in `settings` (folds into the cron slice) and caching scout results into `scout_picks`.
+- [x] **Radar** — watchlist CRUD + per-name tracking updates + Scout with persisted themes (`/api/watchlist`, `/api/track-update`, `/api/scout`, `/api/themes`, `RadarView`).
+- [x] **Background sweeps** — daily `/api/cron/sweep` (service-role): real top movers (`lib/market.ts`) + theme scout → `scout_picks` "fresh finds" feed, plus tracked-name refresh; per-user opt-in via `settings`. Auto-sweep toggle on the Radar.
 - [ ] **News** — paraphrase + attribute (`/api/news`, `news_items`, `NewsView`)
 - [ ] **Discuss** — streaming chat (`/api/chat`, `chat_messages`, `ChatPanel`)
 - [ ] **Sizer + Frameworks** — mostly static ports (`FRAMEWORKS` data already in `lib/lenses.ts`)
 - [ ] **TradingView widgets** — embed Advanced Chart + Mini Symbol; keep attribution; keep `TVLink` fallback
-- [ ] **Background sweeps** — `/api/cron/sweep` + `vercel.json`; real auto-scout/news with the tab closed (uses the service-role client)
+- [ ] **News** auto-refresh into the sweep (paraphrased headlines → `news_items`)
 - [ ] **Command line + boot screen** — nice-to-have, port last
 
 Full spec: [`BACON_BUILD.md`](BACON_BUILD.md).
@@ -157,3 +164,26 @@ Full spec: [`BACON_BUILD.md`](BACON_BUILD.md).
 # 5. Deploy. Verify: login works, the shell renders, /api/health returns ok,
 #    and Analyze returns a briefing.
 ```
+
+## Background sweep — operating it
+
+1. **Re-run `supabase/schema.sql`** once (it's idempotent) to add the new
+   `scout_picks` columns (`change_pct`, `data_source`, `kind`).
+2. In Vercel, set **`MARKET_DATA_API_KEY`** (Alpha Vantage free key) and
+   **`CRON_SECRET`**. Vercel automatically sends `CRON_SECRET` as a Bearer token
+   to cron routes; the route rejects anything else.
+3. `vercel.json` schedules `/api/cron/sweep` daily (`0 13 * * *`) — allowed on the
+   Hobby plan. Sub-daily needs Vercel Pro.
+4. On the **Radar**, flip **Auto-sweep daily** on (writes `scout_interval_minutes`
+   to your `settings`). The cron only touches users who've opted in.
+
+Test it without waiting for the schedule:
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" https://<your-app>/api/cron/sweep
+# → {"ok":true,"swept":N}; then reload the Radar to see "fresh finds".
+```
+
+> Honesty rule intact: the % move is real (from the provider, labelled "via
+> &lt;provider&gt;"); the model only adds qualitative "why / verify" context via web
+> search and never invents figures.

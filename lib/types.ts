@@ -22,5 +22,27 @@ export interface ThemeRow {
   created_at: string;
 }
 
+export interface ScoutPickRow {
+  id: string;
+  name: string;
+  symbol: string;
+  asset_class: string;
+  why: string;
+  now_catalyst: string;
+  check_text: string;
+  change_pct: string | null;
+  data_source: string | null;
+  kind: string; // theme | mover
+  created_at: string;
+}
+
+export const SCOUT_PICK_COLUMNS = "id,name,symbol,asset_class,why,now_catalyst,check_text,change_pct,data_source,kind,created_at";
+
+// per-user settings (subset)
+export interface SettingsRow {
+  scout_interval_minutes: number;
+  last_sweep_at: string | null;
+}
+
 // Columns selected for the watchlist list/detail responses.
 export const WATCH_COLUMNS = "id,symbol,asset_class,lean,lean_reason,update_text,watch_text,thesis,conviction,note,status,last_scan_at,created_at";

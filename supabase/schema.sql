@@ -53,6 +53,11 @@ create table if not exists scout_picks (
   created_at timestamptz default now()
 );
 
+-- background-sweep extras (idempotent; safe to re-run on an existing project)
+alter table scout_picks add column if not exists change_pct text;   -- real % move, via provider
+alter table scout_picks add column if not exists data_source text;  -- e.g. "Alpha Vantage"
+alter table scout_picks add column if not exists kind text default 'theme';  -- theme | mover
+
 -- cached news items
 create table if not exists news_items (
   id uuid primary key default gen_random_uuid(),
