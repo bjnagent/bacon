@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Search, Newspaper, Radar as RadarIcon, BookOpen, Calculator, LogOut, User, CandlestickChart, type LucideIcon } from "lucide-react";
 import { deriveContext, type ChatContext } from "@/lib/prompts";
+import { splitSymCls } from "@/lib/lenses";
+import { Boot, Console, HelpOverlay, type LogEntry } from "./Terminal";
 import BaconMark from "./BaconMark";
 import AnalyzeView from "./AnalyzeView";
 import RadarView from "./RadarView";
@@ -61,6 +63,14 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
   const [analyzeTarget, setAnalyzeTarget] = useState<{ asset: string; cls: string; token: number } | undefined>(undefined);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatContext, setChatContext] = useState<ChatContext | null>(null);
+  const [booting, setBooting] = useState(true);
+  const [cmd, setCmd] = useState("");
+  const [log, setLog] = useState<LogEntry[]>([]);
+  const [history, setHistory] = useState<string[]>([]);
+  const [histIdx, setHistIdx] = useState(-1);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const cmdRef = useRef<HTMLInputElement | null>(null);
+  const finishBoot = useCallback(() => setBooting(false), []);
   const activeLabel = NAV.find((n) => n.key === active)!.label;
 
   const openAnalyze = (t: { asset: string; cls: string }) => {
@@ -73,10 +83,55 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
     setChatOpen(true);
   };
 
+  const pushLog = (text: string, kind = "sys") => setLog((l) => [...l, { id: Date.now() + Math.random(), text, kind }].slice(-50));
+
+  const runCommand = (raw: string) => {
+    const line = raw.trim();
+    if (!line) return;
+    setHistory((h) => [...h, line]); setHistIdx(-1);
+    pushLog("> " + line, "cmd");
+    const [verbRaw, ...rest] = line.split(/\s+/);
+    const verb = verbRaw.toUpperCase();
+    const arg = rest.join(" ").trim();
+    const nav: Record<string, ViewKey> = { RADAR: "radar", HOME: "radar", NEWS: "news", ANALYZE: "analyze", ANL: "analyze", MARKETS: "markets", MKT: "markets", FRMK: "frameworks", FRAMEWORKS: "frameworks", FRM: "frameworks", SIZE: "sizer", SIZER: "sizer", SIZ: "sizer", ACCOUNT: "account", ACCT: "account" };
+    if (verb === "HELP" || verb === "?") { setHelpOpen(true); return; }
+    if (verb === "CLS" || verb === "CLEAR") { setLog([]); return; }
+    if (verb === "ASK" || verb === "DISCUSS" || verb === "CHAT") { openChat(); return; }
+    if ((verb === "ANL" || verb === "ANALYZE") && arg) { const { sym, cls } = splitSymCls(arg); openAnalyze({ asset: sym, cls }); pushLog("→ analyzing " + sym, "ok"); return; }
+    if (verb in nav && !arg) { setActive(nav[verb]); pushLog("→ " + nav[verb], "sys"); return; }
+    const { sym, cls } = splitSymCls(line); openAnalyze({ asset: sym, cls }); pushLog("→ analyzing " + sym, "ok");
+  };
+
+  const doHistory = (dir: number) => {
+    if (!history.length) return;
+    let idx = histIdx === -1 ? history.length : histIdx;
+    idx = Math.min(Math.max(idx + dir, 0), history.length);
+    setHistIdx(idx === history.length ? -1 : idx);
+    setCmd(idx === history.length ? "" : history[idx] || "");
+  };
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (booting) return;
+      const target = e.target as HTMLElement;
+      const tag = (target.tagName || "").toLowerCase();
+      const typing = tag === "input" || tag === "textarea" || tag === "select" || target.isContentEditable;
+      if (e.key === "Escape") { if (helpOpen) setHelpOpen(false); else if (typing) target.blur(); return; }
+      if (typing) return;
+      if (e.key === "/") { e.preventDefault(); cmdRef.current?.focus(); return; }
+      if (e.key === "?") { e.preventDefault(); setHelpOpen((h) => !h); return; }
+      if (/^[1-7]$/.test(e.key)) { const idx = parseInt(e.key, 10) - 1; if (NAV[idx]) setActive(NAV[idx].key); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [booting, helpOpen]);
+
   return (
     <div className="pr-app">
       <div className="pr-scan" aria-hidden="true" />
-      <ChatFab onClick={() => openChat()} hidden={chatOpen} />
+      {booting && <Boot onDone={finishBoot} />}
+      {helpOpen && <HelpOverlay onClose={() => setHelpOpen(false)} />}
+      <ChatFab onClick={() => openChat()} hidden={chatOpen || booting} />
       <ChatPanel open={chatOpen} context={chatContext} onClose={() => setChatOpen(false)} />
       <div className="pr-mobilehead">
         <div className="pr-brand">
@@ -111,7 +166,10 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
         </nav>
 
         <main className="pr-main">
-          <div className="pr-head"><StatusBar module={`MODULE · ${activeLabel}`} /></div>
+          <div className="pr-head">
+            <StatusBar module={`MODULE · ${activeLabel}`} />
+            <Console value={cmd} setValue={setCmd} onRun={runCommand} inputRef={cmdRef} log={log} onHistory={doHistory} />
+          </div>
           <div className="pr-canvas">
             {active === "radar" ? <RadarView onAnalyze={openAnalyze} />
               : active === "news" ? <NewsView onAnalyze={openAnalyze} onDiscuss={openChat} />
