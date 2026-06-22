@@ -5,6 +5,17 @@ import { NextResponse, type NextRequest } from "next/server";
 // the Supabase auth session on every request and redirects unauthenticated users
 // to /login (except the login and auth-callback routes).
 export async function proxy(request: NextRequest) {
+  // Safety net for the auth code exchange. Supabase magic links sometimes deliver
+  // the PKCE `?code=` to the Site URL root instead of /api/auth/callback (e.g. when
+  // the callback URL isn't in the redirect allow-list). Route any stray code to the
+  // callback handler, which exchanges it for a session and lands the user home.
+  const code = request.nextUrl.searchParams.get("code");
+  if (code && !request.nextUrl.pathname.startsWith("/api/auth/callback")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/api/auth/callback";
+    return NextResponse.redirect(url);
+  }
+
   let supabaseResponse = NextResponse.next({ request });
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
