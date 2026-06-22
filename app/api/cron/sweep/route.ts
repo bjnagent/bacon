@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ask } from "@/lib/anthropic";
-import { scoutPrompt, moversScoutPrompt, trackingUpdatePrompt } from "@/lib/prompts";
-import { parseScout, parseTrackingUpdate, type ScoutResult } from "@/lib/parsers";
+import { scoutPrompt, moversScoutPrompt, trackingUpdatePrompt, newsPrompt } from "@/lib/prompts";
+import { parseScout, parseTrackingUpdate, parseNews, type ScoutResult, type NewsResult } from "@/lib/parsers";
 import { getTopGainers, MARKET_SOURCE } from "@/lib/market";
 import { mapClass } from "@/lib/lenses";
 
@@ -23,7 +23,7 @@ export async function GET(req: Request) {
   const admin = createAdminClient();
 
   // Users who opted into auto-sweep and are due (interval honored even on a daily cron).
-  const { data: users } = await admin.from("settings").select("user_id,scout_interval_minutes,last_sweep_at").gt("scout_interval_minutes", 0);
+  const { data: users } = await admin.from("settings").select("user_id,scout_interval_minutes,last_sweep_at,news_source,news_focus").gt("scout_interval_minutes", 0);
   const now = Date.now();
   const due = (users ?? []).filter((u) => !u.last_sweep_at || now - new Date(u.last_sweep_at).getTime() >= u.scout_interval_minutes * 60000);
   if (!due.length) return NextResponse.json({ ok: true, swept: 0 });
@@ -43,13 +43,13 @@ export async function GET(req: Request) {
 
   let swept = 0;
   for (const u of due) {
-    await sweepUser(admin, u.user_id, moverPicks);
+    await sweepUser(admin, u.user_id, moverPicks, u.news_source, u.news_focus);
     swept++;
   }
   return NextResponse.json({ ok: true, swept });
 }
 
-async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: string, moverPicks: MoverPick[]) {
+async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: string, moverPicks: MoverPick[], newsSource: string | null, newsFocus: string | null) {
   const [{ data: themes }, { data: items }] = await Promise.all([
     admin.from("themes").select("label").eq("user_id", userId),
     admin.from("watchlist").select("id,symbol,asset_class").eq("user_id", userId).order("last_scan_at", { ascending: true, nullsFirst: true }).limit(6),
@@ -61,12 +61,18 @@ async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: st
   const themeScoutP: Promise<ScoutResult | null> = themeLabels.length
     ? ask(scoutPrompt(themeLabels), [{ role: "user", content: `Themes: ${themeLabels.join("; ")}` }], true, 1100).then(parseScout).catch(() => null)
     : Promise.resolve(null);
+  const newsP: Promise<NewsResult | null> = ask(
+    newsPrompt(newsSource || "All", newsFocus || ""),
+    [{ role: "user", content: `Source focus: ${newsSource || "All"}\nTopic focus: ${newsFocus || "(general markets)"}\n\nSurface the latest market-moving business headlines now.` }],
+    true,
+    1500,
+  ).then(parseNews).catch(() => null);
   const trackP = tracked.map((it) =>
     ask(trackingUpdatePrompt(), [{ role: "user", content: `Asset: ${it.symbol}\nAsset class: ${it.asset_class}\n\nGive the monitoring update from current public information.` }], true, 1100)
       .then((text) => ({ it, upd: parseTrackingUpdate(text) }))
       .catch(() => ({ it, upd: null }))
   );
-  const [themeRes, trackResults] = await Promise.all([themeScoutP, Promise.all(trackP)]);
+  const [themeRes, newsRes, trackResults] = await Promise.all([themeScoutP, newsP, Promise.all(trackP)]);
 
   // Rebuild the fresh-finds feed (movers first, then theme picks).
   const picks: ScoutInsert[] = [];
@@ -75,6 +81,15 @@ async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: st
   if (picks.length) {
     await admin.from("scout_picks").delete().eq("user_id", userId);
     await admin.from("scout_picks").insert(picks);
+  }
+
+  // Refresh the news feed (paraphrased + attributed in the prompt).
+  if (newsRes && newsRes.items.length) {
+    await admin.from("news_items").delete().eq("user_id", userId);
+    await admin.from("news_items").insert(newsRes.items.map((n) => ({
+      user_id: userId, headline: n.head, source: n.source, why: n.why,
+      symbol: n.ticker, asset_class: n.cls, signal: n.signal, recency: n.when,
+    })));
   }
 
   // Persist tracking refreshes.
