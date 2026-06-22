@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Loader2, ArrowRight, ArrowUpRight, AlertTriangle, Scale, LayoutGrid, Bookmark } from "lucide-react";
+import { Loader2, ArrowRight, ArrowUpRight, AlertTriangle, Scale, LayoutGrid, Bookmark, MessageCircle } from "lucide-react";
 import { LENSES, STANCES, ASSET_CLASSES, overallLean, type LensKey, type StanceKey } from "@/lib/lenses";
 import { toPoints, type Briefing, type Debate } from "@/lib/parsers";
+import type { ChatContext } from "@/lib/prompts";
 import Spectrum from "./Spectrum";
 import ConvictionRadar from "./ConvictionRadar";
 import TVLink from "./TVLink";
@@ -12,7 +13,7 @@ import TradingViewChart from "./TradingViewChart";
 // Six-lens cockpit + convergence gauge + Bull/Bear debate. Ported from the
 // artifact's AnalyzeView; the in-browser Anthropic calls are replaced by our
 // server routes (/api/analyze, /api/debate) and "save" persists to Supabase.
-export default function AnalyzeView({ target }: { target?: { asset: string; cls: string; token: number } }) {
+export default function AnalyzeView({ target, onDiscuss }: { target?: { asset: string; cls: string; token: number }; onDiscuss: (ctx: ChatContext) => void }) {
   const [query, setQuery] = useState("");
   const [assetClass, setAssetClass] = useState(ASSET_CLASSES[0]);
   const [loading, setLoading] = useState(false);
@@ -127,6 +128,7 @@ export default function AnalyzeView({ target }: { target?: { asset: string; cls:
               <div className="pr-readout-leannote">synthesis of the six stances — not a rating or signal</div>
             </div>
             <TVLink sym={analyzed} square />
+            <button className="pr-readout-discuss" onClick={() => onDiscuss({ kind: "asset", asset: analyzed, cls: assetClass, title: analyzed.toUpperCase(), sub: "six-lens analysis" })} title="Discuss this asset"><MessageCircle size={16} /></button>
             <button className={`pr-readout-save ${saved ? "is-saved" : ""}`} onClick={save} disabled={saved} title={saved ? "On radar" : "Track on radar"}><Bookmark size={16} /></button>
           </div>
 

@@ -2,11 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { Search, Newspaper, Radar as RadarIcon, BookOpen, Calculator, LogOut, User, CandlestickChart, type LucideIcon } from "lucide-react";
+import { deriveContext, type ChatContext } from "@/lib/prompts";
 import BaconMark from "./BaconMark";
 import AnalyzeView from "./AnalyzeView";
 import RadarView from "./RadarView";
 import AccountView from "./AccountView";
 import MarketsView from "./MarketsView";
+import NewsView from "./NewsView";
+import FrameworksView from "./FrameworksView";
+import SizerView from "./SizerView";
+import ChatPanel, { ChatFab } from "./ChatPanel";
 
 type ViewKey = "radar" | "news" | "analyze" | "markets" | "frameworks" | "sizer" | "account";
 
@@ -20,17 +25,9 @@ const NAV: { key: ViewKey; label: string; Icon: LucideIcon }[] = [
   { key: "account", label: "Account", Icon: User },
 ];
 
-const PLACEHOLDERS: Record<"news" | "frameworks" | "sizer", { title: string; sub: string }> = {
-  news: { title: "News", sub: "Paraphrased, attributed business headlines as signals — never an outlet's exact words. Coming in a later Phase 2 slice." },
-  frameworks: { title: "Frameworks — the latticework", sub: "A reference for the six lenses: playbooks, terms, and caveats. A straight static port, coming next." },
-  sizer: { title: "Sizer", sub: "Position sizing and fractional-Kelly math on your own inputs — never a specific bet. Coming in a later Phase 2 slice." },
-};
-
 function Clock() {
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => {
-    // Set state only inside async callbacks (not synchronously in the effect
-    // body): avoids a hydration mismatch and React's set-state-in-effect rule.
     let id: ReturnType<typeof setInterval>;
     const t = setTimeout(() => {
       setNow(new Date());
@@ -62,6 +59,8 @@ function StatusBar({ module }: { module: string }) {
 export default function AppShell({ userEmail }: { userEmail: string }) {
   const [active, setActive] = useState<ViewKey>("radar");
   const [analyzeTarget, setAnalyzeTarget] = useState<{ asset: string; cls: string; token: number } | undefined>(undefined);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatContext, setChatContext] = useState<ChatContext | null>(null);
   const activeLabel = NAV.find((n) => n.key === active)!.label;
 
   const openAnalyze = (t: { asset: string; cls: string }) => {
@@ -69,8 +68,15 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
     setActive("analyze");
   };
 
+  const openChat = (ctx?: ChatContext) => {
+    setChatContext(ctx ?? deriveContext(active, analyzeTarget ?? null, null));
+    setChatOpen(true);
+  };
+
   return (
     <div className="pr-app">
+      <ChatFab onClick={() => openChat()} hidden={chatOpen} />
+      <ChatPanel open={chatOpen} context={chatContext} onClose={() => setChatOpen(false)} />
       <div className="pr-shell">
         <nav className="pr-rail">
           <div className="pr-railbrand">
@@ -94,27 +100,19 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
               <button type="submit" className="pr-railbtn"><span className="pr-railidx" /><LogOut size={17} /><span className="lbl">Sign out</span></button>
             </form>
           </div>
-          <div className="pr-railfoot">{userEmail}<br />verify yourself · not advice</div>
+          <div className="pr-railfoot">{userEmail}<br />Charts via <a className="pr-foot-link" href="https://www.tradingview.com" target="_blank" rel="noopener noreferrer">TradingView</a> · not advice</div>
         </nav>
 
         <main className="pr-main">
           <div className="pr-head"><StatusBar module={`MODULE · ${activeLabel}`} /></div>
           <div className="pr-canvas">
-            {active === "radar" ? (
-              <RadarView onAnalyze={openAnalyze} />
-            ) : active === "analyze" ? (
-              <AnalyzeView target={analyzeTarget} />
-            ) : active === "markets" ? (
-              <MarketsView onAnalyze={openAnalyze} />
-            ) : active === "account" ? (
-              <AccountView email={userEmail} />
-            ) : (
-              <div className="pr-placeholder">
-                <BaconMark size={64} />
-                <div className="pr-placeholder-title">{PLACEHOLDERS[active as keyof typeof PLACEHOLDERS].title}</div>
-                <div className="pr-placeholder-sub">{PLACEHOLDERS[active as keyof typeof PLACEHOLDERS].sub}</div>
-              </div>
-            )}
+            {active === "radar" ? <RadarView onAnalyze={openAnalyze} />
+              : active === "news" ? <NewsView onAnalyze={openAnalyze} onDiscuss={openChat} />
+              : active === "analyze" ? <AnalyzeView target={analyzeTarget} onDiscuss={openChat} />
+              : active === "markets" ? <MarketsView onAnalyze={openAnalyze} />
+              : active === "frameworks" ? <FrameworksView />
+              : active === "sizer" ? <SizerView />
+              : <AccountView email={userEmail} />}
           </div>
         </main>
       </div>

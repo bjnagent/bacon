@@ -34,3 +34,23 @@ export async function ask(
     .join("\n")
     .trim();
 }
+
+// Streaming variant for chat — yields text deltas as they arrive.
+export async function* askStream(
+  system: string,
+  messages: { role: "user" | "assistant"; content: string }[],
+  useSearch = true,
+  maxTokens = 1024
+): AsyncGenerator<string> {
+  const stream = await getClient().messages.create({
+    model: MODEL,
+    max_tokens: maxTokens,
+    system,
+    messages,
+    stream: true,
+    ...(useSearch ? { tools: [{ type: "web_search_20250305" as const, name: "web_search" }] } : {}),
+  });
+  for await (const ev of stream) {
+    if (ev.type === "content_block_delta" && ev.delta.type === "text_delta") yield ev.delta.text;
+  }
+}

@@ -1,6 +1,6 @@
 # Bacon — Investment Research Tool
 
-> **Status:** Phase 1 complete + Phase 2 **Analyze**, **Radar**, and **Background Sweep** (auto-scout) slices live. See [Phase 2 TODO](#phase-2-todo).
+> **Status:** Phase 1 complete + Phase 2 **feature-complete** — Analyze, Radar, Background Sweep, Macro, Markets (live charts), News, Discuss (chat), Frameworks, Sizer, and password/account auth. See [Phase 2 TODO](#phase-2-todo) for the remaining nice-to-haves.
 
 Multi-asset investment research through six independent professional lenses — Fundamental, Technical, Factor, Macro/Regulatory, Smart Money/Signals, and Risk. Conviction comes from **convergence** across lenses, never a single indicator.
 
@@ -28,7 +28,10 @@ Multi-asset investment research through six independent professional lenses — 
 - **Markets (live prices):** a dedicated tab with an embedded **TradingView Advanced Chart** (real-time prices from a real provider, attribution kept) — plus a live chart inside the Analyze readout. Clarifies the constraint: the *AI* never fabricates prices; real prices come from TradingView.
 - **Macro backdrop (real data):** the Radar home opens with a strip of live macro indicators — Fed funds, 10Y/2Y, the 10Y–2Y curve, CPI YoY, unemployment, VIX — from **FRED** (`/api/macro`, cached). The same snapshot is fed into the Analyze **Macro lens** so it reasons against real rates/inflation, not guesses. Real numbers, attributed; neutral direction arrows (no buy/sell signal).
 - **Health:** `/api/health` probes Anthropic server-side and returns `{ ok, model }`.
-- **News / Frameworks / Sizer:** present as placeholders in the shell; ported in later slices.
+- **News:** paraphrased, attributed business headlines as signals (`/api/news` → `news_items`) — one-tap deep-dive, track, or discuss. Copyright rule enforced in the prompt (never an outlet's exact words).
+- **Discuss (chat):** a context-aware **streaming** chat panel (FAB on every view; `/api/chat` → `chat_messages`) that reasons through the lenses, steelmans both sides, and flags what to verify — grounded in live search, never advice.
+- **Frameworks:** the six lenses as a reference (playbooks, terms, caveats).
+- **Sizer:** risk-based + fractional-Kelly position math on your own inputs — no market data, no guarantees.
 
 ## Setup
 
@@ -149,9 +152,9 @@ Feature port from [`reference/bacon-artifact.jsx`](reference/bacon-artifact.jsx)
 - [x] **Analyze** — six-lens cockpit + convergence gauge + Bull/Bear (`/api/analyze`, `/api/debate`, `AnalyzeView`) + save-to-watchlist
 - [x] **Radar** — watchlist CRUD + per-name tracking updates + Scout with persisted themes (`/api/watchlist`, `/api/track-update`, `/api/scout`, `/api/themes`, `RadarView`).
 - [x] **Background sweeps** — daily `/api/cron/sweep` (service-role): real top movers (`lib/market.ts`) + theme scout → `scout_picks` "fresh finds" feed, plus tracked-name refresh; per-user opt-in via `settings`. Auto-sweep toggle on the Radar.
-- [ ] **News** — paraphrase + attribute (`/api/news`, `news_items`, `NewsView`)
-- [ ] **Discuss** — streaming chat (`/api/chat`, `chat_messages`, `ChatPanel`)
-- [ ] **Sizer + Frameworks** — mostly static ports (`FRAMEWORKS` data already in `lib/lenses.ts`)
+- [x] **News** — paraphrase + attribute (`/api/news`, `news_items`, `NewsView`)
+- [x] **Discuss** — streaming chat (`/api/chat`, `chat_messages`, `ChatPanel`)
+- [x] **Sizer + Frameworks** — static ports (`FRAMEWORKS` data in `lib/lenses.ts`)
 - [x] **TradingView widgets** — embedded Advanced Chart on a **Markets** tab + inside Analyze (`TradingViewChart`); attribution kept; `TVLink` fallback retained
 - [x] **Real data layer** — Alpha Vantage movers (`lib/market.ts`) + FRED macro (`lib/macro.ts`, `/api/macro`, `MacroBackdrop`). _Next connectors (own code, public APIs):_ World Bank / IMF macro, sector movers, crypto movers.
 - [ ] **News** auto-refresh into the sweep (paraphrased headlines → `news_items`)

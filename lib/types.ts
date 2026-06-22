@@ -38,6 +38,20 @@ export interface ScoutPickRow {
 
 export const SCOUT_PICK_COLUMNS = "id,name,symbol,asset_class,why,now_catalyst,check_text,change_pct,data_source,kind,created_at";
 
+export interface NewsItemRow {
+  id: string;
+  headline: string;
+  source: string;
+  why: string;
+  symbol: string;
+  asset_class: string;
+  signal: string;
+  recency: string;
+  created_at: string;
+}
+
+export const NEWS_COLUMNS = "id,headline,source,why,symbol,asset_class,signal,recency,created_at";
+
 // per-user settings (subset)
 export interface SettingsRow {
   scout_interval_minutes: number;
