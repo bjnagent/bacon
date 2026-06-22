@@ -7,6 +7,7 @@ import { toPoints, type Briefing, type Debate } from "@/lib/parsers";
 import Spectrum from "./Spectrum";
 import ConvictionRadar from "./ConvictionRadar";
 import TVLink from "./TVLink";
+import TradingViewChart from "./TradingViewChart";
 
 // Six-lens cockpit + convergence gauge + Bull/Bear debate. Ported from the
 // artifact's AnalyzeView; the in-browser Anthropic calls are replaced by our
@@ -101,7 +102,7 @@ export default function AnalyzeView({ target }: { target?: { asset: string; cls:
           <select className="pr-select" value={assetClass} onChange={(e) => setAssetClass(e.target.value)} aria-label="Asset class">{ASSET_CLASSES.map((c) => <option key={c}>{c}</option>)}</select>
           <button className="pr-btn" type="submit" disabled={!query.trim() || loading}>{loading ? <Loader2 size={16} className="pr-spin" /> : <>RUN <ArrowRight size={15} /></>}</button>
         </div>
-        <div className="pr-command-hint">Live web search · typically 20–40s · no live price feed by design</div>
+        <div className="pr-command-hint">Live web search · typically 20–40s · live chart via TradingView</div>
       </form>
 
       {loading && (
@@ -128,6 +129,8 @@ export default function AnalyzeView({ target }: { target?: { asset: string; cls:
             <TVLink sym={analyzed} square />
             <button className={`pr-readout-save ${saved ? "is-saved" : ""}`} onClick={save} disabled={saved} title={saved ? "On radar" : "Track on radar"}><Bookmark size={16} /></button>
           </div>
+
+          <div className="pr-result-chart"><TradingViewChart symbol={analyzed} height={360} /></div>
 
           <div className="pr-subnav">
             <button className={`pr-subnav-btn ${subView === "lenses" ? "is-active" : ""}`} onClick={() => setSubView("lenses")}><LayoutGrid size={14} /> Lens cockpit</button>
@@ -168,7 +171,7 @@ export default function AnalyzeView({ target }: { target?: { asset: string; cls:
                   </div>); })}
               </div>
               {briefing.BOTTOMLINE && <div className="pr-bottomline"><div className="pr-bottomline-label">Bottom line</div>{briefing.BOTTOMLINE}</div>}
-              <div className="pr-disclaimer">BACON synthesizes public information and may be incomplete or out of date. It carries no live price feed and is not financial advice. The lenses can disagree — confirm every figure independently and decide for yourself.</div>
+              <div className="pr-disclaimer">BACON synthesizes public information and may be incomplete or out of date. Live prices/charts are from TradingView; Bacon&apos;s analysis stays qualitative and is not financial advice. The lenses can disagree — confirm every figure independently and decide for yourself.</div>
             </>
           )}
 

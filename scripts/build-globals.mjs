@@ -94,6 +94,13 @@ const login = `
 .pr-acct-msg.is-ok{color:var(--good)}
 .pr-acct-msg.is-err{color:var(--bad)}
 .pr-acct-note{font-size:12px;color:var(--muted);margin-top:14px;line-height:1.6;max-width:420px}
+
+/* Live TradingView chart (Markets tab + Analyze) */
+.pr-tvchart{border:1px solid var(--line2);border-radius:9px;overflow:hidden;background:var(--card)}
+.pr-result-chart{margin-top:18px}
+.tradingview-widget-copyright{font-family:var(--fm);font-size:10px;color:var(--muted2);padding:6px 11px;text-align:right;line-height:1}
+.tradingview-widget-copyright a{color:var(--accent);text-decoration:none}
+.tradingview-widget-copyright a:hover{text-decoration:underline}
 `;
 
 const out = (importLine ? importLine + "\n\n" : "") + base + css + login;

@@ -1,18 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search, Newspaper, Radar as RadarIcon, BookOpen, Calculator, LogOut, User, type LucideIcon } from "lucide-react";
+import { Search, Newspaper, Radar as RadarIcon, BookOpen, Calculator, LogOut, User, CandlestickChart, type LucideIcon } from "lucide-react";
 import BaconMark from "./BaconMark";
 import AnalyzeView from "./AnalyzeView";
 import RadarView from "./RadarView";
 import AccountView from "./AccountView";
+import MarketsView from "./MarketsView";
 
-type ViewKey = "radar" | "news" | "analyze" | "frameworks" | "sizer" | "account";
+type ViewKey = "radar" | "news" | "analyze" | "markets" | "frameworks" | "sizer" | "account";
 
 const NAV: { key: ViewKey; label: string; Icon: LucideIcon }[] = [
   { key: "radar", label: "Radar", Icon: RadarIcon },
   { key: "news", label: "News", Icon: Newspaper },
   { key: "analyze", label: "Analyze", Icon: Search },
+  { key: "markets", label: "Markets", Icon: CandlestickChart },
   { key: "frameworks", label: "Frameworks", Icon: BookOpen },
   { key: "sizer", label: "Sizer", Icon: Calculator },
   { key: "account", label: "Account", Icon: User },
@@ -102,6 +104,8 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
               <RadarView onAnalyze={openAnalyze} />
             ) : active === "analyze" ? (
               <AnalyzeView target={analyzeTarget} />
+            ) : active === "markets" ? (
+              <MarketsView onAnalyze={openAnalyze} />
             ) : active === "account" ? (
               <AccountView email={userEmail} />
             ) : (
