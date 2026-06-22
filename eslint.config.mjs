@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // The raw single-file reference artifact (committed as the Phase 2
+    // source-of-truth, never imported/built) and one-shot build scripts.
+    "reference/**",
+    "scripts/**",
   ]),
 ]);
 

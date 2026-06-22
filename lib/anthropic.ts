@@ -1,7 +1,15 @@
 import Anthropic from "@anthropic-ai/sdk";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
-const MODEL = process.env.BACON_MODEL ?? "claude-sonnet-4-20250514";
+const MODEL = process.env.BACON_MODEL ?? "claude-sonnet-4-6";
+
+// Lazily construct the client so importing this module (e.g. during `next build`,
+// when route handlers are traced) never throws on a missing key. The key is only
+// required when an AI call actually runs, at request time, on the server.
+let client: Anthropic | null = null;
+function getClient(): Anthropic {
+  if (!client) client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
+  return client;
+}
 
 export async function ask(
   system: string,
@@ -9,7 +17,7 @@ export async function ask(
   useSearch = true,
   maxTokens = 1100
 ): Promise<string> {
-  const res = await anthropic.messages.create({
+  const res = await getClient().messages.create({
     model: MODEL,
     max_tokens: maxTokens,
     system,

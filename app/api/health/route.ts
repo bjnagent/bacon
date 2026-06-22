@@ -6,7 +6,7 @@ export async function GET() {
     const result = await ask("You are a health check.", [{ role: "user", content: "reply OK" }], false, 16);
     return NextResponse.json({
       ok: true,
-      model: process.env.BACON_MODEL ?? "claude-sonnet-4-20250514",
+      model: process.env.BACON_MODEL ?? "claude-sonnet-4-6",
       response: result,
     });
   } catch (err: unknown) {
