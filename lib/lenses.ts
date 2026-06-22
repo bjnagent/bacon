@@ -42,7 +42,7 @@ export function normStance(s: string | null | undefined): StanceKey {
   if (!s) return "mixed";
   const k = s.toLowerCase();
   if (k.includes("construct") || k.includes("bull") || k.includes("favor") || k.includes("positive")) return "constructive";
-  if (k.includes("caution") || k.includes("bear") || k.includes("negativ") || k.includes("unfavor")) return "cautious";
+  if (k.includes("cautio") || k.includes("bear") || k.includes("negativ") || k.includes("unfavor")) return "cautious";
   if (k.includes("limit") || k.includes("insufficient") || k.includes("unclear") || k.includes("n/a")) return "limited-data";
   return "mixed";
 }
