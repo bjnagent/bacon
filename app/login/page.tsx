@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import BaconMark from "@/components/BaconMark";
 
@@ -13,10 +14,17 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   async function handleLogin(formData: FormData) {
     "use server";
     const email = String(formData.get("email") || "").trim();
+    // Prefer an explicit canonical URL, but fall back to the actual request host
+    // so magic links work on whatever domain serves the app — even if
+    // NEXT_PUBLIC_SITE_URL isn't set on the deployment.
+    const h = await headers();
+    const host = h.get("x-forwarded-host") ?? h.get("host");
+    const proto = h.get("x-forwarded-proto") ?? "https";
+    const origin = process.env.NEXT_PUBLIC_SITE_URL || (host ? `${proto}://${host}` : "");
     const sb = await createClient();
     const { error } = await sb.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/api/auth/callback` },
+      options: { emailRedirectTo: `${origin}/api/auth/callback` },
     });
     redirect(error ? "/login?error=1" : "/login?sent=1");
   }
