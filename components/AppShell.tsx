@@ -75,8 +75,15 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
 
   return (
     <div className="pr-app">
+      <div className="pr-scan" aria-hidden="true" />
       <ChatFab onClick={() => openChat()} hidden={chatOpen} />
       <ChatPanel open={chatOpen} context={chatContext} onClose={() => setChatOpen(false)} />
+      <div className="pr-mobilehead">
+        <div className="pr-brand">
+          <div className="pr-logo"><BaconMark size={26} /></div>
+          <div className="pr-brand-text"><div className="pr-brand-name">BACON</div><div className="pr-brand-tag">research radar</div></div>
+        </div>
+      </div>
       <div className="pr-shell">
         <nav className="pr-rail">
           <div className="pr-railbrand">
