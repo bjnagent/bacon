@@ -61,7 +61,7 @@ export function Boot({ onDone }: { onDone: () => void }) {
 export function HelpOverlay({ onClose }: { onClose: () => void }) {
   return (
     <div className="pr-help-wrap" onClick={onClose}>
-      <div className="pr-help" onClick={(e) => e.stopPropagation()}>
+      <div className="pr-help" role="dialog" aria-modal="true" aria-label="Command reference" onClick={(e) => e.stopPropagation()}>
         <div className="pr-help-head"><span>BACON // COMMAND REFERENCE</span><button onClick={onClose} aria-label="Close"><X size={15} /></button></div>
         <pre className="pr-help-body">{HELP_TEXT}</pre>
         <div className="pr-help-foot">ESC to close</div>

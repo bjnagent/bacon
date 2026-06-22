@@ -23,6 +23,12 @@ export default function ChatPanel({ open, context, onClose }: { open: boolean; c
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [messages, loading]);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
 
   const send = async (textIn: string) => {
     const t = textIn.trim();
@@ -60,7 +66,7 @@ export default function ChatPanel({ open, context, onClose }: { open: boolean; c
 
   return (
     <div className="pr-chat-wrap" onClick={onClose}>
-      <div className="pr-chat" onClick={(e) => e.stopPropagation()}>
+      <div className="pr-chat" role="dialog" aria-modal="true" aria-label={context ? `Discuss ${context.title}` : "Discussion"} onClick={(e) => e.stopPropagation()}>
         <div className="pr-chat-head">
           <div className="pr-chat-ctx">
             <span className="pr-chat-ctx-dot" />
@@ -74,7 +80,7 @@ export default function ChatPanel({ open, context, onClose }: { open: boolean; c
             <button onClick={onClose} title="Close" className="pr-chat-x"><X size={16} /></button>
           </div>
         </div>
-        <div className="pr-chat-body">
+        <div className="pr-chat-body" aria-live="polite">
           {messages.length === 0 && (
             <div className="pr-chat-intro">
               <BaconMark size={46} />

@@ -71,6 +71,7 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
   const [helpOpen, setHelpOpen] = useState(false);
   const cmdRef = useRef<HTMLInputElement | null>(null);
   const finishBoot = useCallback(() => setBooting(false), []);
+  const closeChat = useCallback(() => setChatOpen(false), []);
   const activeLabel = NAV.find((n) => n.key === active)!.label;
 
   const openAnalyze = (t: { asset: string; cls: string }) => {
@@ -132,7 +133,7 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
       {booting && <Boot onDone={finishBoot} />}
       {helpOpen && <HelpOverlay onClose={() => setHelpOpen(false)} />}
       <ChatFab onClick={() => openChat()} hidden={chatOpen || booting} />
-      <ChatPanel open={chatOpen} context={chatContext} onClose={() => setChatOpen(false)} />
+      <ChatPanel open={chatOpen} context={chatContext} onClose={closeChat} />
       <div className="pr-mobilehead">
         <div className="pr-brand">
           <div className="pr-logo"><BaconMark size={26} /></div>
