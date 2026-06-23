@@ -70,8 +70,14 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
   const [histIdx, setHistIdx] = useState(-1);
   const [helpOpen, setHelpOpen] = useState(false);
   const cmdRef = useRef<HTMLInputElement | null>(null);
-  const finishBoot = useCallback(() => setBooting(false), []);
+  const finishBoot = useCallback(() => { try { sessionStorage.setItem("bacon_booted", "1"); } catch { /* ignore */ } setBooting(false); }, []);
   const closeChat = useCallback(() => setChatOpen(false), []);
+
+  // Boot animation plays once per browser session, not on every refresh.
+  useEffect(() => {
+    const id = setTimeout(() => { try { if (sessionStorage.getItem("bacon_booted")) setBooting(false); } catch { /* ignore */ } }, 0);
+    return () => clearTimeout(id);
+  }, []);
   const activeLabel = NAV.find((n) => n.key === active)!.label;
 
   const openAnalyze = (t: { asset: string; cls: string }) => {

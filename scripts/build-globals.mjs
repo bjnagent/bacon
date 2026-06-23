@@ -16,6 +16,7 @@ const importMatch = css.match(/@import\s+url\([^)]*\)\s*;\s*/);
 const importLine = importMatch ? importMatch[0].trim() : "";
 if (importMatch) css = css.replace(importMatch[0], "");
 
+
 const base = `/* ============================================================
    Base reset for the Next.js shell (outside .pr-app scope).
    The Bacon design system below is scoped to .pr-app, so the
@@ -103,7 +104,13 @@ const login = `
 .tradingview-widget-copyright a:hover{text-decoration:underline}
 `;
 
-const out = (importLine ? importLine + "\n\n" : "") + base + css + login;
+// Accessibility transform (intentional, documented override): raise the smallest
+// label sizes to a readable floor and darken the faint --muted2 token so secondary
+// labels meet WCAG AA contrast on the bone background.
+const out = ((importLine ? importLine + "\n\n" : "") + base + css + login)
+  .replace(/font-size:9px/g, "font-size:10.5px")
+  .replace(/font-size:9\.5px/g, "font-size:11px")
+  .replace(/--muted2:#9A9384/g, "--muted2:#6C6757");
 mkdirSync("app", { recursive: true });
 writeFileSync("app/globals.css", out, "utf8");
 console.log("wrote app/globals.css —", out.split("\n").length, "lines; font import hoisted:", !!importLine);
