@@ -1,10 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import BaconMark from "./BaconMark";
-
-export interface LogEntry { id: number; text: string; kind: string }
 
 const BOOT_LINES = [
   "> init lens array ............ 6 OK",
@@ -14,21 +12,16 @@ const BOOT_LINES = [
   "> calibrate convergence gauge  OK",
 ];
 
-const HELP_TEXT = `COMMAND              ACTION
-  <ticker>            deep-dive six lenses     NVDA   USD/JPY   BTC
-  ANL <ticker>        deep-dive six lenses
-  RADAR               scout + tracking home
-  NEWS                market headlines
-  MARKETS             live charts
-  FRMK                lens reference
-  SIZE                sizing & risk calc
-  ACCOUNT             account settings
-  ASK                 open the discuss panel
-  CLS                 clear console
-  HELP  ?             this reference
+const HELP_TEXT = `NAVIGATION
+  ⌘K  or  /          open the command palette
+  type a ticker  →   six-lens analysis
+  Discover           radar dashboard + news
+  Analyze            the asset workspace (chart + lenses)
+  Sizer · Frameworks tools — slide over your work
+  Discuss            contextual chat (the ● button)
 
 KEYS
-  /  focus cmd     1-7  modules     ?  help     ESC  close`;
+  ⌘K  /   palette     ?   this help     ESC   close`;
 
 export function Boot({ onDone }: { onDone: () => void }) {
   const [n, setN] = useState(0);
@@ -66,40 +59,6 @@ export function HelpOverlay({ onClose }: { onClose: () => void }) {
         <pre className="pr-help-body">{HELP_TEXT}</pre>
         <div className="pr-help-foot">ESC to close</div>
       </div>
-    </div>
-  );
-}
-
-export function Console({ value, setValue, onRun, inputRef, log, onHistory }: {
-  value: string;
-  setValue: (v: string) => void;
-  onRun: (v: string) => void;
-  inputRef: RefObject<HTMLInputElement | null>;
-  log: LogEntry[];
-  onHistory: (dir: number) => void;
-}) {
-  const endRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [log]);
-  const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") { e.preventDefault(); onRun(value); setValue(""); }
-    else if (e.key === "ArrowUp") { e.preventDefault(); onHistory(-1); }
-    else if (e.key === "ArrowDown") { e.preventDefault(); onHistory(1); }
-    else if (e.key === "Escape") { inputRef.current?.blur(); }
-  };
-  return (
-    <div className="pr-console">
-      <div className="pr-cmd" onClick={() => inputRef.current?.focus()}>
-        <span className="pr-cmd-prompt">BACON</span><span className="pr-cmd-arrow">:~$</span>
-        <span className="pr-cmd-text">{value}</span><span className="pr-cmd-cursor">█</span>
-        {!value && <span className="pr-cmd-hint">type a ticker · RADAR · NEWS · MARKETS · HELP</span>}
-        <input ref={inputRef} className="pr-cmd-input" value={value} onChange={(e) => setValue(e.target.value)} onKeyDown={handleKey} spellCheck={false} autoComplete="off" aria-label="Command line" />
-      </div>
-      {log.length > 0 && (
-        <div className="pr-log">
-          {log.map((l) => <div key={l.id} className={`pr-log-line is-${l.kind}`}>{l.text}</div>)}
-          <div ref={endRef} />
-        </div>
-      )}
     </div>
   );
 }
