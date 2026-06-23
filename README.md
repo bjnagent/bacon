@@ -15,7 +15,8 @@ Multi-asset investment research through six independent professional lenses — 
 | Auth + DB | Supabase (Postgres, Auth, RLS) via `@supabase/ssr` |
 | AI | Anthropic Messages API + `web_search` server tool, **server-side only** (`@anthropic-ai/sdk`) |
 | Icons | `lucide-react` |
-| Charts | Embedded TradingView Advanced Chart (`TradingViewChart`) on the Markets tab + Analyze; `TVLink` deep-links as fallback |
+| Charts | Embedded TradingView Advanced Chart (`TradingViewChart`) inside Analyze; `TVLink` deep-links as fallback |
+| Navigation | Object + command-driven: **Discover** (Radar + News) and **Analyze** destinations, a **⌘K command palette**, tools (Sizer/Frameworks) as slide-overs, Account in a user menu |
 | Hosting | Vercel + Vercel Cron (daily background sweep) |
 | Data | Alpha Vantage (movers) · FRED (macro) — the only real-number sources; the model never fabricates figures |
 | Tests / CI | Vitest (parsers, helpers, financial math) · GitHub Actions (lint + test + build) |
@@ -27,7 +28,8 @@ Multi-asset investment research through six independent professional lenses — 
 - **Radar (Phase 2 slice, home view):** a Scout + Tracking dashboard. **Tracking** lists your names with qualitative monitoring updates (`/api/track-update`) and editable thesis / conviction / note — all persisted to `watchlist`. **Scout** runs `/api/scout` on your saved `themes` to surface timely candidates; track a pick or jump straight into its lenses.
 - **Analyze (Phase 2 slice):** run any asset through the six-lens cockpit. Calls `/api/analyze` → live web search → parsed briefing with per-lens stances, a convergence gauge, summary + bottom line. **Bull vs Bear** runs `/api/debate`. **Save to radar** persists to `watchlist`.
 - **Background Sweep (auto-scout):** a daily Vercel Cron (`/api/cron/sweep`) that, per user who's enabled it, surfaces a **"fresh finds"** feed — **today's real top movers** (via a market-data provider, the one place real numbers are allowed) enriched with a qualitative "why it's moving / verify" read, plus theme-scout matches — and refreshes tracked names. Toggle it on the Radar; new finds are waiting when you return. No fabricated prices: the % move is attributed to the provider, the rest is grounded by web search.
-- **Markets (live prices):** a dedicated tab with an embedded **TradingView Advanced Chart** (real-time prices from a real provider, attribution kept) — plus a live chart inside the Analyze readout. Clarifies the constraint: the *AI* never fabricates prices; real prices come from TradingView.
+- **Navigation:** an object + command-driven shell — **⌘K / "/" command palette** (type a ticker → analyze, or run a command), **Discover** (Radar + News) and **Analyze** as the two destinations, **Sizer/Frameworks** as slide-over tools, and **Account** in a user menu. Boot animation plays once per session.
+- **Live prices:** embedded **TradingView Advanced Chart** inside the Analyze readout (real-time prices from a real provider, attribution kept). The constraint stands: the *AI* never fabricates prices.
 - **Macro backdrop (real data):** the Radar home opens with a strip of live macro indicators — Fed funds, 10Y/2Y, the 10Y–2Y curve, CPI YoY, unemployment, VIX — from **FRED** (`/api/macro`, cached). The same snapshot is fed into the Analyze **Macro lens** so it reasons against real rates/inflation, not guesses. Real numbers, attributed; neutral direction arrows (no buy/sell signal).
 - **Health:** `/api/health` probes Anthropic server-side and returns `{ ok, model }`.
 - **News:** paraphrased, attributed business headlines as signals (`/api/news` → `news_items`) — one-tap deep-dive, track, or discuss. Copyright rule enforced in the prompt (never an outlet's exact words).
