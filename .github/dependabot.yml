@@ -8,6 +8,19 @@ updates:
     groups:
       dev-dependencies:
         dependency-type: development
+    ignore:
+      # Major tooling bumps are adopted deliberately, not auto-PR'd — the
+      # ESLint 10 / TS 6 / Vitest 4 group breaks the build (see closed #3/#9).
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "vitest"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "jsdom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
