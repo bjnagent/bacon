@@ -16,6 +16,15 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Machine endpoints bypass the session redirect entirely. Vercel Cron calls
+  // /api/cron/* with a CRON_SECRET bearer token but no browser session — the
+  // route enforces that secret itself. /api/health is an uptime probe exposing
+  // only presence booleans. Redirecting these to /login broke them silently.
+  const { pathname } = request.nextUrl;
+  if (pathname.startsWith("/api/cron") || pathname === "/api/health" || pathname === "/robots.txt") {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({ request });
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

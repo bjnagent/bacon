@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Plus, X, AlertTriangle, ArrowRight, MessageCircle } from "lucide-react";
+import { Plus, X, AlertTriangle, ArrowRight, MessageCircle, History } from "lucide-react";
 import { chatStarters, type ChatContext } from "@/lib/prompts";
 import BaconMark from "./BaconMark";
 
@@ -20,9 +20,38 @@ export default function ChatPanel({ open, context, onClose }: { open: boolean; c
   const [error, setError] = useState<string | null>(null);
   const [text, setText] = useState("");
   const [conversationId, setConversationId] = useState(() => crypto.randomUUID());
+  // A resumable prior conversation (from the server) + its restored context.
+  // localCtx overrides the prop context after a resume; cleared on "New".
+  const [resume, setResume] = useState<{ id: string; messages: Msg[]; ctx: ChatContext | null } | null>(null);
+  const [localCtx, setLocalCtx] = useState<ChatContext | null>(null);
+  const fetchedRef = useRef(false);
+  const effCtx = localCtx ?? context;
   const endRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => { if (open) taRef.current?.focus(); }, [open]);
+
+  // Look up the latest saved conversation once, so the intro can offer resume.
+  useEffect(() => {
+    if (!open || fetchedRef.current) return;
+    fetchedRef.current = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/chat");
+        const d = await res.json();
+        if (res.ok && d.conversationId && Array.isArray(d.messages) && d.messages.length) {
+          setResume({ id: d.conversationId, messages: d.messages as Msg[], ctx: (d.context as ChatContext) ?? null });
+        }
+      } catch { /* resume is best-effort */ }
+    })();
+  }, [open]);
+
+  const doResume = () => {
+    if (!resume) return;
+    setMessages(resume.messages);
+    setConversationId(resume.id);
+    if (resume.ctx) setLocalCtx(resume.ctx);
+    setResume(null);
+  };
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [messages, loading]);
   useEffect(() => {
@@ -38,7 +67,7 @@ export default function ChatPanel({ open, context, onClose }: { open: boolean; c
     const next: Msg[] = [...messages, { role: "user", content: t }];
     setMessages(next); setText(""); setLoading(true); setError(null);
     try {
-      const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: next, context, conversationId }) });
+      const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: next, context: effCtx, conversationId }) });
       if (!res.ok || !res.body) throw new Error(res.status === 401 ? "Please sign in again" : `Request failed (${res.status})`);
       setMessages((m) => [...m, { role: "assistant", content: "" }]);
       const reader = res.body.getReader();
@@ -60,21 +89,25 @@ export default function ChatPanel({ open, context, onClose }: { open: boolean; c
     }
   };
 
-  const clear = () => { setMessages([]); setError(null); setConversationId(crypto.randomUUID()); };
+  const clear = () => {
+    // The cleared thread stays resumable until a new one starts.
+    if (messages.length) setResume({ id: conversationId, messages, ctx: effCtx });
+    setMessages([]); setError(null); setLocalCtx(null); setConversationId(crypto.randomUUID());
+  };
 
   if (!open) return null;
-  const starters = chatStarters(context || { kind: "general" });
+  const starters = chatStarters(effCtx || { kind: "general" });
   const showTyping = loading && (messages.length === 0 || messages[messages.length - 1].role !== "assistant");
 
   return (
     <div className="pr-chat-wrap" onClick={onClose}>
-      <div className="pr-chat" role="dialog" aria-modal="true" aria-label={context ? `Discuss ${context.title}` : "Discussion"} onClick={(e) => e.stopPropagation()}>
+      <div className="pr-chat" role="dialog" aria-modal="true" aria-label={effCtx ? `Discuss ${effCtx.title}` : "Discussion"} onClick={(e) => e.stopPropagation()}>
         <div className="pr-chat-head">
           <div className="pr-chat-ctx">
             <span className="pr-chat-ctx-dot" />
             <div className="pr-chat-ctx-text">
-              <div className="pr-chat-ctx-title">{context ? context.title : "Discussion"}</div>
-              <div className="pr-chat-ctx-sub">{context ? context.sub : ""}</div>
+              <div className="pr-chat-ctx-title">{effCtx ? effCtx.title : "Discussion"}</div>
+              <div className="pr-chat-ctx-sub">{effCtx ? effCtx.sub : ""}</div>
             </div>
           </div>
           <div className="pr-chat-head-btns">
@@ -87,7 +120,12 @@ export default function ChatPanel({ open, context, onClose }: { open: boolean; c
             <div className="pr-chat-intro">
               <BaconMark size={46} />
               <div className="pr-chat-intro-title">Let&apos;s talk it through.</div>
-              <div className="pr-chat-intro-sub">Ask anything about {context && context.kind !== "general" ? context.title : "what you're researching"}. I&apos;ll reason through the lenses, weigh both sides, and flag what to verify — grounded in live search, never advice.</div>
+              <div className="pr-chat-intro-sub">Ask anything about {effCtx && effCtx.kind !== "general" ? effCtx.title : "what you're researching"}. I&apos;ll reason through the lenses, weigh both sides, and flag what to verify — grounded in live search, never advice.</div>
+              {resume && (
+                <button className="pr-chat-resume" onClick={doResume}>
+                  <History size={13} /> Resume last conversation{resume.ctx?.title ? ` — ${resume.ctx.title}` : ""} ({resume.messages.length} messages)
+                </button>
+              )}
               <div className="pr-chat-starters">
                 {starters.map((s, i) => <button key={i} className="pr-chat-starter" onClick={() => send(s)}>{s}</button>)}
               </div>

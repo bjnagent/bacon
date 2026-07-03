@@ -10,6 +10,7 @@ interface MacroIndicator { key: string; label: string; value: string; unit: stri
 // context to verify, not a signal.
 export default function MacroBackdrop() {
   const [indicators, setIndicators] = useState<MacroIndicator[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -19,10 +20,19 @@ export default function MacroBackdrop() {
         const data = await res.json();
         if (!cancelled && Array.isArray(data.indicators)) setIndicators(data.indicators);
       } catch { /* silently omit the strip if unavailable */ }
+      finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };
   }, []);
 
+  if (loading) {
+    return (
+      <div className="pr-macro" aria-hidden="true">
+        <div className="pr-macro-head">Macro backdrop</div>
+        <div className="pr-macro-skel">{[0, 1, 2, 3, 4].map((i) => <div key={i} className="pr-skel" />)}</div>
+      </div>
+    );
+  }
   if (!indicators.length) return null;
 
   return (

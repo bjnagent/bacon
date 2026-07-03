@@ -31,6 +31,7 @@ export default function RadarView({ onAnalyze }: { onAnalyze: (t: { asset: strin
   const [autoOn, setAutoOn] = useState(false);
   const [lastSweepAt, setLastSweepAt] = useState<string | null>(null);
   const [savingAuto, setSavingAuto] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const scanRef = useRef<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -48,6 +49,7 @@ export default function RadarView({ onAnalyze }: { onAnalyze: (t: { asset: strin
         if (Array.isArray(sd.picks)) setFreshFinds(sd.picks);
         if (std.settings) { setAutoOn((std.settings.scout_interval_minutes || 0) > 0); setLastSweepAt(std.settings.last_sweep_at ?? null); }
       } catch { /* leave empty; user can retry actions */ }
+      finally { if (!cancelled) setLoaded(true); }
     })();
     return () => { cancelled = true; };
   }, []);
@@ -165,7 +167,18 @@ export default function RadarView({ onAnalyze }: { onAnalyze: (t: { asset: strin
           <button className="pr-btn" onClick={manualAdd} disabled={!newSym.trim()}>TRACK <Plus size={14} /></button>
         </div>
 
-        {items.length === 0 && (
+        {!loaded && (
+          <div className="pr-trk-list" aria-hidden="true">
+            {[0, 1].map((i) => (
+              <div key={i} className="pr-skel-card">
+                <div className="pr-skel pr-skel-line is-w40" />
+                <div className="pr-skel pr-skel-line is-w90" />
+                <div className="pr-skel pr-skel-line is-w70" />
+              </div>
+            ))}
+          </div>
+        )}
+        {loaded && items.length === 0 && (
           <div className="pr-empty"><RadarIcon size={26} /><div>Your radar is empty. Scout picks below and tap <strong>+ Track</strong>, or add a ticker above. BACON then watches each name for new developments.</div></div>
         )}
 
@@ -233,6 +246,10 @@ export default function RadarView({ onAnalyze }: { onAnalyze: (t: { asset: strin
             <button className="pr-btn" onClick={runScout} disabled={scoutLoading}>{scoutLoading ? <><Loader2 size={14} className="pr-spin" /> SCOUTING</> : <><RadarIcon size={14} /> SCOUT NOW</>}</button>
           </div>
         </div>
+
+        {loaded && autoOn && freshFinds.length === 0 && (
+          <div className="pr-nudge"><Compass size={14} /> Auto-sweep is armed — your first <strong>fresh finds</strong> drop lands with the next daily sweep. Don&apos;t want to wait? Hit <strong>Scout now</strong>.</div>
+        )}
 
         {freshFinds.length > 0 && (
           <>

@@ -4,6 +4,32 @@ import { chatSystemPrompt, type ChatContext } from "@/lib/prompts";
 
 export const maxDuration = 60;
 
+// GET: resume the most recent conversation — its id, messages, and context —
+// so the panel can pick up where the user left off.
+export async function GET() {
+  const sb = await createClient();
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return Response.json({ error: "Not authenticated" }, { status: 401 });
+
+  const { data: latest } = await sb
+    .from("chat_messages")
+    .select("conversation_id")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!latest) return Response.json({ conversationId: null, messages: [], context: null });
+
+  const { data: rows } = await sb
+    .from("chat_messages")
+    .select("role,content,context,created_at")
+    .eq("conversation_id", latest.conversation_id)
+    .order("created_at", { ascending: true })
+    .limit(40);
+  const messages = (rows ?? []).map((r) => ({ role: r.role, content: r.content }));
+  const context = rows && rows.length ? rows[rows.length - 1].context : null;
+  return Response.json({ conversationId: latest.conversation_id, messages, context });
+}
+
 // Context-aware streaming chat. Streams text deltas to the client and persists
 // the user + assistant turn to chat_messages once the stream completes.
 export async function POST(req: Request) {
