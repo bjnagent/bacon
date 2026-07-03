@@ -621,3 +621,43 @@ body { background: #EBE8E0; color: #1A1712; }
 
 .pr-nudge{display:flex;align-items:flex-start;gap:9px;font-size:12.5px;color:var(--ink2);background:var(--paper2);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:6px;padding:10px 13px;line-height:1.55;margin-bottom:14px}
 .pr-nudge svg{color:var(--accent);flex-shrink:0;margin-top:1px}
+
+/* ============================================================
+   Visual pass (screenshot-driven): tighter heroes, centered
+   content column, compact mobile chrome, quick-run chips.
+   ============================================================ */
+/* Content column centers on wide screens instead of hugging the rail. */
+.pr-view{margin-left:auto;margin-right:auto}
+
+/* Heroes were eating ~40% of the viewport before any content. */
+.pr-rdr-head{padding:8px 0 20px}
+.pr-hero{padding:8px 0 20px}
+.pr-rdr-title,.pr-hero-title{font-size:clamp(26px,3.6vw,38px)}
+.pr-hero-eyebrow{margin-bottom:10px}
+.pr-rdr-honest{margin-top:12px;font-size:13px}
+.pr-hero-prism .pr-prism{width:104px;height:104px}
+
+/* Rail footer needs air under the user menu. */
+.pr-railfoot{margin-top:10px}
+
+/* Palette input: accent underline instead of a boxed outline (focus stays visible). */
+.pr-palette-input input:focus-visible{outline:none}
+.pr-palette-input:focus-within{box-shadow:inset 0 -2px 0 var(--accent)}
+
+/* Quick-run chips under the Analyze command row. */
+.pr-quickrun{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px}
+.pr-quickrun-lbl{font-family:var(--fm);font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.08em}
+.pr-quickrun .pr-chip{font-family:var(--fm);font-size:12px;letter-spacing:0.03em}
+
+@media (max-width:880px){
+  /* One compact status row: keep NOT ADVICE + clock, drop CONN/DATA chips. */
+  .pr-status{flex-wrap:nowrap;gap:8px}
+  .pr-status-tag{display:none}
+  .pr-status-tag.is-warn{display:inline-block}
+  /* Hero: no oversized mark, tighter copy. */
+  .pr-hero-prism{display:none}
+  .pr-rdr-head,.pr-hero{padding:4px 0 14px}
+  /* Icon-only round Discuss button. */
+  .pr-fab span{display:none}
+  .pr-fab{padding:14px;border-radius:50%}
+}

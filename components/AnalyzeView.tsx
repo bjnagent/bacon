@@ -13,7 +13,7 @@ import TradingViewChart from "./TradingViewChart";
 // Six-lens cockpit + convergence gauge + Bull/Bear debate. Ported from the
 // artifact's AnalyzeView; the in-browser Anthropic calls are replaced by our
 // server routes (/api/analyze, /api/debate) and "save" persists to Supabase.
-export default function AnalyzeView({ target, onDiscuss }: { target?: { asset: string; cls: string; token: number }; onDiscuss: (ctx: ChatContext) => void }) {
+export default function AnalyzeView({ target, onDiscuss, quickSyms = [] }: { target?: { asset: string; cls: string; token: number }; onDiscuss: (ctx: ChatContext) => void; quickSyms?: string[] }) {
   const [query, setQuery] = useState("");
   const [assetClass, setAssetClass] = useState(ASSET_CLASSES[0]);
   const [loading, setLoading] = useState(false);
@@ -123,6 +123,14 @@ export default function AnalyzeView({ target, onDiscuss }: { target?: { asset: s
           <button className="pr-btn" type="submit" disabled={!query.trim() || loading}>{loading ? <Loader2 size={16} className="pr-spin" /> : <>RUN <ArrowRight size={15} /></>}</button>
         </div>
         <div className="pr-command-hint">Live web search · typically 20–40s · live chart via TradingView</div>
+        {!hasBriefing && !loading && quickSyms.length > 0 && (
+          <div className="pr-quickrun">
+            <span className="pr-quickrun-lbl">Your radar ▸</span>
+            {quickSyms.slice(0, 8).map((s) => (
+              <button key={s} type="button" className="pr-chip" onClick={() => { setQuery(s); setAssetClass(s.includes("/") ? "FX / Currency pair" : assetClass); run(s, s.includes("/") ? "FX / Currency pair" : undefined); }}>{s}</button>
+            ))}
+          </div>
+        )}
       </form>
 
       {loading && (

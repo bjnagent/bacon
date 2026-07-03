@@ -167,7 +167,7 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
           <div className="pr-canvas">
             {place === "discover"
               ? <DiscoverView tab={discoverTab} setTab={setDiscoverTab} onAnalyze={openAnalyze} onDiscuss={openChat} />
-              : <AnalyzeView target={analyzeTarget} onDiscuss={openChat} />}
+              : <AnalyzeView target={analyzeTarget} onDiscuss={openChat} quickSyms={watchlistSyms} />}
           </div>
         </main>
       </div>
