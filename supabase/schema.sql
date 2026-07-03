@@ -106,15 +106,19 @@ create policy "own picks"     on scout_picks   for all using (auth.uid() = user_
 create policy "own news"      on news_items    for all using (auth.uid() = user_id)  with check (auth.uid() = user_id);
 create policy "own chat"      on chat_messages for all using (auth.uid() = user_id)  with check (auth.uid() = user_id);
 
--- auto-create profile + settings on signup
+-- auto-create profile + settings on signup.
+-- security definer hardening: pinned search_path (schema-shadowing) and no
+-- PostgREST RPC access — only the auth trigger may execute it.
 create or replace function public.handle_new_user()
-returns trigger language plpgsql security definer as $$
+returns trigger language plpgsql security definer set search_path = '' as $$
 begin
   insert into public.profiles (id) values (new.id) on conflict do nothing;
   insert into public.settings (user_id) values (new.id) on conflict do nothing;
   return new;
 end;
 $$;
+
+revoke execute on function public.handle_new_user() from public, anon, authenticated;
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
