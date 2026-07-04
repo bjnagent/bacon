@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getTopGainers } from "@/lib/market";
+import { getMarketSignals, getSectorPerformance, type MarketSignals } from "@/lib/market";
 import { getMacroSnapshot } from "@/lib/macro";
-import { generateBrief, briefToRows } from "@/lib/brief";
+import { generateBrief, briefToRows, briefToDailyRow } from "@/lib/brief";
 import { SCOUT_PICK_COLUMNS, type ScoutPickRow } from "@/lib/types";
 
 export const maxDuration = 60;
@@ -40,20 +40,26 @@ export async function POST() {
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
   try {
-    const [movers, macro, themesRes, trackedRes, newsRes] = await Promise.all([
-      getTopGainers(8).catch(() => []),
+    const [signals, sectors, macro, themesRes, trackedRes, newsRes] = await Promise.all([
+      getMarketSignals(8).catch((): MarketSignals => ({ gainers: [], losers: [], mostActive: [] })),
+      getSectorPerformance().catch(() => []),
       getMacroSnapshot().catch(() => []),
       sb.from("themes").select("label"),
       sb.from("watchlist").select("symbol"),
       sb.from("news_items").select("headline,source,why").order("created_at", { ascending: false }).limit(10),
     ]);
     const brief = await generateBrief({
-      movers,
+      movers: signals.gainers,
+      losers: signals.losers,
+      mostActive: signals.mostActive,
+      sectors,
       headlines: (newsRes.data ?? []).map((n) => ({ head: n.headline, source: n.source, why: n.why })),
       macro,
       themes: (themesRes.data ?? []).map((t) => t.label),
       tracked: (trackedRes.data ?? []).map((t) => t.symbol),
     });
+    // Track record (best-effort — table ships in schema.sql).
+    await sb.from("daily_briefs").upsert({ ...briefToDailyRow(user.id, brief), brief_date: new Date().toISOString().slice(0, 10) }, { onConflict: "user_id,brief_date" });
     const rows = briefToRows(user.id, brief);
     if (rows.length) {
       await sb.from("scout_picks").delete().in("kind", ["opportunity", "brief-intro"]);

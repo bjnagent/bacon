@@ -315,6 +315,28 @@ const login = `
 .pr-opp-horizon{font-family:var(--fm);font-size:10px;color:var(--muted);border:1px solid var(--line2);border-radius:99px;padding:2px 9px;text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap}
 @media (max-width:880px){.pr-opp{flex-direction:column;gap:8px}.pr-opp-rank{font-size:18px}}
 
+/* Track record + morning-email toggle. */
+.pr-record-list{display:flex;flex-direction:column;gap:11px;margin-top:6px}
+.pr-record{background:var(--card);border:1px solid var(--line2);border-radius:9px;overflow:hidden;transition:border-color .2s}
+.pr-record.is-open{border-color:var(--ink)}
+.pr-record-head{width:100%;display:flex;align-items:center;gap:12px;padding:14px 18px;border:none;background:none;color:var(--ink);font-family:var(--fb);cursor:pointer;text-align:left}
+.pr-record-date{font-family:var(--fm);font-weight:600;font-size:14px;letter-spacing:0.03em}
+.pr-record-sum{font-family:var(--fm);font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;flex:1}
+.pr-record-verdicts{display:flex;gap:5px;flex-wrap:wrap}
+.pr-verdict{font-style:normal;font-family:var(--fm);font-size:10px;border:1px solid var(--line2);border-radius:99px;padding:2px 9px;text-transform:uppercase;letter-spacing:0.04em;color:var(--muted)}
+.pr-verdict.is-good{color:var(--good);border-color:rgba(30,142,76,0.45);background:rgba(30,142,76,0.07)}
+.pr-verdict.is-live{color:var(--warn);border-color:rgba(176,122,18,0.45);background:rgba(176,122,18,0.07)}
+.pr-verdict.is-bad{color:var(--bad);border-color:rgba(207,59,44,0.45);background:rgba(207,59,44,0.07)}
+.pr-verdict.is-mute{color:var(--muted)}
+.pr-record-body{padding:2px 18px 18px;animation:prFade .3s ease}
+.pr-record-item{padding:12px 0;border-top:1px solid var(--line)}
+.pr-record-item-head{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:14px;color:var(--ink);margin-bottom:5px}
+.pr-record-actions{margin-top:14px}
+
+.pr-mailtoggle{display:inline-flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--line2);color:var(--muted);font-family:var(--fm);font-size:11px;letter-spacing:0.04em;padding:9px 12px;border-radius:99px;cursor:pointer;transition:all .14s;text-transform:uppercase}
+.pr-mailtoggle:hover{border-color:var(--accent);color:var(--ink)}
+.pr-mailtoggle.is-on{color:var(--good);border-color:rgba(30,142,76,0.5);background:rgba(30,142,76,0.07)}
+
 @media (prefers-reduced-motion:reduce){
   .pr-trk-list>*,.pr-pick-grid>*,.pr-news-list>*,.pr-radar-poly,.pr-radar circle,.pr-fab,.pr-logo:hover .pr-prism{animation:none}
   .pr-trk:hover,.pr-pick:hover,.pr-news:hover,.pr-panel:hover,.pr-chip:hover,.pr-railbtn:hover svg{transform:none}

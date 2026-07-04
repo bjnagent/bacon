@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseBriefing, parseDebate, parseScout, parseNews, parseTrackingUpdate, parseOpportunities, toPoints } from "./parsers";
+import { parseBriefing, parseDebate, parseScout, parseNews, parseTrackingUpdate, parseOpportunities, parseBriefReview, toPoints } from "./parsers";
 
 describe("parseBriefing", () => {
   const sample = `===SUMMARY===
@@ -152,6 +152,27 @@ starting points, not advice`;
     expect(out.items[0].confirm).toBe("Q3 backlog numbers");
     expect(out.items[0].kill).toBe("contract loss to rival");
     expect(out.items[1].name).toBe("NoTicker Play");
+  });
+});
+
+describe("parseBriefReview", () => {
+  it("parses per-item outcomes with normalized verdicts", () => {
+    const out = parseBriefReview(`===REVIEW===
+@@ITEM@@
+ticker: WSC
+outcome: Guidance raise confirmed the backlog thesis (via Reuters).
+verdict: Played-Out
+@@ITEM@@
+ticker: XYZ
+outcome: No follow-through; volume faded within days.
+verdict: faded
+===NOTE===
+qualitative outcomes; not advice`);
+    expect(out.items).toHaveLength(2);
+    expect(out.items[0]).toMatchObject({ ticker: "WSC", verdict: "played-out" });
+    expect(out.items[0].outcome).toContain("Reuters");
+    expect(out.items[1].verdict).toBe("faded");
+    expect(out.note).toContain("not advice");
   });
 });
 

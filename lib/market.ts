@@ -19,22 +19,45 @@ export function marketDataEnabled(): boolean {
   return !!KEY;
 }
 
-// Today's top price gainers (US equities). Returns [] if no key is configured so
-// the sweep degrades gracefully to the qualitative theme scout.
+export interface MarketSignals {
+  gainers: Mover[];
+  losers: Mover[];
+  mostActive: Mover[]; // attention flow
+}
+
+function toMovers(arr: Array<Record<string, string>> | undefined, limit: number): Mover[] {
+  return (Array.isArray(arr) ? arr : []).slice(0, limit).map((g) => ({
+    ticker: g.ticker, price: g.price, changePct: g.change_percentage, volume: g.volume,
+  }));
+}
+
+// Today's gainers + losers + most-active in ONE provider call (US equities).
+// Returns empty sets if no key is configured so callers degrade gracefully.
+export async function getMarketSignals(limit = 8): Promise<MarketSignals> {
+  const empty: MarketSignals = { gainers: [], losers: [], mostActive: [] };
+  if (!KEY || PROVIDER !== "alphavantage") return empty;
+  const res = await fetch(`https://www.alphavantage.co/query?function=TOP_GAINERS_LOSERS&apikey=${KEY}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`market data request failed (${res.status})`);
+  const data = await res.json();
+  if (!data?.top_gainers?.length && data?.Information) throw new Error(`market data: ${String(data.Information).slice(0, 120)}`);
+  return {
+    gainers: toMovers(data?.top_gainers, limit),
+    losers: toMovers(data?.top_losers, Math.min(limit, 5)),
+    mostActive: toMovers(data?.most_actively_traded, Math.min(limit, 5)),
+  };
+}
+
 export async function getTopGainers(limit = 8): Promise<Mover[]> {
-  if (!KEY) return [];
-  if (PROVIDER === "alphavantage") {
-    const res = await fetch(`https://www.alphavantage.co/query?function=TOP_GAINERS_LOSERS&apikey=${KEY}`, { cache: "no-store" });
-    if (!res.ok) throw new Error(`market data request failed (${res.status})`);
-    const data = await res.json();
-    const arr: Array<Record<string, string>> = Array.isArray(data?.top_gainers) ? data.top_gainers : [];
-    if (!arr.length && data?.Information) throw new Error(`market data: ${String(data.Information).slice(0, 120)}`);
-    return arr.slice(0, limit).map((g) => ({
-      ticker: g.ticker,
-      price: g.price,
-      changePct: g.change_percentage,
-      volume: g.volume,
-    }));
-  }
-  return [];
+  return (await getMarketSignals(limit)).gainers;
+}
+
+// Real-time sector performance (one call) — feeds rotation context to the brief.
+export async function getSectorPerformance(): Promise<{ sector: string; changePct: string }[]> {
+  if (!KEY || PROVIDER !== "alphavantage") return [];
+  const res = await fetch(`https://www.alphavantage.co/query?function=SECTOR&apikey=${KEY}`, { cache: "no-store" });
+  if (!res.ok) return [];
+  const data = await res.json();
+  const rt = data?.["Rank A: Real-Time Performance"];
+  if (!rt || typeof rt !== "object") return [];
+  return Object.entries(rt as Record<string, string>).map(([sector, changePct]) => ({ sector, changePct }));
 }

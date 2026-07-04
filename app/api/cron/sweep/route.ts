@@ -3,9 +3,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { ask } from "@/lib/anthropic";
 import { scoutPrompt, moversScoutPrompt, trackingUpdatePrompt, newsPrompt } from "@/lib/prompts";
 import { parseScout, parseTrackingUpdate, parseNews, type ScoutResult, type NewsResult } from "@/lib/parsers";
-import { getTopGainers, MARKET_SOURCE } from "@/lib/market";
+import { getMarketSignals, getSectorPerformance, MARKET_SOURCE, type MarketSignals } from "@/lib/market";
 import { getMacroSnapshot } from "@/lib/macro";
-import { generateBrief, briefToRows } from "@/lib/brief";
+import { generateBrief, briefToRows, briefToDailyRow } from "@/lib/brief";
+import { sendBriefEmail, emailEnabled } from "@/lib/email";
 import { mapClass } from "@/lib/lenses";
 
 // Background sweep: surface fresh opportunities (today's real movers + theme
@@ -25,15 +26,18 @@ export async function GET(req: Request) {
   const admin = createAdminClient();
 
   // Users who opted into auto-sweep and are due (interval honored even on a daily cron).
-  const { data: users } = await admin.from("settings").select("user_id,scout_interval_minutes,last_sweep_at,news_source,news_focus").gt("scout_interval_minutes", 0);
+  const { data: users } = await admin.from("settings").select("*").gt("scout_interval_minutes", 0);
   const now = Date.now();
   const due = (users ?? []).filter((u) => !u.last_sweep_at || now - new Date(u.last_sweep_at).getTime() >= u.scout_interval_minutes * 60000);
   if (!due.length) return NextResponse.json({ ok: true, swept: 0 });
 
-  // Top movers are market-wide → enrich once and reuse across users.
+  // Market-wide signals → fetch and enrich once, reuse across users.
   let moverPicks: MoverPick[] = [];
+  let signals: MarketSignals = { gainers: [], losers: [], mostActive: [] };
+  let sectors: { sector: string; changePct: string }[] = [];
   try {
-    const movers = await getTopGainers(8);
+    [signals, sectors] = await Promise.all([getMarketSignals(8), getSectorPerformance().catch(() => [])]);
+    const movers = signals.gainers;
     if (movers.length) {
       const text = await ask(moversScoutPrompt(movers), [{ role: "user", content: "Explain today's top movers and what to verify." }], true, 1400);
       moverPicks = parseScout(text).picks.map((p) => {
@@ -45,13 +49,13 @@ export async function GET(req: Request) {
 
   let swept = 0;
   for (const u of due) {
-    await sweepUser(admin, u.user_id, moverPicks, u.news_source, u.news_focus);
+    await sweepUser(admin, u.user_id, moverPicks, u.news_source, u.news_focus, signals, sectors, !!u.brief_email_enabled);
     swept++;
   }
   return NextResponse.json({ ok: true, swept });
 }
 
-async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: string, moverPicks: MoverPick[], newsSource: string | null, newsFocus: string | null) {
+async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: string, moverPicks: MoverPick[], newsSource: string | null, newsFocus: string | null, signals: MarketSignals, sectors: { sector: string; changePct: string }[], emailOptIn: boolean) {
   const [{ data: themes }, { data: items }] = await Promise.all([
     admin.from("themes").select("label").eq("user_id", userId),
     admin.from("watchlist").select("id,symbol,asset_class").eq("user_id", userId).order("last_scan_at", { ascending: true, nullsFirst: true }).limit(6),
@@ -82,13 +86,28 @@ async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: st
   try {
     const macro = await getMacroSnapshot().catch(() => []);
     const brief = await generateBrief({
-      movers: moverPicks.map((p) => ({ ticker: p.ticker, price: "", changePct: p.change_pct ?? "" })),
+      movers: signals.gainers.length ? signals.gainers : moverPicks.map((p) => ({ ticker: p.ticker, price: "", changePct: p.change_pct ?? "" })),
+      losers: signals.losers,
+      mostActive: signals.mostActive,
+      sectors,
       headlines: (newsRes?.items ?? []).map((n) => ({ head: n.head, source: n.source, why: n.why })),
       macro,
       themes: themeLabels,
       tracked: tracked.map((t) => t.symbol),
     });
     briefRows = briefToRows(userId, brief);
+    // Track record: upsert today's brief (best-effort — table ships in schema.sql).
+    try {
+      await admin.from("daily_briefs").upsert({ ...briefToDailyRow(userId, brief), brief_date: new Date().toISOString().slice(0, 10) }, { onConflict: "user_id,brief_date" });
+    } catch { /* track record is additive */ }
+    // Morning email, if the user opted in and delivery is configured.
+    if (emailOptIn && emailEnabled() && brief.items.length) {
+      try {
+        const { data: u } = await admin.auth.admin.getUserById(userId);
+        const to = u?.user?.email;
+        if (to) await sendBriefEmail(to, brief, new Date().toUTCString().slice(0, 16));
+      } catch { /* email is best-effort */ }
+    }
   } catch { /* brief is best-effort; feeds below still land */ }
 
   // Rebuild the signal feeds (opportunities first, then movers + theme picks).

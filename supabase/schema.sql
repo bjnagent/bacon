@@ -67,6 +67,22 @@ create table if not exists news_items (
   created_at timestamptz default now()
 );
 
+-- daily opportunity briefs — the cockpit's track record (one row per user per day)
+create table if not exists daily_briefs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  brief_date date not null default (now() at time zone 'utc')::date,
+  intro text,
+  caveat text,
+  items jsonb not null default '[]'::jsonb,   -- [{name,ticker,cls,horizon,thesis,signals,checks,outcome,verdict}]
+  reviewed_at timestamptz,
+  created_at timestamptz default now(),
+  unique (user_id, brief_date)
+);
+
+-- morning-brief email opt-in
+alter table settings add column if not exists brief_email_enabled boolean default false;
+
 -- discuss chat history
 create table if not exists chat_messages (
   id uuid primary key default gen_random_uuid(),
@@ -86,6 +102,7 @@ alter table themes        enable row level security;
 alter table scout_picks   enable row level security;
 alter table news_items    enable row level security;
 alter table chat_messages enable row level security;
+alter table daily_briefs  enable row level security;
 
 -- policy template: each user sees only their rows.
 -- Postgres has no "create policy if not exists", so drop-then-create keeps this
@@ -97,6 +114,7 @@ drop policy if exists "own themes"   on themes;
 drop policy if exists "own picks"    on scout_picks;
 drop policy if exists "own news"     on news_items;
 drop policy if exists "own chat"     on chat_messages;
+drop policy if exists "own briefs"   on daily_briefs;
 
 create policy "own profile"   on profiles      for all using (auth.uid() = id)       with check (auth.uid() = id);
 create policy "own settings"  on settings      for all using (auth.uid() = user_id)  with check (auth.uid() = user_id);
@@ -105,6 +123,7 @@ create policy "own themes"    on themes        for all using (auth.uid() = user_
 create policy "own picks"     on scout_picks   for all using (auth.uid() = user_id)  with check (auth.uid() = user_id);
 create policy "own news"      on news_items    for all using (auth.uid() = user_id)  with check (auth.uid() = user_id);
 create policy "own chat"      on chat_messages for all using (auth.uid() = user_id)  with check (auth.uid() = user_id);
+create policy "own briefs"    on daily_briefs   for all using (auth.uid() = user_id)  with check (auth.uid() = user_id);
 
 -- auto-create profile + settings on signup.
 -- security definer hardening: pinned search_path (schema-shadowing) and no

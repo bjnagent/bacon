@@ -165,6 +165,27 @@ kill: <one line: what would invalidate it>
 <one line: assembled from today's public signals as starting points; convergence is a hypothesis to verify, not a signal; not financial advice>`;
 }
 
+export function briefReviewPrompt(briefDate: string): string {
+  return `You are BACON's track-record desk. On ${briefDate} the system flagged the opportunities below. Using web_search, check what has ACTUALLY happened to each since then — earnings, news, catalysts, direction of the story. Be brutally honest: the point of a track record is credibility, not flattery. Do NOT invent prices or figures; describe outcomes qualitatively (cite the reporting).
+
+For each, give a verdict:
+- played-out: the thesis materialized
+- developing: still in motion, thesis intact
+- faded: nothing happened; the signal decayed
+- invalidated: the kill condition (or contrary evidence) hit
+
+Output ONLY in this exact format, one block per opportunity, same order as given:
+===REVIEW===
+@@ITEM@@
+ticker: <ticker or name as given>
+outcome: <1-2 lines: what actually happened since, grounded in current reporting>
+verdict: <played-out | developing | faded | invalidated>
+@@ITEM@@
+...
+===NOTE===
+<one line: outcomes summarized from public reporting; qualitative; not advice>`;
+}
+
 export function trackingUpdatePrompt(): string {
   return `You are BACON monitoring an asset the investor is TRACKING on their radar. Using web_search, report ONLY what is NOTABLE and RECENT (roughly the past few weeks): news, filings, earnings, catalysts, insider/institutional activity, regulatory or macro moves relevant to this asset. Do NOT report live prices or price targets — this is a qualitative monitoring update, not advice.
 

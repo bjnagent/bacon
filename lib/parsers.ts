@@ -106,6 +106,20 @@ export function parseOpportunities(text: string): OpportunityBrief {
   return { intro, items, caveat };
 }
 
+export interface ReviewItem { ticker: string; outcome: string; verdict: string }
+
+export function parseBriefReview(text: string): { items: ReviewItem[]; note: string | null } {
+  const nm = text.match(/===\s*NOTE\s*===([\s\S]*)$/i);
+  const note = nm ? nm[1].trim() : null;
+  const blocks = text.split(/@@ITEM@@/i).slice(1);
+  const items = blocks.map((raw) => {
+    const b = raw.split(/===\s*NOTE/i)[0];
+    const get = (k: string) => { const m = b.match(new RegExp(k + "\\s*:\\s*(.+)", "i")); return m ? m[1].trim() : ""; };
+    return { ticker: get("ticker"), outcome: get("outcome"), verdict: get("verdict").toLowerCase() };
+  }).filter((r) => r.ticker);
+  return { items, note };
+}
+
 export interface TrackingUpdate {
   update: string;
   watch: string;

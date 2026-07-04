@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Sparkles, ArrowRight, Plus, AlertTriangle, RefreshCw } from "lucide-react";
+import { Loader2, Sparkles, ArrowRight, Plus, AlertTriangle, RefreshCw, Mail, MailX } from "lucide-react";
 import { mapClass, relTime } from "@/lib/lenses";
 import type { ChatContext } from "@/lib/prompts";
 import MacroBackdrop from "./MacroBackdrop";
@@ -19,16 +19,20 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tracked, setTracked] = useState<Record<string, boolean>>({});
+  const [emailOn, setEmailOn] = useState(false);
+  const [emailErr, setEmailErr] = useState<string | null>(null);
+  const [savingEmail, setSavingEmail] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [b, w] = await Promise.all([fetch("/api/brief"), fetch("/api/watchlist")]);
-        const bd = await b.json(); const wd = await w.json();
+        const [b, w, st] = await Promise.all([fetch("/api/brief"), fetch("/api/watchlist"), fetch("/api/settings")]);
+        const bd = await b.json(); const wd = await w.json(); const std = await st.json();
         if (cancelled) return;
         if (bd.brief) setBrief(bd.brief);
         if (Array.isArray(wd.items)) { const t: Record<string, boolean> = {}; wd.items.forEach((it: { symbol: string }) => { t[it.symbol.toUpperCase()] = true; }); setTracked(t); }
+        if (std.settings) setEmailOn(!!std.settings.brief_email_enabled);
       } catch { /* empty state handles it */ }
       finally { if (!cancelled) setLoaded(true); }
     })();
@@ -45,6 +49,19 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
       setBrief(data.brief);
     } catch (err) { setError(err instanceof Error ? err.message : "Something went wrong"); }
     finally { setGenerating(false); }
+  };
+
+  const toggleEmail = async () => {
+    if (savingEmail) return;
+    const next = !emailOn;
+    setSavingEmail(true); setEmailErr(null); setEmailOn(next);
+    try {
+      const res = await fetch("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brief_email_enabled: next }) });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error || "save failed"); }
+    } catch (err) {
+      setEmailOn(!next);
+      setEmailErr(err instanceof Error && /column|schema/i.test(err.message) ? "Run the latest supabase/schema.sql once to enable email." : "Couldn't save — try again.");
+    } finally { setSavingEmail(false); }
   };
 
   const track = async (ticker: string, cls: string) => {
@@ -65,6 +82,9 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
           <h2 className="pr-section-title">Today&apos;s brief</h2>
           <div className="pr-sec-actions">
             {hasBrief && brief!.generatedAt && <span className="pr-auto-lbl">assembled {relTime(brief!.generatedAt)}</span>}
+            <button className={`pr-mailtoggle ${emailOn ? "is-on" : ""}`} onClick={toggleEmail} disabled={savingEmail} title={emailOn ? "Morning email is ON — the brief lands in your inbox after each sweep" : "Morning email is OFF"}>
+              {emailOn ? <Mail size={13} /> : <MailX size={13} />} {emailOn ? "Email: ON" : "Email: OFF"}
+            </button>
             <button className="pr-btn" onClick={generate} disabled={generating}>
               {generating ? <><Loader2 size={14} className="pr-spin" /> PIECING IT TOGETHER</> : <><RefreshCw size={14} /> {hasBrief ? "RE-SWEEP NOW" : "SWEEP NOW"}</>}
             </button>
@@ -74,6 +94,7 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
         {generating && !hasBrief && (
           <div className="pr-loading"><div className="pr-loading-text">Reading the movers, the tape, and the macro backdrop — piecing today&apos;s signals together…</div></div>
         )}
+        {emailErr && <div className="pr-nudge"><AlertTriangle size={14} /> {emailErr}</div>}
         {error && <div className="pr-error"><AlertTriangle size={18} /><div><strong>Couldn&apos;t assemble the brief.</strong><div className="pr-error-detail">{error}. Try again.</div></div></div>}
 
         {loaded && !hasBrief && !generating && (

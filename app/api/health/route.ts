@@ -14,6 +14,7 @@ export async function GET() {
     market_data: !!process.env.MARKET_DATA_API_KEY,
     fred: !!process.env.FRED_API_KEY,
     cron_secret: !!process.env.CRON_SECRET,
+    resend_email: !!process.env.RESEND_API_KEY,
     site_url: process.env.NEXT_PUBLIC_SITE_URL || null,
   };
   const model = process.env.BACON_MODEL ?? "claude-sonnet-4-6";

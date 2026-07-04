@@ -107,6 +107,7 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
 
   const paletteActions: PaletteAction[] = [
     { id: "today", label: "Today — the daily opportunity brief", hint: "cockpit", run: () => { setPlace("discover"); setDiscoverTab("today"); } },
+    { id: "record", label: "Track record — how past briefs aged", hint: "cockpit", run: () => { setPlace("discover"); setDiscoverTab("record"); } },
     { id: "radar", label: "Radar — tracking & fresh finds", hint: "cockpit", run: () => { setPlace("discover"); setDiscoverTab("radar"); } },
     { id: "news", label: "News — market headlines", hint: "cockpit", run: () => { setPlace("discover"); setDiscoverTab("news"); } },
     { id: "analyze", label: "Analyze — six-lens cockpit", hint: "workspace", run: () => setPlace("analyze") },

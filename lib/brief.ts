@@ -10,6 +10,9 @@ import type { MacroIndicator } from "./macro";
 
 export interface SignalBundle {
   movers: Mover[];
+  losers?: Mover[];
+  mostActive?: Mover[];
+  sectors?: { sector: string; changePct: string }[];
   headlines: { head: string; source: string; why: string }[];
   macro: MacroIndicator[];
   themes: string[];
@@ -18,7 +21,10 @@ export interface SignalBundle {
 
 export function buildSignalBundle(b: SignalBundle): string {
   const parts: string[] = [];
-  if (b.movers.length) parts.push("REAL MOVERS TODAY (via market-data provider):\n" + b.movers.map((m) => `- ${m.ticker}: ${m.changePct}`).join("\n"));
+  if (b.movers.length) parts.push("REAL GAINERS TODAY (via market-data provider):\n" + b.movers.map((m) => `- ${m.ticker}: ${m.changePct}`).join("\n"));
+  if (b.losers?.length) parts.push("REAL DECLINERS TODAY (contrarian / second-order clues):\n" + b.losers.map((m) => `- ${m.ticker}: ${m.changePct}`).join("\n"));
+  if (b.mostActive?.length) parts.push("MOST ACTIVELY TRADED (attention flow):\n" + b.mostActive.map((m) => `- ${m.ticker}: ${m.changePct}`).join("\n"));
+  if (b.sectors?.length) parts.push("SECTOR ROTATION (real-time performance):\n" + b.sectors.map((x) => `- ${x.sector}: ${x.changePct}`).join("\n"));
   if (b.headlines.length) parts.push("CURRENT HEADLINES (paraphrased, attributed):\n" + b.headlines.slice(0, 10).map((n) => `- ${n.head} (${n.source})${n.why ? " — " + n.why : ""}`).join("\n"));
   if (b.macro.length) parts.push("MACRO BACKDROP (real data via FRED):\n" + b.macro.map((m) => `- ${m.label}: ${m.value}${m.unit}${m.change != null ? ` (${m.change >= 0 ? "+" : ""}${m.change.toFixed(2)} vs prior)` : ""}`).join("\n"));
   if (b.themes.length) parts.push("INVESTOR THEMES: " + b.themes.join("; "));
@@ -30,6 +36,23 @@ export function buildSignalBundle(b: SignalBundle): string {
 export async function generateBrief(bundle: SignalBundle): Promise<OpportunityBrief> {
   const text = await ask(opportunityBriefPrompt(), [{ role: "user", content: buildSignalBundle(bundle) }], true, 1800);
   return parseOpportunities(text);
+}
+
+// Track-record storage: one daily_briefs row per user per day. Items are the
+// brief's opportunities; a later review pass appends outcome/verdict per item.
+export interface StoredBriefItem {
+  name: string; ticker: string; cls: string; horizon: string;
+  thesis: string; signals: string; checks: string;
+  outcome?: string; verdict?: string; // played-out | developing | faded | invalidated
+}
+
+export function briefToDailyRow(userId: string, brief: OpportunityBrief) {
+  const items: StoredBriefItem[] = brief.items.map((o) => ({
+    name: o.name, ticker: o.ticker, cls: o.cls, horizon: o.horizon,
+    thesis: o.thesis, signals: o.signals,
+    checks: [o.confirm && `Confirm: ${o.confirm}`, o.kill && `Kill: ${o.kill}`].filter(Boolean).join(" · "),
+  }));
+  return { user_id: userId, intro: brief.intro ?? "", caveat: brief.caveat ?? "", items };
 }
 
 // Storage mapping (zero-migration: rides the existing scout_picks table).
