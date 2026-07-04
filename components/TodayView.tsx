@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Loader2, Sparkles, ArrowRight, Plus, AlertTriangle, RefreshCw, Mail, MailX } from "lucide-react";
 import { mapClass, relTime } from "@/lib/lenses";
 import type { ChatContext } from "@/lib/prompts";
+import { fetchJson } from "@/lib/fetchJson";
 import MacroBackdrop from "./MacroBackdrop";
 import BaconMark from "./BaconMark";
 import TVLink from "./TVLink";
@@ -43,10 +44,9 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
     if (generating) return;
     setGenerating(true); setError(null);
     try {
-      const res = await fetch("/api/brief", { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
-      setBrief(data.brief);
+      const { ok, status, data } = await fetchJson("/api/brief", { method: "POST" });
+      if (!ok) throw new Error(String(data.error || `Request failed (${status})`));
+      setBrief(data.brief as Brief);
     } catch (err) { setError(err instanceof Error ? err.message : "Something went wrong"); }
     finally { setGenerating(false); }
   };

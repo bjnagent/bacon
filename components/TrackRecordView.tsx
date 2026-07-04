@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Loader2, History, ChevronDown, AlertTriangle, Microscope } from "lucide-react";
 import type { StoredBriefItem } from "@/lib/brief";
+import { fetchJson } from "@/lib/fetchJson";
 
 interface BriefRow { id: string; brief_date: string; intro: string | null; caveat: string | null; items: StoredBriefItem[]; reviewed_at: string | null }
 
@@ -39,10 +40,9 @@ export default function TrackRecordView() {
     if (reviewing) return;
     setReviewing(id); setError(null);
     try {
-      const res = await fetch("/api/brief/review", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
-      setBriefs((prev) => prev.map((b) => b.id === id ? { ...b, items: data.items, reviewed_at: data.reviewed_at } : b));
+      const { ok, status, data } = await fetchJson("/api/brief/review", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+      if (!ok) throw new Error(String(data.error || `Request failed (${status})`));
+      setBriefs((prev) => prev.map((b) => b.id === id ? { ...b, items: data.items as StoredBriefItem[], reviewed_at: data.reviewed_at as string } : b));
     } catch (err) { setError(err instanceof Error ? err.message : "Something went wrong"); }
     finally { setReviewing(null); }
   };

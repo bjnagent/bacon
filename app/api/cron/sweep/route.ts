@@ -39,7 +39,7 @@ export async function GET(req: Request) {
     [signals, sectors] = await Promise.all([getMarketSignals(8), getSectorPerformance().catch(() => [])]);
     const movers = signals.gainers;
     if (movers.length) {
-      const text = await ask(moversScoutPrompt(movers), [{ role: "user", content: "Explain today's top movers and what to verify." }], true, 1400);
+      const text = await ask(moversScoutPrompt(movers), [{ role: "user", content: "Explain today's top movers and what to verify." }], true, 1400, 4);
       moverPicks = parseScout(text).picks.map((p) => {
         const m = movers.find((mv) => (mv.ticker || "").toUpperCase() === (p.ticker || "").toUpperCase());
         return { name: p.name, ticker: p.ticker, cls: p.cls, why: p.why, now: p.now, check: p.check, change_pct: m?.changePct ?? null };
@@ -56,45 +56,50 @@ export async function GET(req: Request) {
 }
 
 async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: string, moverPicks: MoverPick[], newsSource: string | null, newsFocus: string | null, signals: MarketSignals, sectors: { sector: string; changePct: string }[], emailOptIn: boolean) {
-  const [{ data: themes }, { data: items }] = await Promise.all([
+  const [{ data: themes }, { data: items }, { data: cachedNews }, macro] = await Promise.all([
     admin.from("themes").select("label").eq("user_id", userId),
     admin.from("watchlist").select("id,symbol,asset_class").eq("user_id", userId).order("last_scan_at", { ascending: true, nullsFirst: true }).limit(6),
+    admin.from("news_items").select("headline,source,why").eq("user_id", userId).order("created_at", { ascending: false }).limit(10),
+    getMacroSnapshot().catch(() => [] as Awaited<ReturnType<typeof getMacroSnapshot>>),
   ]);
   const themeLabels = (themes ?? []).map((t) => t.label as string);
   const tracked = (items ?? []) as { id: string; symbol: string; asset_class: string }[];
 
   // Fire the user's AI calls concurrently.
   const themeScoutP: Promise<ScoutResult | null> = themeLabels.length
-    ? ask(scoutPrompt(themeLabels), [{ role: "user", content: `Themes: ${themeLabels.join("; ")}` }], true, 1100).then(parseScout).catch(() => null)
+    ? ask(scoutPrompt(themeLabels), [{ role: "user", content: `Themes: ${themeLabels.join("; ")}` }], true, 1100, 4).then(parseScout).catch(() => null)
     : Promise.resolve(null);
   const newsP: Promise<NewsResult | null> = ask(
     newsPrompt(newsSource || "All", newsFocus || ""),
     [{ role: "user", content: `Source focus: ${newsSource || "All"}\nTopic focus: ${newsFocus || "(general markets)"}\n\nSurface the latest market-moving business headlines now.` }],
     true,
     1500,
+    4,
   ).then(parseNews).catch(() => null);
   const trackP = tracked.map((it) =>
-    ask(trackingUpdatePrompt(), [{ role: "user", content: `Asset: ${it.symbol}\nAsset class: ${it.asset_class}\n\nGive the monitoring update from current public information.` }], true, 1100)
+    ask(trackingUpdatePrompt(), [{ role: "user", content: `Asset: ${it.symbol}\nAsset class: ${it.asset_class}\n\nGive the monitoring update from current public information.` }], true, 1100, 2)
       .then((text) => ({ it, upd: parseTrackingUpdate(text) }))
       .catch(() => ({ it, upd: null }))
   );
-  const [themeRes, newsRes, trackResults] = await Promise.all([themeScoutP, newsP, Promise.all(trackP)]);
+  // Synthesis runs CONCURRENTLY with the gatherers, reading yesterday's cached
+  // headlines — decoupling it from the fresh news fetch keeps the whole sweep
+  // inside the 60s serverless ceiling (wall-clock = slowest single call).
+  const briefP = generateBrief({
+    movers: signals.gainers.length ? signals.gainers : moverPicks.map((p) => ({ ticker: p.ticker, price: "", changePct: p.change_pct ?? "" })),
+    losers: signals.losers,
+    mostActive: signals.mostActive,
+    sectors,
+    headlines: (cachedNews ?? []).map((n) => ({ head: n.headline, source: n.source, why: n.why })),
+    macro,
+    themes: themeLabels,
+    tracked: tracked.map((t) => t.symbol),
+  }).catch(() => null);
 
-  // Synthesis: piece today's signals together into the opportunity brief —
-  // the cockpit's centerpiece. Runs after the gatherers so it sees everything.
+  const [themeRes, newsRes, trackResults, brief] = await Promise.all([themeScoutP, newsP, Promise.all(trackP), briefP]);
+
   let briefRows: Array<Record<string, unknown>> = [];
   try {
-    const macro = await getMacroSnapshot().catch(() => []);
-    const brief = await generateBrief({
-      movers: signals.gainers.length ? signals.gainers : moverPicks.map((p) => ({ ticker: p.ticker, price: "", changePct: p.change_pct ?? "" })),
-      losers: signals.losers,
-      mostActive: signals.mostActive,
-      sectors,
-      headlines: (newsRes?.items ?? []).map((n) => ({ head: n.head, source: n.source, why: n.why })),
-      macro,
-      themes: themeLabels,
-      tracked: tracked.map((t) => t.symbol),
-    });
+    if (!brief) throw new Error("brief failed");
     briefRows = briefToRows(userId, brief);
     // Track record: upsert today's brief (best-effort — table ships in schema.sql).
     try {

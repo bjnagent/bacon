@@ -34,7 +34,8 @@ export async function POST(req: Request) {
       scoutPrompt(themes),
       [{ role: "user", content: `Themes: ${themes.join("; ") || "(none — scan broadly)"}\n\nScout current candidates to research, emphasizing recent catalysts.` }],
       true,
-      1100
+      1100,
+      4
     );
     return NextResponse.json({ result: parseScout(text) });
   } catch (err) {

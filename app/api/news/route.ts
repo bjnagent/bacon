@@ -34,7 +34,8 @@ export async function POST(req: Request) {
       newsPrompt(source, focus),
       [{ role: "user", content: `Source focus: ${source}\nTopic focus: ${focus || "(general markets)"}\n\nSurface the latest market-moving business headlines now.` }],
       true,
-      1500
+      1500,
+      4
     );
     const result = parseNews(text);
     if (result.items.length) {

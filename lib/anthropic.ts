@@ -15,7 +15,8 @@ export async function ask(
   system: string,
   messages: { role: "user" | "assistant"; content: string }[],
   useSearch = true,
-  maxTokens = 1100
+  maxTokens = 1100,
+  maxSearches?: number
 ): Promise<string> {
   const res = await getClient().messages.create({
     model: MODEL,
@@ -24,7 +25,9 @@ export async function ask(
     messages,
     ...(useSearch
       ? {
-          tools: [{ type: "web_search_20250305" as const, name: "web_search" }],
+          // max_uses bounds the search loop — serverless routes have a hard
+          // 60s ceiling, and an uncapped search loop is what blows it.
+          tools: [{ type: "web_search_20250305" as const, name: "web_search", ...(maxSearches ? { max_uses: maxSearches } : {}) }],
         }
       : {}),
   });
