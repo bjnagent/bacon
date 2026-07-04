@@ -179,7 +179,7 @@ export default function RadarView({ onAnalyze }: { onAnalyze: (t: { asset: strin
           </div>
         )}
         {loaded && items.length === 0 && (
-          <div className="pr-empty"><RadarIcon size={26} /><div>Your radar is empty. Scout picks below and tap <strong>+ Track</strong>, or add a ticker above. BACON then watches each name for new developments.</div></div>
+          <div className="pr-empty"><RadarIcon size={26} /><div>Nothing on the griddle yet. Scout picks below and tap <strong>+ Track</strong>, or add a ticker above — BACON then watches each name for new developments.</div></div>
         )}
 
         <div className="pr-trk-list">
@@ -294,7 +294,7 @@ export default function RadarView({ onAnalyze }: { onAnalyze: (t: { asset: strin
           </div>
         )}
 
-        {scoutLoading && <div className="pr-loading"><div className="pr-loading-text">Scanning public sources for timely candidates…</div></div>}
+        {scoutLoading && <div className="pr-loading"><div className="pr-loading-text">Sniffing out fresh candidates across the public record…</div></div>}
         {scoutError && <div className="pr-error"><AlertTriangle size={18} /><div><strong>Scout couldn&apos;t run.</strong><div className="pr-error-detail">{scoutError}. Try again.</div></div></div>}
 
         {!scoutLoading && !scout && themes.length === 0 && (

@@ -136,7 +136,7 @@ export default function AnalyzeView({ target, onDiscuss, quickSyms = [] }: { tar
       {loading && (
         <div className="pr-loading">
           <div className="pr-loading-lenses">{LENSES.map((l, i) => <div key={l.key} className="pr-loading-lens" style={{ animationDelay: `${i * 0.18}s` }}><span className="pr-loading-dot" style={{ background: l.hue }} />{l.short}</div>)}</div>
-          <div className="pr-loading-text">Fetching current data and reading through each lens…</div>
+          <div className="pr-loading-text">Sizzling through all six lenses — live search on the wire…</div>
         </div>
       )}
       {error && <div className="pr-error"><AlertTriangle size={18} /><div><strong>Couldn&apos;t complete the analysis.</strong><div className="pr-error-detail">{error}. Check your connection and try again — the live search occasionally times out.</div></div></div>}

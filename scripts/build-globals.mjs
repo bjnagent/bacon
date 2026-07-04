@@ -220,6 +220,88 @@ const login = `
   .pr-fab span{display:none}
   .pr-fab{padding:14px;border-radius:50%}
 }
+
+/* ============================================================
+   CHARACTER PASS — sticker tactility, lens hues everywhere,
+   motion on touch, playful without breaking the honest-tool tone.
+   All motion is gated behind prefers-reduced-motion at the end.
+   ============================================================ */
+.pr-app{--pop:cubic-bezier(.2,.8,.2,1)}
+
+/* Section markers trade the flat orange square for the six-lens spectrum. */
+.pr-section-title::before{background:var(--spectrum);border-radius:2px}
+
+/* Eyebrows get a spectrum underline flourish. */
+.pr-hero-eyebrow{position:relative;display:inline-block;padding-bottom:7px}
+.pr-hero-eyebrow::after{content:"";position:absolute;left:0;bottom:0;width:100%;height:3px;background:var(--spectrum);border-radius:2px}
+
+/* Sticker cards: lift + a hair of tilt + hard offset shadow on hover. */
+.pr-trk,.pr-pick,.pr-news{transition:transform .18s var(--pop),box-shadow .18s var(--pop),border-color .14s}
+.pr-trk:hover,.pr-pick:hover,.pr-news:hover{transform:translateY(-3px) rotate(-0.35deg);border-color:var(--ink);box-shadow:5px 7px 0 var(--line2)}
+/* Lens panels glow in their own hue instead. */
+.pr-panel{transition:transform .18s var(--pop),box-shadow .18s var(--pop),border-color .14s}
+.pr-panel:hover{transform:translateY(-2px);border-color:var(--ink);box-shadow:0 10px 26px color-mix(in srgb,var(--h) 30%,transparent)}
+
+/* Cards pop in with a stagger when a list mounts. */
+.pr-trk-list>*,.pr-pick-grid>*,.pr-news-list>*{animation:prPopIn .5s var(--pop) backwards}
+.pr-trk-list>*:nth-child(1),.pr-pick-grid>*:nth-child(1),.pr-news-list>*:nth-child(1){animation-delay:.03s}
+.pr-trk-list>*:nth-child(2),.pr-pick-grid>*:nth-child(2),.pr-news-list>*:nth-child(2){animation-delay:.08s}
+.pr-trk-list>*:nth-child(3),.pr-pick-grid>*:nth-child(3),.pr-news-list>*:nth-child(3){animation-delay:.13s}
+.pr-trk-list>*:nth-child(4),.pr-pick-grid>*:nth-child(4),.pr-news-list>*:nth-child(4){animation-delay:.18s}
+.pr-trk-list>*:nth-child(5),.pr-pick-grid>*:nth-child(5),.pr-news-list>*:nth-child(5){animation-delay:.23s}
+.pr-trk-list>*:nth-child(6),.pr-pick-grid>*:nth-child(6),.pr-news-list>*:nth-child(6){animation-delay:.28s}
+.pr-trk-list>*:nth-child(n+7),.pr-pick-grid>*:nth-child(n+7),.pr-news-list>*:nth-child(n+7){animation-delay:.33s}
+@keyframes prPopIn{from{opacity:0;transform:translateY(12px) scale(.985)}}
+
+/* Nav comes alive: icons tip their hat, active gets the accent. */
+.pr-railbtn svg{transition:transform .18s var(--pop),color .14s}
+.pr-railbtn:hover svg{transform:rotate(-8deg) scale(1.15)}
+.pr-railbtn.is-active svg{color:var(--accent)}
+
+/* Buttons squish when pressed. */
+.pr-btn:active,.pr-btn-sm:active,.pr-pick-track:active,.pr-news-dd:active,.pr-chip:active,.pr-seg-btn:active,.pr-login-btn:active{transform:translateY(2px) scale(.985)}
+.pr-chip{transition:transform .14s var(--pop),border-color .14s,color .14s}
+.pr-chip:hover{transform:translateY(-1px) rotate(-0.5deg)}
+
+/* Segmented control gets sticker depth when selected. */
+.pr-seg-btn{transition:all .16s var(--pop)}
+.pr-seg-btn.is-on{box-shadow:inset 0 0 0 1px var(--ink),2px 2px 0 var(--line2)}
+
+/* The spectrum bar is touchable — stripes grow under the cursor. */
+.pr-spectrum span{transition:flex .22s var(--pop)}
+.pr-spectrum span:hover{flex:2.4}
+
+/* Convergence gauge draws itself in; lens dots breathe. */
+.pr-radar-poly{transform-box:fill-box;transform-origin:center;animation:prGaugeIn .7s var(--pop) backwards .15s}
+@keyframes prGaugeIn{from{opacity:0;transform:scale(.6)}}
+.pr-radar circle{animation:prDotIn .5s var(--pop) backwards .5s}
+@keyframes prDotIn{from{opacity:0;transform:scale(0)}}
+
+/* Logo wiggles when greeted; FAB sizzles idly every few seconds. */
+.pr-logo:hover .pr-prism{animation:prWiggle .55s ease}
+@keyframes prWiggle{25%{transform:rotate(-7deg)}60%{transform:rotate(5deg)}85%{transform:rotate(-2deg)}}
+.pr-fab{animation:prSizzle 8s ease-in-out infinite}
+@keyframes prSizzle{0%,93%,100%{transform:none}94.5%{transform:rotate(-3.5deg) scale(1.03)}96%{transform:rotate(3deg)}97.5%{transform:rotate(-1.5deg)}}
+
+/* Inputs perk up on focus. */
+.pr-add,.pr-command-row{transition:transform .16s var(--pop),border-color .14s,box-shadow .14s}
+.pr-add:focus-within,.pr-command-row:focus-within{transform:translateY(-1px)}
+
+/* Login card becomes a sticker with a spectrum lid. */
+.pr-login-card{position:relative;overflow:hidden;box-shadow:7px 9px 0 rgba(26,23,18,0.12)}
+.pr-login-card::before{content:"";position:absolute;top:0;left:0;right:0;height:5px;background:var(--spectrum)}
+
+/* Tool + chat panels: the header strip carries the spectrum too. */
+.pr-tool-head,.pr-chat-head{position:relative}
+.pr-tool-head::after,.pr-chat-head::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--spectrum);opacity:.85}
+
+/* Selection color joins the brand. */
+.pr-app ::selection{background:rgba(238,67,16,0.22)}
+
+@media (prefers-reduced-motion:reduce){
+  .pr-trk-list>*,.pr-pick-grid>*,.pr-news-list>*,.pr-radar-poly,.pr-radar circle,.pr-fab,.pr-logo:hover .pr-prism{animation:none}
+  .pr-trk:hover,.pr-pick:hover,.pr-news:hover,.pr-panel:hover,.pr-chip:hover,.pr-railbtn:hover svg{transform:none}
+}
 `;
 
 // Accessibility transform (intentional, documented override): raise the smallest
