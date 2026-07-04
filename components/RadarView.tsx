@@ -7,7 +7,6 @@ import type { WatchRow, ThemeRow, ScoutPickRow } from "@/lib/types";
 import type { ScoutResult } from "@/lib/parsers";
 import BaconMark from "./BaconMark";
 import TVLink from "./TVLink";
-import MacroBackdrop from "./MacroBackdrop";
 
 const CONVICTION_LABELS = ["—", "Watching", "Tentative", "Building", "Strong", "High"];
 
@@ -142,7 +141,6 @@ export default function RadarView({ onAnalyze }: { onAnalyze: (t: { asset: strin
 
   return (
     <div className="pr-view">
-      <MacroBackdrop />
       <div className="pr-rdr-head pr-rdr-head--split">
         <div className="pr-rdr-head-text">
           <div className="pr-hero-eyebrow">Scout · Track · Verify</div>

@@ -74,6 +74,38 @@ export function parseScout(text: string): ScoutResult {
   return { intro, picks, caveat };
 }
 
+export interface OpportunityItem {
+  name: string;
+  ticker: string;
+  cls: string;
+  horizon: string;
+  thesis: string;
+  signals: string;
+  confirm: string;
+  kill: string;
+}
+
+export interface OpportunityBrief {
+  intro: string | null;
+  items: OpportunityItem[];
+  caveat: string | null;
+}
+
+export function parseOpportunities(text: string): OpportunityBrief {
+  let intro: string | null = null, caveat: string | null = null;
+  const im = text.match(/===\s*INTRO\s*===([\s\S]*?)(?:@@OPP@@|===\s*CAVEAT|$)/i);
+  if (im) intro = im[1].trim();
+  const cm = text.match(/===\s*CAVEAT\s*===([\s\S]*)$/i);
+  if (cm) caveat = cm[1].trim();
+  const blocks = text.split(/@@OPP@@/i).slice(1);
+  const items = blocks.map((raw) => {
+    const b = raw.split(/===\s*CAVEAT/i)[0];
+    const get = (k: string) => { const m = b.match(new RegExp(k + "\\s*:\\s*(.+)", "i")); return m ? m[1].trim() : ""; };
+    return { name: get("name"), ticker: get("ticker"), cls: get("class"), horizon: get("horizon"), thesis: get("thesis"), signals: get("signals"), confirm: get("confirm"), kill: get("kill") };
+  }).filter((o) => o.name || (o.ticker && o.ticker !== "—"));
+  return { intro, items, caveat };
+}
+
 export interface TrackingUpdate {
   update: string;
   watch: string;

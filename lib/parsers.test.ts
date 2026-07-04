@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseBriefing, parseDebate, parseScout, parseNews, parseTrackingUpdate, toPoints } from "./parsers";
+import { parseBriefing, parseDebate, parseScout, parseNews, parseTrackingUpdate, parseOpportunities, toPoints } from "./parsers";
 
 describe("parseBriefing", () => {
   const sample = `===SUMMARY===
@@ -115,6 +115,43 @@ paraphrased; verify at source`);
     expect(out.items).toHaveLength(1);
     expect(out.items[0]).toMatchObject({ head: "Chipmaker guides higher", source: "Reuters", ticker: "NVDA", signal: "Guidance", when: "2h" });
     expect(out.note).toContain("verify at source");
+  });
+});
+
+describe("parseOpportunities", () => {
+  const sample = `===INTRO===
+Signals point at a supply-chain reprice.
+@@OPP@@
+name: Widget Supply Co
+ticker: WSC
+class: Equity
+horizon: weeks
+thesis: Unpriced supplier to today's biggest mover.
+signals: ACME +14% today; capacity headline via Reuters; curve steepening
+confirm: Q3 backlog numbers
+kill: contract loss to rival
+@@OPP@@
+name: NoTicker Play
+ticker: —
+class: Commodity
+horizon: months
+thesis: second-order beneficiary
+signals: macro only
+confirm: inventories
+kill: demand rollover
+===CAVEAT===
+starting points, not advice`;
+
+  it("parses intro, ranked items with all fields, and caveat", () => {
+    const out = parseOpportunities(sample);
+    expect(out.intro).toBe("Signals point at a supply-chain reprice.");
+    expect(out.caveat).toContain("not advice");
+    expect(out.items).toHaveLength(2);
+    expect(out.items[0]).toMatchObject({ name: "Widget Supply Co", ticker: "WSC", horizon: "weeks" });
+    expect(out.items[0].signals).toContain("ACME +14%");
+    expect(out.items[0].confirm).toBe("Q3 backlog numbers");
+    expect(out.items[0].kill).toBe("contract loss to rival");
+    expect(out.items[1].name).toBe("NoTicker Play");
   });
 });
 

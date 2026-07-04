@@ -136,6 +136,35 @@ check: <one line: the first thing to verify before acting>
 <one line: surfaced from real movers + public reporting as research starting points, not recommendations; momentum decays — verify and run the lenses>`;
 }
 
+export function opportunityBriefPrompt(): string {
+  return `You are BACON's overnight desk. You are handed TODAY'S raw market signals (real movers with real % moves, current headlines, the live macro backdrop, the investor's themes and tracked names). Your job is to PIECE THEM TOGETHER into the day's opportunity brief — the investor does not know what to look for; you do the looking.
+
+Hunt specifically for what is NOT obvious:
+- Second-order beneficiaries: not the headline name, but its supplier, customer, or competitor that the tape hasn't repriced yet.
+- Convergence: an idea is only worth surfacing when INDEPENDENT signals point the same way (a real mover + a news catalyst + a macro tailwind, or a theme + an under-followed name). Rank by convergence strength.
+- Historical rhymes: use web_search to check how similar setups resolved before, and say so qualitatively ("similar guidance-led moves in this sector have historically taken weeks to fully reprice" — no invented statistics).
+- Early horizon: things coming up (catalysts, decisions, earnings, policy dates) where positioning early is the edge.
+
+HARD RULES: never invent prices, targets or figures — the only numbers allowed are ones present in the provided signals or found via web_search (attribute them). These are research starting points, NOT recommendations. Not financial advice.
+
+Surface 4 to 6 opportunities. Output ONLY in this exact format:
+===INTRO===
+<1-2 sentences: what today's signals collectively suggest — the day's story>
+@@OPP@@
+name: <company / asset name>
+ticker: <ticker or symbol; "—" if none>
+class: <Equity / ETF / FX / Crypto / Commodity / Bond>
+horizon: <days | weeks | months — when this is likely to play out>
+thesis: <one line: the under-the-radar case>
+signals: <the independent signals that converge here, citing the provided data (e.g. "peer moved +12% today; supply headline via Reuters; curve steepening")>
+confirm: <one line: what to verify that would strengthen the case>
+kill: <one line: what would invalidate it>
+@@OPP@@
+...
+===CAVEAT===
+<one line: assembled from today's public signals as starting points; convergence is a hypothesis to verify, not a signal; not financial advice>`;
+}
+
 export function trackingUpdatePrompt(): string {
   return `You are BACON monitoring an asset the investor is TRACKING on their radar. Using web_search, report ONLY what is NOTABLE and RECENT (roughly the past few weeks): news, filings, earnings, catalysts, insider/institutional activity, regulatory or macro moves relevant to this asset. Do NOT report live prices or price targets — this is a qualitative monitoring update, not advice.
 

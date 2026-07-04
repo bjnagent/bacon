@@ -4,6 +4,8 @@ import { ask } from "@/lib/anthropic";
 import { scoutPrompt, moversScoutPrompt, trackingUpdatePrompt, newsPrompt } from "@/lib/prompts";
 import { parseScout, parseTrackingUpdate, parseNews, type ScoutResult, type NewsResult } from "@/lib/parsers";
 import { getTopGainers, MARKET_SOURCE } from "@/lib/market";
+import { getMacroSnapshot } from "@/lib/macro";
+import { generateBrief, briefToRows } from "@/lib/brief";
 import { mapClass } from "@/lib/lenses";
 
 // Background sweep: surface fresh opportunities (today's real movers + theme
@@ -74,13 +76,28 @@ async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: st
   );
   const [themeRes, newsRes, trackResults] = await Promise.all([themeScoutP, newsP, Promise.all(trackP)]);
 
-  // Rebuild the fresh-finds feed (movers first, then theme picks).
+  // Synthesis: piece today's signals together into the opportunity brief —
+  // the cockpit's centerpiece. Runs after the gatherers so it sees everything.
+  let briefRows: Array<Record<string, unknown>> = [];
+  try {
+    const macro = await getMacroSnapshot().catch(() => []);
+    const brief = await generateBrief({
+      movers: moverPicks.map((p) => ({ ticker: p.ticker, price: "", changePct: p.change_pct ?? "" })),
+      headlines: (newsRes?.items ?? []).map((n) => ({ head: n.head, source: n.source, why: n.why })),
+      macro,
+      themes: themeLabels,
+      tracked: tracked.map((t) => t.symbol),
+    });
+    briefRows = briefToRows(userId, brief);
+  } catch { /* brief is best-effort; feeds below still land */ }
+
+  // Rebuild the signal feeds (opportunities first, then movers + theme picks).
   const picks: ScoutInsert[] = [];
   for (const p of moverPicks) picks.push({ user_id: userId, name: p.name, symbol: p.ticker, asset_class: "Equity / Stock", why: p.why, now_catalyst: p.now, check_text: p.check, change_pct: p.change_pct, data_source: MARKET_SOURCE, kind: "mover" });
   if (themeRes) for (const p of themeRes.picks) picks.push({ user_id: userId, name: p.name, symbol: p.ticker, asset_class: mapClass(p.cls), why: p.why, now_catalyst: p.now, check_text: p.check, change_pct: null, data_source: null, kind: "theme" });
-  if (picks.length) {
+  if (picks.length || briefRows.length) {
     await admin.from("scout_picks").delete().eq("user_id", userId);
-    await admin.from("scout_picks").insert(picks);
+    await admin.from("scout_picks").insert([...briefRows, ...picks]);
   }
 
   // Refresh the news feed (paraphrased + attributed in the prompt).

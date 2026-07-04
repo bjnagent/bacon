@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Compass, Search, Calculator, BookOpen, Command } from "lucide-react";
+import { Sunrise, Search, Calculator, BookOpen, Command } from "lucide-react";
 import { deriveContext, type ChatContext } from "@/lib/prompts";
 import { splitSymCls } from "@/lib/lenses";
 import { Boot, HelpOverlay } from "./Terminal";
 import BaconMark from "./BaconMark";
-import DiscoverView from "./DiscoverView";
+import DiscoverView, { type DiscoverTab } from "./DiscoverView";
 import AnalyzeView from "./AnalyzeView";
 import SizerView from "./SizerView";
 import FrameworksView from "./FrameworksView";
@@ -49,7 +49,7 @@ function StatusBar({ module }: { module: string }) {
 
 export default function AppShell({ userEmail }: { userEmail: string }) {
   const [place, setPlace] = useState<Place>("discover");
-  const [discoverTab, setDiscoverTab] = useState<"radar" | "news">("radar");
+  const [discoverTab, setDiscoverTab] = useState<DiscoverTab>("today");
   const [tool, setTool] = useState<Tool>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -106,8 +106,9 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
   }, [booting, helpOpen]);
 
   const paletteActions: PaletteAction[] = [
-    { id: "radar", label: "Radar — scout & tracking", hint: "discover", run: () => { setPlace("discover"); setDiscoverTab("radar"); } },
-    { id: "news", label: "News — market headlines", hint: "discover", run: () => { setPlace("discover"); setDiscoverTab("news"); } },
+    { id: "today", label: "Today — the daily opportunity brief", hint: "cockpit", run: () => { setPlace("discover"); setDiscoverTab("today"); } },
+    { id: "radar", label: "Radar — tracking & fresh finds", hint: "cockpit", run: () => { setPlace("discover"); setDiscoverTab("radar"); } },
+    { id: "news", label: "News — market headlines", hint: "cockpit", run: () => { setPlace("discover"); setDiscoverTab("news"); } },
     { id: "analyze", label: "Analyze — six-lens cockpit", hint: "workspace", run: () => setPlace("analyze") },
     { id: "sizer", label: "Open Sizer", hint: "sizing & risk", run: () => setTool("sizer") },
     { id: "frameworks", label: "Open Frameworks", hint: "lens reference", run: () => setTool("frameworks") },
@@ -116,7 +117,7 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
     { id: "help", label: "Keyboard & commands", hint: "?", run: () => setHelpOpen(true) },
   ];
 
-  const moduleLabel = place === "analyze" ? "ANALYZE · SIX-LENS COCKPIT" : `DISCOVER · ${discoverTab.toUpperCase()}`;
+  const moduleLabel = place === "analyze" ? "ANALYZE · SIX-LENS DEEP DIVE" : `COCKPIT · ${discoverTab.toUpperCase()}`;
 
   return (
     <div className="pr-app">
@@ -147,7 +148,7 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
           </div>
           <div className="pr-railnav">
             <button className={`pr-railbtn ${place === "discover" ? "is-active" : ""}`} aria-current={place === "discover" ? "page" : undefined} onClick={() => setPlace("discover")}>
-              <span className="pr-railidx">01</span><Compass size={17} /><span className="lbl">Discover</span>
+              <span className="pr-railidx">01</span><Sunrise size={17} /><span className="lbl">Today</span>
             </button>
             <button className={`pr-railbtn ${place === "analyze" ? "is-active" : ""}`} aria-current={place === "analyze" ? "page" : undefined} onClick={() => setPlace("analyze")}>
               <span className="pr-railidx">02</span><Search size={17} /><span className="lbl">Analyze</span>

@@ -739,6 +739,23 @@ body { background: #EBE8E0; color: #1A1712; }
 /* Selection color joins the brand. */
 .pr-app ::selection{background:rgba(238,67,16,0.22)}
 
+/* Today's brief — ranked opportunity cards (the cockpit centerpiece). */
+.pr-opp-list{display:flex;flex-direction:column;gap:13px;margin-top:14px}
+.pr-opp-list>*{animation:prPopIn .5s var(--pop) backwards}
+.pr-opp-list>*:nth-child(1){animation-delay:.03s}
+.pr-opp-list>*:nth-child(2){animation-delay:.09s}
+.pr-opp-list>*:nth-child(3){animation-delay:.15s}
+.pr-opp-list>*:nth-child(4){animation-delay:.21s}
+.pr-opp-list>*:nth-child(n+5){animation-delay:.27s}
+.pr-opp{display:flex;gap:16px;background:var(--card);border:1px solid var(--line2);border-radius:10px;padding:18px 20px;position:relative;overflow:hidden;transition:transform .18s var(--pop),box-shadow .18s var(--pop),border-color .14s}
+.pr-opp::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--spectrum)}
+.pr-opp:hover{transform:translateY(-3px) rotate(-0.25deg);border-color:var(--ink);box-shadow:5px 7px 0 var(--line2)}
+.pr-opp-rank{font-family:var(--fd);font-weight:700;font-size:26px;color:var(--line2);line-height:1;flex-shrink:0;padding-top:2px}
+.pr-opp:hover .pr-opp-rank{color:var(--accent)}
+.pr-opp-main{flex:1;min-width:0}
+.pr-opp-horizon{font-family:var(--fm);font-size:10px;color:var(--muted);border:1px solid var(--line2);border-radius:99px;padding:2px 9px;text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap}
+@media (max-width:880px){.pr-opp{flex-direction:column;gap:8px}.pr-opp-rank{font-size:18px}}
+
 @media (prefers-reduced-motion:reduce){
   .pr-trk-list>*,.pr-pick-grid>*,.pr-news-list>*,.pr-radar-poly,.pr-radar circle,.pr-fab,.pr-logo:hover .pr-prism{animation:none}
   .pr-trk:hover,.pr-pick:hover,.pr-news:hover,.pr-panel:hover,.pr-chip:hover,.pr-railbtn:hover svg{transform:none}
