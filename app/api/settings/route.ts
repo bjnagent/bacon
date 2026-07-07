@@ -17,11 +17,12 @@ export async function PATCH(req: Request) {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  let body: { scout_interval_minutes?: number; news_source?: string; news_focus?: string; brief_email_enabled?: boolean };
+  let body: { scout_interval_minutes?: number; news_source?: string; news_focus?: string; brief_email_enabled?: boolean; voices?: string };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Bad request" }, { status: 400 }); }
 
   const patch: Record<string, string | number | boolean> = {};
   if (typeof body.brief_email_enabled === "boolean") patch.brief_email_enabled = body.brief_email_enabled;
+  if (typeof body.voices === "string") patch.voices = body.voices.slice(0, 400);
   if (typeof body.scout_interval_minutes === "number") patch.scout_interval_minutes = Math.max(0, Math.round(body.scout_interval_minutes));
   if (typeof body.news_source === "string") patch.news_source = body.news_source;
   if (typeof body.news_focus === "string") patch.news_focus = body.news_focus;

@@ -144,6 +144,8 @@ Hunt specifically for what is NOT obvious:
 - Convergence: an idea is only worth surfacing when INDEPENDENT signals point the same way (a real mover + a news catalyst + a macro tailwind, or a theme + an under-followed name). Rank by convergence strength.
 - Historical rhymes: use web_search to check how similar setups resolved before, and say so qualitatively ("similar guidance-led moves in this sector have historically taken weeks to fully reprice" — no invented statistics).
 - Early horizon: things coming up (catalysts, decisions, earnings, policy dates) where positioning early is the edge.
+- Smart-money echoes: if INSIDER FILING CLUSTERS are provided, clustered open-market buying is one independent signal — verify the context with a search before leaning on it. Consider spending one search on notable recent US congressional trading disclosures (public STOCK Act data, e.g. as covered by Capitol Trades) when it could intersect today's signals; attribute anything found.
+- If TRACKED VOICES are provided, spend one search on what those voices have publicly flagged recently. A voice's idea is ONE signal that still needs convergence with the tape — never surface it on the voice's word alone.
 
 Budget: you have AT MOST 6 web searches — spend them on the strongest convergences, not on every candidate.
 

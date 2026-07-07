@@ -24,6 +24,9 @@ export default function RadarView({ onAnalyze }: { onAnalyze: (t: { asset: strin
 
   const [themes, setThemes] = useState<ThemeRow[]>([]);
   const [themeInput, setThemeInput] = useState("");
+  const [voices, setVoices] = useState<string[]>([]);
+  const [voiceInput, setVoiceInput] = useState("");
+  const [voiceErr, setVoiceErr] = useState<string | null>(null);
   const [scout, setScout] = useState<ScoutResult | null>(null);
   const [scoutLoading, setScoutLoading] = useState(false);
   const [scoutError, setScoutError] = useState<string | null>(null);
@@ -42,13 +45,17 @@ export default function RadarView({ onAnalyze }: { onAnalyze: (t: { asset: strin
           cachedJson<{ items?: WatchRow[] }>("/api/watchlist", 30_000),
           cachedJson<{ themes?: ThemeRow[] }>("/api/themes", 60_000),
           cachedJson<{ picks?: ScoutPickRow[] }>("/api/scout", 60_000),
-          cachedJson<{ settings?: { scout_interval_minutes?: number; last_sweep_at?: string | null } }>("/api/settings", 60_000),
+          cachedJson<{ settings?: { scout_interval_minutes?: number; last_sweep_at?: string | null; voices?: string } }>("/api/settings", 60_000),
         ]);
         if (cancelled) return;
         if (Array.isArray(wd.items)) setItems(wd.items);
         if (Array.isArray(td.themes)) setThemes(td.themes);
         if (Array.isArray(sd.picks)) setFreshFinds(sd.picks);
-        if (std.settings) { setAutoOn((std.settings.scout_interval_minutes || 0) > 0); setLastSweepAt(std.settings.last_sweep_at ?? null); }
+        if (std.settings) {
+          setAutoOn((std.settings.scout_interval_minutes || 0) > 0);
+          setLastSweepAt(std.settings.last_sweep_at ?? null);
+          if (typeof std.settings.voices === "string") setVoices(std.settings.voices.split(",").map((v) => v.trim()).filter(Boolean));
+        }
       } catch { /* leave empty; user can retry actions */ }
       finally { if (!cancelled) setLoaded(true); }
     })();
@@ -115,6 +122,26 @@ export default function RadarView({ onAnalyze }: { onAnalyze: (t: { asset: strin
   const removeTheme = async (id: string) => {
     setThemes((prev) => prev.filter((t) => t.id !== id));
     try { await fetch("/api/themes", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) }); invalidate("/api/themes"); } catch { /* ignore */ }
+  };
+
+  // Voices live in settings as one comma-separated column (no extra table).
+  const saveVoices = async (list: string[]) => {
+    setVoices(list);
+    try {
+      const res = await fetch("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ voices: list.join(", ") }) });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setVoiceErr(/voices/.test(String(data.error || "")) ? "Voices need a schema update — run supabase/schema.sql once, then retry." : String(data.error || "Couldn't save voices."));
+        return;
+      }
+      setVoiceErr(null);
+      invalidate("/api/settings");
+    } catch { setVoiceErr("Couldn't save voices."); }
+  };
+  const addVoice = (raw: string) => {
+    const v = raw.trim().replace(/,+$/, "");
+    if (!v || voices.some((x) => x.toLowerCase() === v.toLowerCase()) || voices.length >= 8) return;
+    saveVoices([...voices, v]);
   };
 
   const runScout = async () => {
@@ -288,6 +315,16 @@ export default function RadarView({ onAnalyze }: { onAnalyze: (t: { asset: strin
             <input value={themeInput} onChange={(e) => setThemeInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { addTheme(themeInput); setThemeInput(""); } }} placeholder="+ add theme" aria-label="Add theme" />
           </span>
         </div>
+
+        <div className="pr-scout-themes">
+          <span className="pr-scout-lbl">voices</span>
+          {voices.map((v) => <span key={v} className="pr-theme">{v}<button onClick={() => saveVoices(voices.filter((x) => x !== v))} aria-label={`Remove ${v}`}><X size={11} /></button></span>)}
+          <span className="pr-theme-add">
+            <input value={voiceInput} onChange={(e) => setVoiceInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { addVoice(voiceInput); setVoiceInput(""); } }} placeholder="+ analyst or account you trust" aria-label="Add voice" />
+          </span>
+        </div>
+        {voiceErr && <div className="pr-voices-note">{voiceErr}</div>}
+        {!voiceErr && voices.length > 0 && <div className="pr-voices-note is-ok">The sweep checks what these voices flagged recently — one signal among many, never followed blindly.</div>}
         {themes.length === 0 && (
           <div className="pr-theme-sugg">
             <span className="pr-scout-lbl">try</span>

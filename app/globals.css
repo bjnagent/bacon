@@ -776,6 +776,10 @@ body { background: #EBE8E0; color: #1A1712; }
 .pr-mailtoggle:hover{border-color:var(--accent);color:var(--ink)}
 .pr-mailtoggle.is-on{color:var(--good);border-color:rgba(30,142,76,0.5);background:rgba(30,142,76,0.07)}
 
+/* Tracked-voices row (Radar) — status note under the chip editor. */
+.pr-voices-note{font-family:var(--fm);font-size:10px;color:var(--warn);margin:5px 0 0;letter-spacing:0.02em}
+.pr-voices-note.is-ok{color:var(--muted2)}
+
 /* Welcome splash — public landing page (logo click → intro + PWA install). */
 .pr-welcome{min-height:100vh;overflow-y:auto;display:flex;justify-content:center;padding:56px 22px 64px;
   background-image:linear-gradient(var(--gridline) 1px,transparent 1px),linear-gradient(90deg,var(--gridline) 1px,transparent 1px);

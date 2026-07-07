@@ -83,6 +83,9 @@ create table if not exists daily_briefs (
 -- morning-brief email opt-in
 alter table settings add column if not exists brief_email_enabled boolean default false;
 
+-- tracked voices: comma-separated public commentators the sweep checks
+alter table settings add column if not exists voices text default '';
+
 -- discuss chat history
 create table if not exists chat_messages (
   id uuid primary key default gen_random_uuid(),

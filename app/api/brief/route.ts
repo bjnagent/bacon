@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getMarketSignals, getSectorPerformance, type MarketSignals } from "@/lib/market";
 import { getMacroSnapshot } from "@/lib/macro";
-import { buildSignalBundle, briefToRows, briefToDailyRow } from "@/lib/brief";
+import { getInsiderClusters } from "@/lib/insider";
+import { buildSignalBundle, briefToRows, briefToDailyRow, splitVoices } from "@/lib/brief";
 import { parseOpportunities } from "@/lib/parsers";
 import { opportunityBriefPrompt } from "@/lib/prompts";
 import { askStream } from "@/lib/anthropic";
@@ -45,13 +46,15 @@ export async function POST() {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  const [signals, sectors, macro, themesRes, trackedRes, newsRes] = await Promise.all([
+  const [signals, sectors, macro, insiders, themesRes, trackedRes, newsRes, settingsRes] = await Promise.all([
     getMarketSignals(8).catch((): MarketSignals => ({ gainers: [], losers: [], mostActive: [] })),
     getSectorPerformance().catch(() => []),
     getMacroSnapshot().catch(() => []),
+    getInsiderClusters().catch(() => []),
     sb.from("themes").select("label"),
     sb.from("watchlist").select("symbol"),
     sb.from("news_items").select("headline,source,why").order("created_at", { ascending: false }).limit(10),
+    sb.from("settings").select("*").eq("user_id", user.id).maybeSingle(),
   ]);
   const bundle = buildSignalBundle({
     movers: signals.gainers,
@@ -62,6 +65,8 @@ export async function POST() {
     macro,
     themes: (themesRes.data ?? []).map((t) => t.label),
     tracked: (trackedRes.data ?? []).map((t) => t.symbol),
+    insiders,
+    voices: splitVoices((settingsRes.data as { voices?: string } | null)?.voices),
   });
 
   return textStreamResponse(

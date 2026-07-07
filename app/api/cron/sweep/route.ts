@@ -5,7 +5,8 @@ import { scoutPrompt, moversScoutPrompt, trackingUpdatePrompt, newsPrompt } from
 import { parseScout, parseTrackingUpdate, parseNews, type ScoutResult, type NewsResult } from "@/lib/parsers";
 import { getMarketSignals, getSectorPerformance, MARKET_SOURCE, type MarketSignals } from "@/lib/market";
 import { getMacroSnapshot } from "@/lib/macro";
-import { generateBrief, briefToRows, briefToDailyRow } from "@/lib/brief";
+import { getInsiderClusters, type InsiderCluster } from "@/lib/insider";
+import { generateBrief, briefToRows, briefToDailyRow, splitVoices } from "@/lib/brief";
 import { sendBriefEmail, emailEnabled } from "@/lib/email";
 import { mapClass } from "@/lib/lenses";
 
@@ -35,8 +36,9 @@ export async function GET(req: Request) {
   let moverPicks: MoverPick[] = [];
   let signals: MarketSignals = { gainers: [], losers: [], mostActive: [] };
   let sectors: { sector: string; changePct: string }[] = [];
+  let insiders: InsiderCluster[] = [];
   try {
-    [signals, sectors] = await Promise.all([getMarketSignals(8), getSectorPerformance().catch(() => [])]);
+    [signals, sectors, insiders] = await Promise.all([getMarketSignals(8), getSectorPerformance().catch(() => []), getInsiderClusters().catch(() => [])]);
     const movers = signals.gainers;
     if (movers.length) {
       const text = await ask(moversScoutPrompt(movers), [{ role: "user", content: "Explain today's top movers and what to verify." }], true, 1400, 6);
@@ -49,13 +51,13 @@ export async function GET(req: Request) {
 
   let swept = 0;
   for (const u of due) {
-    await sweepUser(admin, u.user_id, moverPicks, u.news_source, u.news_focus, signals, sectors, !!u.brief_email_enabled);
+    await sweepUser(admin, u.user_id, moverPicks, u.news_source, u.news_focus, signals, sectors, !!u.brief_email_enabled, insiders, splitVoices(u.voices));
     swept++;
   }
   return NextResponse.json({ ok: true, swept });
 }
 
-async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: string, moverPicks: MoverPick[], newsSource: string | null, newsFocus: string | null, signals: MarketSignals, sectors: { sector: string; changePct: string }[], emailOptIn: boolean) {
+async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: string, moverPicks: MoverPick[], newsSource: string | null, newsFocus: string | null, signals: MarketSignals, sectors: { sector: string; changePct: string }[], emailOptIn: boolean, insiders: InsiderCluster[], voices: string[]) {
   const [{ data: themes }, { data: items }, { data: cachedNews }, macro] = await Promise.all([
     admin.from("themes").select("label").eq("user_id", userId),
     admin.from("watchlist").select("id,symbol,asset_class").eq("user_id", userId).order("last_scan_at", { ascending: true, nullsFirst: true }).limit(6),
@@ -82,8 +84,8 @@ async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: st
       .catch(() => ({ it, upd: null }))
   );
   // Synthesis runs CONCURRENTLY with the gatherers, reading yesterday's cached
-  // headlines — decoupling it from the fresh news fetch keeps the whole sweep
-  // inside the 60s serverless ceiling (wall-clock = slowest single call).
+  // headlines — decoupling it from the fresh news fetch keeps the sweep's
+  // wall-clock at the slowest single call, not the sum.
   const briefP = generateBrief({
     movers: signals.gainers.length ? signals.gainers : moverPicks.map((p) => ({ ticker: p.ticker, price: "", changePct: p.change_pct ?? "" })),
     losers: signals.losers,
@@ -93,6 +95,8 @@ async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: st
     macro,
     themes: themeLabels,
     tracked: tracked.map((t) => t.symbol),
+    insiders,
+    voices,
   }).catch(() => null);
 
   const [themeRes, newsRes, trackResults, brief] = await Promise.all([themeScoutP, newsP, Promise.all(trackP), briefP]);
