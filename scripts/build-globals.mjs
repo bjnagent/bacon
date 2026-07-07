@@ -373,6 +373,9 @@ const login = `
 .pr-w-platform-name{font-family:var(--fm);font-size:11px;font-weight:600;color:var(--ink);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:9px}
 .pr-w-steps{margin:0;padding-left:19px;display:flex;flex-direction:column;gap:6px;color:var(--muted);font-size:12.5px;line-height:1.55}
 .pr-w-steps b{color:var(--ink);font-weight:600}
+.pr-w-install-grid.is-single{grid-template-columns:1fr}
+.pr-w-swap{background:none;border:none;color:var(--muted);font-family:var(--fb);font-size:12px;cursor:pointer;text-decoration:underline;padding:0;margin-top:11px;display:inline-block}
+.pr-w-swap:hover{color:var(--accent)}
 .pr-w-installbtn{margin-top:15px}
 .pr-w-installed{display:inline-flex;align-items:center;gap:7px;color:var(--good);font-family:var(--fm);font-size:12px;margin-top:15px}
 .pr-w-foot{font-family:var(--fm);font-size:9.5px;color:var(--muted2);text-align:center;text-transform:uppercase;letter-spacing:0.08em;padding-bottom:8px}
@@ -381,7 +384,25 @@ const login = `
 .pr-brandlink{text-decoration:none;color:inherit;display:block;border-radius:8px}
 .pr-brandlink:hover .pr-brand-name{color:var(--accent)}
 .pr-brandlink:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
-@media (max-width:760px){.pr-w-grid{grid-template-columns:1fr}.pr-w-install-grid{grid-template-columns:1fr}.pr-w-name{font-size:36px}.pr-welcome{padding:36px 16px 48px}}
+@media (max-width:760px){
+  .pr-welcome{padding:26px 14px 40px}
+  .pr-w{gap:20px}
+  .pr-w-hero{gap:7px}
+  .pr-w-hero .pr-prism{width:56px;height:56px}
+  .pr-w-name{font-size:30px;margin-top:6px}
+  .pr-w-pitch{font-size:13.5px;line-height:1.6;margin-top:6px}
+  .pr-w-cta{margin-top:10px}
+  .pr-w-btn{padding:11px 18px;font-size:13.5px}
+  .pr-w-grid{grid-template-columns:1fr;gap:9px}
+  .pr-w-card{padding:13px 15px}
+  .pr-w-card-kicker{margin-bottom:5px}
+  .pr-w-card-title{font-size:15px;margin-bottom:4px}
+  .pr-w-card-body{font-size:12px;line-height:1.55}
+  .pr-w-section{padding:16px 15px}
+  .pr-w-section-title{font-size:17px}
+  .pr-w-section-sub{font-size:12.5px}
+  .pr-w-install-grid{grid-template-columns:1fr;gap:9px;margin-top:12px}
+}
 
 @media (prefers-reduced-motion:reduce){
   .pr-trk-list>*,.pr-pick-grid>*,.pr-news-list>*,.pr-radar-poly,.pr-radar circle,.pr-fab,.pr-logo:hover .pr-prism{animation:none}
