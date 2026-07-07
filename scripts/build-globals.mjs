@@ -10,10 +10,11 @@ const end = src.indexOf("`;", start);
 if (end === -1) throw new Error("could not find end of CSS template");
 let css = src.slice(start, end);
 
-// `@import` must be the first statement in a stylesheet or it is ignored.
-// Hoist the Google Fonts import out of the body so the base reset can sit after it.
+// Fonts moved out of CSS: the serial @import (CSS -> then font stylesheet)
+// blocked first paint. The layout now loads the same stylesheet as a
+// preconnected parallel <link>, so we strip the import here.
 const importMatch = css.match(/@import\s+url\([^)]*\)\s*;\s*/);
-const importLine = importMatch ? importMatch[0].trim() : "";
+const importLine = "";
 if (importMatch) css = css.replace(importMatch[0], "");
 
 

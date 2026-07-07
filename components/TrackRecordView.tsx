@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Loader2, History, ChevronDown, AlertTriangle, Microscope } from "lucide-react";
 import type { StoredBriefItem } from "@/lib/brief";
 import { fetchJson } from "@/lib/fetchJson";
+import { cachedJson, invalidate } from "@/lib/clientCache";
 
 interface BriefRow { id: string; brief_date: string; intro: string | null; caveat: string | null; items: StoredBriefItem[]; reviewed_at: string | null }
 
@@ -25,8 +26,7 @@ export default function TrackRecordView() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/brief/history");
-        const data = await res.json();
+        const data = await cachedJson<{ briefs?: BriefRow[]; migrationNeeded?: boolean }>("/api/brief/history", 60_000);
         if (cancelled) return;
         if (Array.isArray(data.briefs)) setBriefs(data.briefs);
         if (data.migrationNeeded) setMigrationNeeded(true);
@@ -42,6 +42,7 @@ export default function TrackRecordView() {
     try {
       const { ok, status, data } = await fetchJson("/api/brief/review", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
       if (!ok) throw new Error(String(data.error || `Request failed (${status})`));
+      invalidate("/api/brief");
       setBriefs((prev) => prev.map((b) => b.id === id ? { ...b, items: data.items as StoredBriefItem[], reviewed_at: data.reviewed_at as string } : b));
     } catch (err) { setError(err instanceof Error ? err.message : "Something went wrong"); }
     finally { setReviewing(null); }

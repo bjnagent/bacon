@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2, RefreshCw, Radar as RadarIcon, Compass, Plus, X, Trash2, ChevronRight, LayoutGrid, AlertTriangle, ArrowRight } from "lucide-react";
 import { ASSET_CLASSES, SUGGESTED_THEMES, STANCES, mapClass, relTime, type StanceKey } from "@/lib/lenses";
 import type { WatchRow, ThemeRow, ScoutPickRow } from "@/lib/types";
+import { cachedJson, invalidate } from "@/lib/clientCache";
 import type { ScoutResult } from "@/lib/parsers";
 import BaconMark from "./BaconMark";
 import TVLink from "./TVLink";
@@ -37,11 +38,12 @@ export default function RadarView({ onAnalyze }: { onAnalyze: (t: { asset: strin
     let cancelled = false;
     (async () => {
       try {
-        const [w, t, s, st] = await Promise.all([
-          fetch("/api/watchlist"), fetch("/api/themes"), fetch("/api/scout"), fetch("/api/settings"),
+        const [wd, td, sd, std] = await Promise.all([
+          cachedJson<{ items?: WatchRow[] }>("/api/watchlist", 30_000),
+          cachedJson<{ themes?: ThemeRow[] }>("/api/themes", 60_000),
+          cachedJson<{ picks?: ScoutPickRow[] }>("/api/scout", 60_000),
+          cachedJson<{ settings?: { scout_interval_minutes?: number; last_sweep_at?: string | null } }>("/api/settings", 60_000),
         ]);
-        const wd = await w.json(); const td = await t.json();
-        const sd = await s.json(); const std = await st.json();
         if (cancelled) return;
         if (Array.isArray(wd.items)) setItems(wd.items);
         if (Array.isArray(td.themes)) setThemes(td.themes);
@@ -82,6 +84,7 @@ export default function RadarView({ onAnalyze }: { onAnalyze: (t: { asset: strin
       const res = await fetch("/api/watchlist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: sym, asset_class: cls }) });
       const data = await res.json();
       if (res.ok && data.item) {
+        invalidate("/api/watchlist");
         setItems((prev) => [...prev, data.item as WatchRow]);
         scanItem(data.item.id, data.item.symbol, data.item.asset_class);
       }
@@ -92,7 +95,7 @@ export default function RadarView({ onAnalyze }: { onAnalyze: (t: { asset: strin
 
   const remove = async (id: string) => {
     setItems((prev) => prev.filter((it) => it.id !== id));
-    try { await fetch(`/api/watchlist/${id}`, { method: "DELETE" }); } catch { /* ignore */ }
+    try { await fetch(`/api/watchlist/${id}`, { method: "DELETE" }); invalidate("/api/watchlist"); } catch { /* ignore */ }
   };
 
   const savePatch = async (id: string, p: { thesis?: string; conviction?: number; note?: string }) => {
@@ -105,13 +108,13 @@ export default function RadarView({ onAnalyze }: { onAnalyze: (t: { asset: strin
     try {
       const res = await fetch("/api/themes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ label: v }) });
       const data = await res.json();
-      if (res.ok && data.theme) setThemes((prev) => [...prev, data.theme as ThemeRow]);
+      if (res.ok && data.theme) { invalidate("/api/themes"); setThemes((prev) => [...prev, data.theme as ThemeRow]); }
     } catch { /* ignore */ }
   };
 
   const removeTheme = async (id: string) => {
     setThemes((prev) => prev.filter((t) => t.id !== id));
-    try { await fetch("/api/themes", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) }); } catch { /* ignore */ }
+    try { await fetch("/api/themes", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) }); invalidate("/api/themes"); } catch { /* ignore */ }
   };
 
   const runScout = async () => {
@@ -130,7 +133,7 @@ export default function RadarView({ onAnalyze }: { onAnalyze: (t: { asset: strin
     if (savingAuto) return;
     const next = autoOn ? 0 : 1440; // daily; the cron honors per-user cadence
     setSavingAuto(true); setAutoOn(!autoOn);
-    try { await fetch("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scout_interval_minutes: next }) }); }
+    try { await fetch("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scout_interval_minutes: next }) }); invalidate("/api/settings"); }
     catch { setAutoOn(autoOn); }
     finally { setSavingAuto(false); }
   };

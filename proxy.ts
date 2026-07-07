@@ -16,15 +16,15 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Machine + PWA endpoints bypass the session redirect entirely. Vercel Cron
-  // calls /api/cron/* with a CRON_SECRET bearer token but no browser session —
-  // the route enforces that secret itself. /api/health is an uptime probe.
-  // The manifest, service worker, and offline fallback are fetched by the
-  // browser without credentials, so they must be public for install to work.
+  // Fast paths that skip the session round-trip entirely:
+  // - ALL /api/* routes authenticate themselves (each handler calls getUser and
+  //   returns a proper 401) — running auth here too doubled the latency of
+  //   every API call. Cron self-protects with CRON_SECRET; health is public.
+  // - PWA files (manifest, sw, offline, icons) are fetched by the browser
+  //   without credentials, so they must be public for install to work.
   const { pathname } = request.nextUrl;
   if (
-    pathname.startsWith("/api/cron") ||
-    pathname === "/api/health" ||
+    pathname.startsWith("/api/") ||
     pathname === "/robots.txt" ||
     pathname === "/manifest.webmanifest" ||
     pathname === "/sw.js" ||

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { cachedJson } from "@/lib/clientCache";
 
 interface MacroIndicator { key: string; label: string; value: string; unit: string; asOf: string; change: number | null }
 
@@ -16,8 +17,7 @@ export default function MacroBackdrop() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/macro");
-        const data = await res.json();
+        const data = await cachedJson<{ indicators?: MacroIndicator[] }>("/api/macro", 600_000);
         if (!cancelled && Array.isArray(data.indicators)) setIndicators(data.indicators);
       } catch { /* silently omit the strip if unavailable */ }
       finally { if (!cancelled) setLoading(false); }

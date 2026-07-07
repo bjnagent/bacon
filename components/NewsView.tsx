@@ -5,6 +5,7 @@ import { Loader2, RefreshCw, AlertTriangle, Newspaper, Plus, ArrowRight, Message
 import { mapClass } from "@/lib/lenses";
 import type { ChatContext } from "@/lib/prompts";
 import TVLink from "./TVLink";
+import { cachedJson, invalidate } from "@/lib/clientCache";
 
 const SOURCES = ["All", "CNBC", "Bloomberg", "Yahoo Finance", "Reuters", "WSJ", "FT", "MarketWatch"];
 
@@ -26,8 +27,10 @@ export default function NewsView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { as
     let cancelled = false;
     (async () => {
       try {
-        const [n, w] = await Promise.all([fetch("/api/news"), fetch("/api/watchlist")]);
-        const nd = await n.json(); const wd = await w.json();
+        const [nd, wd] = await Promise.all([
+          cachedJson<{ items?: { headline: string; source: string; why: string; symbol: string; asset_class: string; signal: string; recency: string }[] }>("/api/news", 60_000),
+          cachedJson<{ items?: { symbol: string }[] }>("/api/watchlist", 30_000),
+        ]);
         if (cancelled) return;
         if (Array.isArray(nd.items)) setItems(nd.items.map((r: { headline: string; source: string; why: string; symbol: string; asset_class: string; signal: string; recency: string }) => ({ head: r.headline, source: r.source, why: r.why, ticker: r.symbol, cls: r.asset_class, signal: r.signal, when: r.recency })));
         if (Array.isArray(wd.items)) { const t: Record<string, boolean> = {}; wd.items.forEach((it: { symbol: string }) => { t[it.symbol.toUpperCase()] = true; }); setTracked(t); }
@@ -54,7 +57,7 @@ export default function NewsView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { as
     const sym = ticker.toUpperCase();
     if (tracked[sym]) return;
     setTracked((t) => ({ ...t, [sym]: true }));
-    try { await fetch("/api/watchlist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: sym, asset_class: cls }) }); } catch { /* ignore */ }
+    try { await fetch("/api/watchlist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: sym, asset_class: cls }) }); invalidate("/api/watchlist"); } catch { /* ignore */ }
   };
 
   return (

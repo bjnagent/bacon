@@ -7,7 +7,9 @@ const MODEL = process.env.BACON_MODEL ?? "claude-sonnet-4-6";
 // required when an AI call actually runs, at request time, on the server.
 let client: Anthropic | null = null;
 function getClient(): Anthropic {
-  if (!client) client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
+  // timeout < the 60s serverless ceiling so a hung upstream call fails fast
+  // with a readable error instead of riding into the gateway timeout page.
+  if (!client) client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY!, timeout: 55_000, maxRetries: 1 });
   return client;
 }
 

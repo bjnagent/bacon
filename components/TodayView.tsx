@@ -5,6 +5,7 @@ import { Loader2, Sparkles, ArrowRight, Plus, AlertTriangle, RefreshCw, Mail, Ma
 import { mapClass, relTime } from "@/lib/lenses";
 import type { ChatContext } from "@/lib/prompts";
 import { fetchJson } from "@/lib/fetchJson";
+import { cachedJson, invalidate } from "@/lib/clientCache";
 import MacroBackdrop from "./MacroBackdrop";
 import BaconMark from "./BaconMark";
 import TVLink from "./TVLink";
@@ -28,8 +29,9 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
     let cancelled = false;
     (async () => {
       try {
-        const [b, w, st] = await Promise.all([fetch("/api/brief"), fetch("/api/watchlist"), fetch("/api/settings")]);
-        const bd = await b.json(); const wd = await w.json(); const std = await st.json();
+        const [bd, wd, std] = await Promise.all([
+          cachedJson("/api/brief", 60_000), cachedJson("/api/watchlist", 30_000), cachedJson("/api/settings", 60_000),
+        ]) as [Record<string, unknown> & { brief?: Brief }, { items?: { symbol: string }[] }, { settings?: { brief_email_enabled?: boolean } }];
         if (cancelled) return;
         if (bd.brief) setBrief(bd.brief);
         if (Array.isArray(wd.items)) { const t: Record<string, boolean> = {}; wd.items.forEach((it: { symbol: string }) => { t[it.symbol.toUpperCase()] = true; }); setTracked(t); }
@@ -46,6 +48,7 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
     try {
       const { ok, status, data } = await fetchJson("/api/brief", { method: "POST" });
       if (!ok) throw new Error(String(data.error || `Request failed (${status})`));
+      invalidate("/api/brief");
       setBrief(data.brief as Brief);
     } catch (err) { setError(err instanceof Error ? err.message : "Something went wrong"); }
     finally { setGenerating(false); }
@@ -58,6 +61,7 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
     try {
       const res = await fetch("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ brief_email_enabled: next }) });
       if (!res.ok) { const d = await res.json(); throw new Error(d.error || "save failed"); }
+      invalidate("/api/settings");
     } catch (err) {
       setEmailOn(!next);
       setEmailErr(err instanceof Error && /column|schema/i.test(err.message) ? "Run the latest supabase/schema.sql once to enable email." : "Couldn't save — try again.");
@@ -68,7 +72,7 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
     const sym = ticker.toUpperCase();
     if (tracked[sym]) return;
     setTracked((t) => ({ ...t, [sym]: true }));
-    try { await fetch("/api/watchlist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: sym, asset_class: cls }) }); } catch { /* ignore */ }
+    try { await fetch("/api/watchlist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: sym, asset_class: cls }) }); invalidate("/api/watchlist"); } catch { /* ignore */ }
   };
 
   const hasBrief = !!brief && brief.items.length > 0;

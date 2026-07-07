@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Sunrise, Search, Calculator, BookOpen, Command } from "lucide-react";
 import { deriveContext, type ChatContext } from "@/lib/prompts";
 import { splitSymCls } from "@/lib/lenses";
+import { cachedJson } from "@/lib/clientCache";
 import { Boot, HelpOverlay } from "./Terminal";
 import BaconMark from "./BaconMark";
 import DiscoverView, { type DiscoverTab } from "./DiscoverView";
@@ -71,7 +72,7 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try { const r = await fetch("/api/watchlist"); const d = await r.json(); if (!cancelled && Array.isArray(d.items)) setWatchlistSyms(d.items.map((it: { symbol: string }) => it.symbol)); } catch { /* ignore */ }
+      try { const d = await cachedJson<{ items?: { symbol: string }[] }>("/api/watchlist", 30_000); if (!cancelled && Array.isArray(d.items)) setWatchlistSyms(d.items.map((it) => it.symbol)); } catch { /* ignore */ }
     })();
     return () => { cancelled = true; };
   }, []);
