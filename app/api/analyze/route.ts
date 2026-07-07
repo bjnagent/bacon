@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { ask } from "@/lib/anthropic";
+import { askStream } from "@/lib/anthropic";
 import { analysisPrompt } from "@/lib/prompts";
-import { parseBriefing } from "@/lib/parsers";
 import { getMacroSnapshot } from "@/lib/macro";
+import { textStreamResponse } from "@/lib/streamRoute";
 
-// Live web search can take 20–40s; allow a longer function timeout on Vercel.
+// Live web search can take 20–40s; stream the briefing so lens panels appear
+// as they're written instead of after the whole generation.
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
@@ -27,17 +28,13 @@ export async function POST(req: Request) {
     if (macro.length) macroCtx = `\n\nCurrent macro backdrop (real data via FRED — context for the Macro lens, not this asset's own figures): ${macro.map((m) => `${m.label} ${m.value}${m.unit}`).join(", ")}.`;
   } catch { /* macro optional */ }
 
-  try {
-    const text = await ask(
+  return textStreamResponse(
+    askStream(
       analysisPrompt(),
       [{ role: "user", content: `Asset: ${asset}\nAsset class: ${assetClass}${macroCtx}\n\nProduce the six-lens BACON briefing using current public information.` }],
       true,
-      1100
-    );
-    const parsed = parseBriefing(text);
-    if (parsed.SUMMARY || Object.keys(parsed.lenses).length >= 3) return NextResponse.json({ briefing: parsed });
-    return NextResponse.json({ raw: text });
-  } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Analysis failed" }, { status: 500 });
-  }
+      1100,
+      5
+    )
+  );
 }

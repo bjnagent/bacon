@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getMarketSignals, getSectorPerformance, type MarketSignals } from "@/lib/market";
 import { getMacroSnapshot } from "@/lib/macro";
-import { generateBrief, briefToRows, briefToDailyRow } from "@/lib/brief";
+import { buildSignalBundle, briefToRows, briefToDailyRow } from "@/lib/brief";
+import { parseOpportunities } from "@/lib/parsers";
+import { opportunityBriefPrompt } from "@/lib/prompts";
+import { askStream } from "@/lib/anthropic";
+import { textStreamResponse } from "@/lib/streamRoute";
 import { SCOUT_PICK_COLUMNS, type ScoutPickRow } from "@/lib/types";
 
 export const maxDuration = 60;
@@ -33,41 +37,42 @@ export async function GET() {
 }
 
 // POST: generate the brief on demand — same synthesis the nightly sweep runs,
-// scoped to the current user's session (RLS enforces row ownership).
+// scoped to the current user's session (RLS enforces row ownership). STREAMS
+// the raw synthesis text so opportunity cards appear as they're written; the
+// parsed result is persisted after the last chunk.
 export async function POST() {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  try {
-    const [signals, sectors, macro, themesRes, trackedRes, newsRes] = await Promise.all([
-      getMarketSignals(8).catch((): MarketSignals => ({ gainers: [], losers: [], mostActive: [] })),
-      getSectorPerformance().catch(() => []),
-      getMacroSnapshot().catch(() => []),
-      sb.from("themes").select("label"),
-      sb.from("watchlist").select("symbol"),
-      sb.from("news_items").select("headline,source,why").order("created_at", { ascending: false }).limit(10),
-    ]);
-    const brief = await generateBrief({
-      movers: signals.gainers,
-      losers: signals.losers,
-      mostActive: signals.mostActive,
-      sectors,
-      headlines: (newsRes.data ?? []).map((n) => ({ head: n.headline, source: n.source, why: n.why })),
-      macro,
-      themes: (themesRes.data ?? []).map((t) => t.label),
-      tracked: (trackedRes.data ?? []).map((t) => t.symbol),
-    });
-    // Track record (best-effort — table ships in schema.sql).
-    await sb.from("daily_briefs").upsert({ ...briefToDailyRow(user.id, brief), brief_date: new Date().toISOString().slice(0, 10) }, { onConflict: "user_id,brief_date" });
-    const rows = briefToRows(user.id, brief);
-    if (rows.length) {
+  const [signals, sectors, macro, themesRes, trackedRes, newsRes] = await Promise.all([
+    getMarketSignals(8).catch((): MarketSignals => ({ gainers: [], losers: [], mostActive: [] })),
+    getSectorPerformance().catch(() => []),
+    getMacroSnapshot().catch(() => []),
+    sb.from("themes").select("label"),
+    sb.from("watchlist").select("symbol"),
+    sb.from("news_items").select("headline,source,why").order("created_at", { ascending: false }).limit(10),
+  ]);
+  const bundle = buildSignalBundle({
+    movers: signals.gainers,
+    losers: signals.losers,
+    mostActive: signals.mostActive,
+    sectors,
+    headlines: (newsRes.data ?? []).map((n) => ({ head: n.headline, source: n.source, why: n.why })),
+    macro,
+    themes: (themesRes.data ?? []).map((t) => t.label),
+    tracked: (trackedRes.data ?? []).map((t) => t.symbol),
+  });
+
+  return textStreamResponse(
+    askStream(opportunityBriefPrompt(), [{ role: "user", content: bundle }], true, 1500, 4),
+    async (full) => {
+      const brief = parseOpportunities(full);
+      if (!brief.items.length) return;
+      await sb.from("daily_briefs").upsert({ ...briefToDailyRow(user.id, brief), brief_date: new Date().toISOString().slice(0, 10) }, { onConflict: "user_id,brief_date" });
+      const rows = briefToRows(user.id, brief);
       await sb.from("scout_picks").delete().in("kind", ["opportunity", "brief-intro"]);
       await sb.from("scout_picks").insert(rows);
     }
-    const { data } = await sb.from("scout_picks").select(SCOUT_PICK_COLUMNS).in("kind", ["opportunity", "brief-intro"]).order("created_at", { ascending: false });
-    return NextResponse.json({ brief: assemble((data ?? []) as ScoutPickRow[]) });
-  } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Brief generation failed" }, { status: 500 });
-  }
+  );
 }

@@ -45,7 +45,8 @@ export async function* askStream(
   system: string,
   messages: { role: "user" | "assistant"; content: string }[],
   useSearch = true,
-  maxTokens = 1024
+  maxTokens = 1024,
+  maxSearches?: number
 ): AsyncGenerator<string> {
   const stream = await getClient().messages.create({
     model: MODEL,
@@ -53,7 +54,7 @@ export async function* askStream(
     system,
     messages,
     stream: true,
-    ...(useSearch ? { tools: [{ type: "web_search_20250305" as const, name: "web_search" }] } : {}),
+    ...(useSearch ? { tools: [{ type: "web_search_20250305" as const, name: "web_search", ...(maxSearches ? { max_uses: maxSearches } : {}) }] } : {}),
   });
   for await (const ev of stream) {
     if (ev.type === "content_block_delta" && ev.delta.type === "text_delta") yield ev.delta.text;

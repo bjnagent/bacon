@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import { Loader2, ArrowRight, ArrowUpRight, AlertTriangle, Scale, LayoutGrid, Bookmark, MessageCircle, Users } from "lucide-react";
 import { LENSES, STANCES, ASSET_CLASSES, PERSONAS, overallLean, type LensKey, type StanceKey } from "@/lib/lenses";
-import { toPoints, type Briefing, type Debate } from "@/lib/parsers";
+import { toPoints, parseBriefing, type Briefing, type Debate } from "@/lib/parsers";
+import { readTextStream } from "@/lib/readStream";
 import type { ChatContext } from "@/lib/prompts";
 import Spectrum from "./Spectrum";
 import ConvictionRadar from "./ConvictionRadar";
@@ -38,16 +39,18 @@ export default function AnalyzeView({ target, onDiscuss, quickSyms = [] }: { tar
     if (!asset || loading) return;
     setLoading(true); setError(null); setBriefing(null); setRawFallback(null);
     setSaved(false); setSubView("lenses"); setDebate(null); setDebateError(null); setPersonas(null); setPersonasError(null);
+    setAnalyzed(asset); // header + live chart mount immediately; lenses stream in
     try {
-      const res = await fetch("/api/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ asset, assetClass: klass }) });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
-      if (data.briefing) setBriefing(data.briefing as Briefing);
-      else if (data.raw) setRawFallback(data.raw as string);
-      else throw new Error("Empty response");
-      setAnalyzed(asset);
+      const full = await readTextStream("/api/analyze", { asset, assetClass: klass }, (acc) => {
+        // Progressive parse: panels appear the moment their ===SECTION=== lands.
+        const partial = parseBriefing(acc);
+        if (partial.SUMMARY || Object.keys(partial.lenses).length > 0) setBriefing(partial);
+      });
+      const parsed = parseBriefing(full);
+      if (parsed.SUMMARY || Object.keys(parsed.lenses).length >= 3) setBriefing(parsed);
+      else { setBriefing(null); setRawFallback(full); }
       setRanAt(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
-    } catch (err) { setError(err instanceof Error ? err.message : "Something went wrong"); }
+    } catch (err) { setBriefing(null); setError(err instanceof Error ? err.message : "Something went wrong"); }
     finally { setLoading(false); }
   };
 
@@ -133,7 +136,7 @@ export default function AnalyzeView({ target, onDiscuss, quickSyms = [] }: { tar
         )}
       </form>
 
-      {loading && (
+      {loading && !hasBriefing && (
         <div className="pr-loading">
           <div className="pr-loading-lenses">{LENSES.map((l, i) => <div key={l.key} className="pr-loading-lens" style={{ animationDelay: `${i * 0.18}s` }}><span className="pr-loading-dot" style={{ background: l.hue }} />{l.short}</div>)}</div>
           <div className="pr-loading-text">Sizzling through all six lenses — live search on the wire…</div>

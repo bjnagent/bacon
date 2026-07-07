@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { Loader2, Sparkles, ArrowRight, Plus, AlertTriangle, RefreshCw, Mail, MailX } from "lucide-react";
 import { mapClass, relTime } from "@/lib/lenses";
 import type { ChatContext } from "@/lib/prompts";
-import { fetchJson } from "@/lib/fetchJson";
+import { parseOpportunities } from "@/lib/parsers";
+import { readTextStream } from "@/lib/readStream";
 import { cachedJson, invalidate } from "@/lib/clientCache";
 import MacroBackdrop from "./MacroBackdrop";
 import BaconMark from "./BaconMark";
@@ -45,11 +46,28 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
   const generate = async () => {
     if (generating) return;
     setGenerating(true); setError(null);
+    const toItems = (acc: string): Brief | null => {
+      const b = parseOpportunities(acc);
+      if (!b.intro && b.items.length === 0) return null;
+      return {
+        intro: b.intro, caveat: b.caveat, generatedAt: null,
+        items: b.items.map((o, i) => ({
+          id: `stream-${i}`, name: o.name, ticker: o.ticker, cls: o.cls, horizon: o.horizon,
+          thesis: o.thesis, signals: o.signals,
+          checks: [o.confirm && `Confirm: ${o.confirm}`, o.kill && `Kill: ${o.kill}`].filter(Boolean).join(" · "),
+        })),
+      };
+    };
     try {
-      const { ok, status, data } = await fetchJson("/api/brief", { method: "POST" });
-      if (!ok) throw new Error(String(data.error || `Request failed (${status})`));
+      // Cards materialize as the synthesis writes them.
+      await readTextStream("/api/brief", undefined, (acc) => { const b = toItems(acc); if (b) setBrief(b); });
       invalidate("/api/brief");
-      setBrief(data.brief as Brief);
+      // Swap in the persisted canonical brief (real row ids + timestamp).
+      try {
+        const res = await fetch("/api/brief");
+        const data = await res.json();
+        if (res.ok && data.brief?.items?.length) setBrief(data.brief as Brief);
+      } catch { /* streamed view is already correct */ }
     } catch (err) { setError(err instanceof Error ? err.message : "Something went wrong"); }
     finally { setGenerating(false); }
   };
