@@ -4,7 +4,7 @@ import { ask } from "@/lib/anthropic";
 import { debatePrompt } from "@/lib/prompts";
 import { parseDebate } from "@/lib/parsers";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export async function POST(req: Request) {
   const sb = await createClient();
@@ -22,7 +22,8 @@ export async function POST(req: Request) {
       debatePrompt(),
       [{ role: "user", content: `Asset: ${asset}\nAsset class: ${assetClass}\n\nRun the bull-vs-bear debate using current public information.` }],
       true,
-      1100
+      1100,
+      6
     );
     return NextResponse.json({ debate: parseDebate(text) });
   } catch (err) {

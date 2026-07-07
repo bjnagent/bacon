@@ -5,7 +5,7 @@ import { briefReviewPrompt } from "@/lib/prompts";
 import { parseBriefReview } from "@/lib/parsers";
 import type { StoredBriefItem } from "@/lib/brief";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 // "How did it age?" — web-search-grounded review of a past brief. Writes each
 // item's outcome + verdict back onto the stored brief (the track record).
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
 
   try {
     const listing = items.map((o, i) => `${i + 1}. ${o.name} (${o.ticker || "—"}) — horizon ${o.horizon || "?"} — thesis: ${o.thesis} — kill: ${o.checks}`).join("\n");
-    const text = await ask(briefReviewPrompt(String(row.brief_date)), [{ role: "user", content: `Opportunities flagged on ${row.brief_date}:\n${listing}\n\nReview what has happened to each since.` }], true, 1400, 5);
+    const text = await ask(briefReviewPrompt(String(row.brief_date)), [{ role: "user", content: `Opportunities flagged on ${row.brief_date}:\n${listing}\n\nReview what has happened to each since.` }], true, 1400, 8);
     const review = parseBriefReview(text);
     const reviewed = items.map((o, i) => {
       const match = review.items.find((r) => r.ticker.toUpperCase().includes((o.ticker || o.name).toUpperCase())) ?? review.items[i];

@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { askStream } from "@/lib/anthropic";
 import { chatSystemPrompt, type ChatContext } from "@/lib/prompts";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 // GET: resume the most recent conversation — its id, messages, and context —
 // so the panel can pick up where the user left off.
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        for await (const chunk of askStream(system, messages, true, 1024)) {
+        for await (const chunk of askStream(system, messages, true, 1024, 5)) {
           full += chunk;
           controller.enqueue(encoder.encode(chunk));
         }

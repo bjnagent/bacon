@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { Sunrise, Search, Calculator, BookOpen, Command } from "lucide-react";
 import { deriveContext, type ChatContext } from "@/lib/prompts";
 import { splitSymCls } from "@/lib/lenses";
@@ -134,19 +135,23 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
       <ChatPanel open={chatOpen} context={chatContext} onClose={closeChat} />
 
       <div className="pr-mobilehead">
-        <div className="pr-brand">
-          <div className="pr-logo"><BaconMark size={26} /></div>
-          <div className="pr-brand-text"><div className="pr-brand-name">BACON</div><div className="pr-brand-tag">research radar</div></div>
-        </div>
+        <Link href="/welcome" className="pr-brandlink" aria-label="About Bacon — intro and install">
+          <div className="pr-brand">
+            <div className="pr-logo"><BaconMark size={26} /></div>
+            <div className="pr-brand-text"><div className="pr-brand-name">BACON</div><div className="pr-brand-tag">research radar</div></div>
+          </div>
+        </Link>
       </div>
 
       <div className="pr-shell">
         <nav className="pr-rail">
           <div className="pr-railbrand">
-            <div className="pr-brand">
-              <div className="pr-logo"><BaconMark size={28} /></div>
-              <div className="pr-brand-text"><div className="pr-brand-name">BACON</div><div className="pr-brand-tag">research radar</div></div>
-            </div>
+            <Link href="/welcome" className="pr-brandlink" aria-label="About Bacon — intro and install">
+              <div className="pr-brand">
+                <div className="pr-logo"><BaconMark size={28} /></div>
+                <div className="pr-brand-text"><div className="pr-brand-name">BACON</div><div className="pr-brand-tag">research radar</div></div>
+              </div>
+            </Link>
           </div>
           <div className="pr-railnav">
             <button className={`pr-railbtn ${place === "discover" ? "is-active" : ""}`} aria-current={place === "discover" ? "page" : undefined} onClick={() => setPlace("discover")}>

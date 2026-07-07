@@ -338,9 +338,56 @@ const login = `
 .pr-mailtoggle:hover{border-color:var(--accent);color:var(--ink)}
 .pr-mailtoggle.is-on{color:var(--good);border-color:rgba(30,142,76,0.5);background:rgba(30,142,76,0.07)}
 
+/* Welcome splash — public landing page (logo click → intro + PWA install). */
+.pr-welcome{min-height:100vh;overflow-y:auto;display:flex;justify-content:center;padding:56px 22px 64px;
+  background-image:linear-gradient(var(--gridline) 1px,transparent 1px),linear-gradient(90deg,var(--gridline) 1px,transparent 1px);
+  background-size:28px 28px,28px 28px}
+.pr-w{width:min(780px,100%);display:flex;flex-direction:column;gap:34px}
+.pr-w-hero{display:flex;flex-direction:column;align-items:center;text-align:center;gap:9px;animation:prFade .5s ease}
+.pr-w-hero .pr-prism{animation:prSizzle 7s ease-in-out infinite}
+.pr-w-name{font-family:var(--fd);font-weight:700;font-size:46px;letter-spacing:0.03em;line-height:1;margin:10px 0 0;background:var(--spectrum);-webkit-background-clip:text;background-clip:text;color:transparent}
+.pr-w-tag{font-family:var(--fm);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.2em}
+.pr-w-pitch{color:var(--ink);font-size:15.5px;line-height:1.7;max-width:600px;margin:10px 0 0}
+.pr-w-pitch em{font-style:normal;color:var(--accent);font-weight:600}
+.pr-w-cta{display:flex;gap:11px;flex-wrap:wrap;justify-content:center;margin-top:16px}
+.pr-w-btn{display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:#fff;border:none;font-family:var(--fb);font-weight:600;font-size:14.5px;padding:13px 22px;border-radius:9px;cursor:pointer;text-decoration:none;box-shadow:0 2px 0 var(--accent2);transition:all .12s}
+.pr-w-btn:hover{background:#ff5018;transform:translateY(1px);box-shadow:0 1px 0 var(--accent2)}
+.pr-w-btn.is-alt{background:var(--card);color:var(--ink);border:1px solid var(--line2);box-shadow:none}
+.pr-w-btn.is-alt:hover{background:var(--paper2);border-color:var(--accent);transform:none}
+.pr-w-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:13px}
+.pr-w-card{background:var(--card);border:1px solid var(--line2);border-radius:10px;padding:18px;position:relative;overflow:hidden;animation:prPopIn .5s var(--pop) backwards;transition:transform .18s var(--pop),box-shadow .18s var(--pop),border-color .14s}
+.pr-w-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--spectrum)}
+.pr-w-card:hover{transform:translateY(-3px) rotate(-0.25deg);border-color:var(--ink);box-shadow:5px 7px 0 var(--line2)}
+.pr-w-grid>*:nth-child(1){animation-delay:.06s}
+.pr-w-grid>*:nth-child(2){animation-delay:.14s}
+.pr-w-grid>*:nth-child(3){animation-delay:.22s}
+.pr-w-card-kicker{font-family:var(--fm);font-size:9.5px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.12em;margin-bottom:8px}
+.pr-w-card-title{font-family:var(--fd);font-weight:700;font-size:16.5px;color:var(--ink);margin-bottom:7px}
+.pr-w-card-body{font-size:12.5px;color:var(--muted);line-height:1.65}
+.pr-w-section{background:var(--card);border:1px solid var(--line2);border-radius:10px;padding:22px 24px}
+.pr-w-section-head{font-family:var(--fm);font-size:10px;color:var(--muted2);text-transform:uppercase;letter-spacing:0.14em;margin-bottom:6px}
+.pr-w-section-title{font-family:var(--fd);font-weight:700;font-size:20px;color:var(--ink);margin-bottom:8px}
+.pr-w-section-sub{font-size:13px;color:var(--muted);line-height:1.65;max-width:560px}
+.pr-w-install-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-top:16px}
+.pr-w-platform{background:var(--paper2);border:1px solid var(--line);border-radius:9px;padding:15px 17px}
+.pr-w-platform-name{font-family:var(--fm);font-size:11px;font-weight:600;color:var(--ink);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:9px}
+.pr-w-steps{margin:0;padding-left:19px;display:flex;flex-direction:column;gap:6px;color:var(--muted);font-size:12.5px;line-height:1.55}
+.pr-w-steps b{color:var(--ink);font-weight:600}
+.pr-w-installbtn{margin-top:15px}
+.pr-w-installed{display:inline-flex;align-items:center;gap:7px;color:var(--good);font-family:var(--fm);font-size:12px;margin-top:15px}
+.pr-w-foot{font-family:var(--fm);font-size:9.5px;color:var(--muted2);text-align:center;text-transform:uppercase;letter-spacing:0.08em;padding-bottom:8px}
+.pr-w-foot a{color:var(--muted);text-decoration:underline}
+.pr-w-foot a:hover{color:var(--accent)}
+.pr-brandlink{text-decoration:none;color:inherit;display:block;border-radius:8px}
+.pr-brandlink:hover .pr-brand-name{color:var(--accent)}
+.pr-brandlink:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+@media (max-width:760px){.pr-w-grid{grid-template-columns:1fr}.pr-w-install-grid{grid-template-columns:1fr}.pr-w-name{font-size:36px}.pr-welcome{padding:36px 16px 48px}}
+
 @media (prefers-reduced-motion:reduce){
   .pr-trk-list>*,.pr-pick-grid>*,.pr-news-list>*,.pr-radar-poly,.pr-radar circle,.pr-fab,.pr-logo:hover .pr-prism{animation:none}
   .pr-trk:hover,.pr-pick:hover,.pr-news:hover,.pr-panel:hover,.pr-chip:hover,.pr-railbtn:hover svg{transform:none}
+  .pr-w-hero,.pr-w-hero .pr-prism,.pr-w-card,.pr-w-grid>*{animation:none}
+  .pr-w-card:hover,.pr-w-btn:hover{transform:none}
 }
 `;
 

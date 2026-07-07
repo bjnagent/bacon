@@ -4,7 +4,7 @@ import { ask } from "@/lib/anthropic";
 import { trackingUpdatePrompt } from "@/lib/prompts";
 import { parseTrackingUpdate } from "@/lib/parsers";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 // Run a qualitative monitoring update for one tracked name and persist it to the
 // row. Returns the parsed update so the client can reflect it immediately.
@@ -25,7 +25,8 @@ export async function POST(req: Request) {
       trackingUpdatePrompt(),
       [{ role: "user", content: `Asset: ${symbol}\nAsset class: ${assetClass}\n\nGive the monitoring update from current public information.` }],
       true,
-      1100
+      1100,
+      4
     );
     const u = parseTrackingUpdate(text);
     const last_scan_at = new Date().toISOString();

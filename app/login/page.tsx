@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
@@ -82,6 +83,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             <button type="submit" formAction={signUp} className="pr-login-btn pr-login-btn-alt">Create account</button>
             <button type="submit" formAction={magicLink} className="pr-login-link">Email me a magic link instead</button>
           </form>
+          <Link href="/welcome" className="pr-login-link">New here? What Bacon is &amp; how to install it →</Link>
           <p className="pr-login-note">Verify yourself · Not financial advice</p>
         </div>
       </div>

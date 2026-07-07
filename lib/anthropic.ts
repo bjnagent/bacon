@@ -7,9 +7,9 @@ const MODEL = process.env.BACON_MODEL ?? "claude-sonnet-4-6";
 // required when an AI call actually runs, at request time, on the server.
 let client: Anthropic | null = null;
 function getClient(): Anthropic {
-  // timeout < the 60s serverless ceiling so a hung upstream call fails fast
-  // with a readable error instead of riding into the gateway timeout page.
-  if (!client) client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY!, timeout: 55_000, maxRetries: 1 });
+  // timeout < the 300s Fluid-compute function ceiling so a hung upstream call
+  // fails with a readable error instead of riding into the gateway timeout page.
+  if (!client) client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY!, timeout: 240_000, maxRetries: 1 });
   return client;
 }
 
@@ -27,8 +27,8 @@ export async function ask(
     messages,
     ...(useSearch
       ? {
-          // max_uses bounds the search loop — serverless routes have a hard
-          // 60s ceiling, and an uncapped search loop is what blows it.
+          // max_uses bounds the search loop — it's what keeps latency and
+          // search spend predictable; an uncapped loop can run for minutes.
           tools: [{ type: "web_search_20250305" as const, name: "web_search", ...(maxSearches ? { max_uses: maxSearches } : {}) }],
         }
       : {}),

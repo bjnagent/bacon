@@ -50,7 +50,10 @@ export async function proxy(request: NextRequest) {
     }
   );
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user && !request.nextUrl.pathname.startsWith("/login") && !request.nextUrl.pathname.startsWith("/api/auth")) {
+  // /welcome is the public splash page (intro + PWA install). It stays on the
+  // session-refresh path — not the fast path — so its login/cockpit CTA is
+  // accurate even when the access token needs a refresh.
+  if (!user && !request.nextUrl.pathname.startsWith("/login") && !request.nextUrl.pathname.startsWith("/api/auth") && request.nextUrl.pathname !== "/welcome") {
     return NextResponse.redirect(new URL("/login", request.url));
   }
   return supabaseResponse;

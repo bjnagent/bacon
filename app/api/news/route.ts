@@ -5,7 +5,7 @@ import { newsPrompt } from "@/lib/prompts";
 import { parseNews } from "@/lib/parsers";
 import { NEWS_COLUMNS } from "@/lib/types";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 // GET: cached headlines. POST: refresh via live search, paraphrased + attributed
 // (the copyright rule lives in newsPrompt), persisted as the latest batch.
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
       [{ role: "user", content: `Source focus: ${source}\nTopic focus: ${focus || "(general markets)"}\n\nSurface the latest market-moving business headlines now.` }],
       true,
       1500,
-      4
+      6
     );
     const result = parseNews(text);
     if (result.items.length) {

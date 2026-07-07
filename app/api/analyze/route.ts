@@ -7,7 +7,7 @@ import { textStreamResponse } from "@/lib/streamRoute";
 
 // Live web search can take 20–40s; stream the briefing so lens panels appear
 // as they're written instead of after the whole generation.
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export async function POST(req: Request) {
   const sb = await createClient();
@@ -33,8 +33,8 @@ export async function POST(req: Request) {
       analysisPrompt(),
       [{ role: "user", content: `Asset: ${asset}\nAsset class: ${assetClass}${macroCtx}\n\nProduce the six-lens BACON briefing using current public information.` }],
       true,
-      1100,
-      5
+      1300,
+      8
     )
   );
 }

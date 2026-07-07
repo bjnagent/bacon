@@ -145,7 +145,7 @@ Hunt specifically for what is NOT obvious:
 - Historical rhymes: use web_search to check how similar setups resolved before, and say so qualitatively ("similar guidance-led moves in this sector have historically taken weeks to fully reprice" — no invented statistics).
 - Early horizon: things coming up (catalysts, decisions, earnings, policy dates) where positioning early is the edge.
 
-Budget: you have AT MOST 4 web searches — spend them on the strongest convergences, not on every candidate.
+Budget: you have AT MOST 6 web searches — spend them on the strongest convergences, not on every candidate.
 
 HARD RULES: never invent prices, targets or figures — the only numbers allowed are ones present in the provided signals or found via web_search (attribute them). These are research starting points, NOT recommendations. Not financial advice.
 

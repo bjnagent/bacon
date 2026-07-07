@@ -34,7 +34,7 @@ export function buildSignalBundle(b: SignalBundle): string {
 }
 
 export async function generateBrief(bundle: SignalBundle): Promise<OpportunityBrief> {
-  const text = await ask(opportunityBriefPrompt(), [{ role: "user", content: buildSignalBundle(bundle) }], true, 1500, 4);
+  const text = await ask(opportunityBriefPrompt(), [{ role: "user", content: buildSignalBundle(bundle) }], true, 1800, 6);
   return parseOpportunities(text);
 }
 

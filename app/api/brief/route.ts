@@ -9,7 +9,7 @@ import { askStream } from "@/lib/anthropic";
 import { textStreamResponse } from "@/lib/streamRoute";
 import { SCOUT_PICK_COLUMNS, type ScoutPickRow } from "@/lib/types";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 function assemble(rows: ScoutPickRow[]) {
   const introRow = rows.find((r) => r.kind === "brief-intro");
@@ -65,7 +65,7 @@ export async function POST() {
   });
 
   return textStreamResponse(
-    askStream(opportunityBriefPrompt(), [{ role: "user", content: bundle }], true, 1500, 4),
+    askStream(opportunityBriefPrompt(), [{ role: "user", content: bundle }], true, 1800, 6),
     async (full) => {
       const brief = parseOpportunities(full);
       if (!brief.items.length) return;

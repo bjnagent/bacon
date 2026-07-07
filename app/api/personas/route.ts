@@ -4,7 +4,7 @@ import { ask } from "@/lib/anthropic";
 import { personasPrompt } from "@/lib/prompts";
 import { parseDebate } from "@/lib/parsers"; // generic ===SECTION=== splitter
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 // Stylized investor takes for the analyzed asset (Buffett/Graham/Lynch/Burry).
 export async function POST(req: Request) {
@@ -23,7 +23,8 @@ export async function POST(req: Request) {
       personasPrompt(),
       [{ role: "user", content: `Asset: ${asset}\nAsset class: ${assetClass}\n\nGive the four stylized investor takes using current public information.` }],
       true,
-      1100
+      1100,
+      6
     );
     return NextResponse.json({ personas: parseDebate(text) });
   } catch (err) {

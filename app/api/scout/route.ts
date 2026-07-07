@@ -5,7 +5,7 @@ import { scoutPrompt } from "@/lib/prompts";
 import { parseScout } from "@/lib/parsers";
 import { SCOUT_PICK_COLUMNS } from "@/lib/types";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 // Cached "fresh finds" — picks the background sweep persisted for this user.
 export async function GET() {
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
       [{ role: "user", content: `Themes: ${themes.join("; ") || "(none — scan broadly)"}\n\nScout current candidates to research, emphasizing recent catalysts.` }],
       true,
       1100,
-      4
+      6
     );
     return NextResponse.json({ result: parseScout(text) });
   } catch (err) {

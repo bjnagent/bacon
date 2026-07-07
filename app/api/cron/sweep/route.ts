@@ -13,7 +13,7 @@ import { mapClass } from "@/lib/lenses";
 // scout) into each user's "fresh finds" feed, and refresh their tracked names —
 // even with the tab closed. Daily on Vercel Cron; protected by CRON_SECRET.
 // AI calls are fired concurrently per user to fit the function time budget.
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 interface MoverPick { name: string; ticker: string; cls: string; why: string; now: string; check: string; change_pct: string | null }
 interface ScoutInsert { user_id: string; name: string; symbol: string; asset_class: string; why: string; now_catalyst: string; check_text: string; change_pct: string | null; data_source: string | null; kind: string }
@@ -39,7 +39,7 @@ export async function GET(req: Request) {
     [signals, sectors] = await Promise.all([getMarketSignals(8), getSectorPerformance().catch(() => [])]);
     const movers = signals.gainers;
     if (movers.length) {
-      const text = await ask(moversScoutPrompt(movers), [{ role: "user", content: "Explain today's top movers and what to verify." }], true, 1400, 4);
+      const text = await ask(moversScoutPrompt(movers), [{ role: "user", content: "Explain today's top movers and what to verify." }], true, 1400, 6);
       moverPicks = parseScout(text).picks.map((p) => {
         const m = movers.find((mv) => (mv.ticker || "").toUpperCase() === (p.ticker || "").toUpperCase());
         return { name: p.name, ticker: p.ticker, cls: p.cls, why: p.why, now: p.now, check: p.check, change_pct: m?.changePct ?? null };
@@ -67,7 +67,7 @@ async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: st
 
   // Fire the user's AI calls concurrently.
   const themeScoutP: Promise<ScoutResult | null> = themeLabels.length
-    ? ask(scoutPrompt(themeLabels), [{ role: "user", content: `Themes: ${themeLabels.join("; ")}` }], true, 1100, 4).then(parseScout).catch(() => null)
+    ? ask(scoutPrompt(themeLabels), [{ role: "user", content: `Themes: ${themeLabels.join("; ")}` }], true, 1100, 6).then(parseScout).catch(() => null)
     : Promise.resolve(null);
   const newsP: Promise<NewsResult | null> = ask(
     newsPrompt(newsSource || "All", newsFocus || ""),
@@ -77,7 +77,7 @@ async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: st
     4,
   ).then(parseNews).catch(() => null);
   const trackP = tracked.map((it) =>
-    ask(trackingUpdatePrompt(), [{ role: "user", content: `Asset: ${it.symbol}\nAsset class: ${it.asset_class}\n\nGive the monitoring update from current public information.` }], true, 1100, 2)
+    ask(trackingUpdatePrompt(), [{ role: "user", content: `Asset: ${it.symbol}\nAsset class: ${it.asset_class}\n\nGive the monitoring update from current public information.` }], true, 1100, 3)
       .then((text) => ({ it, upd: parseTrackingUpdate(text) }))
       .catch(() => ({ it, upd: null }))
   );
