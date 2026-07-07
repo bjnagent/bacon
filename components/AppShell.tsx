@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Sunrise, Search, Calculator, BookOpen, Command } from "lucide-react";
+import { Sunrise, Search, Command } from "lucide-react";
 import { deriveContext, type ChatContext } from "@/lib/prompts";
 import { splitSymCls } from "@/lib/lenses";
 import { cachedJson } from "@/lib/clientCache";
@@ -10,8 +10,6 @@ import { Boot, HelpOverlay } from "./Terminal";
 import BaconMark from "./BaconMark";
 import DiscoverView, { type DiscoverTab } from "./DiscoverView";
 import AnalyzeView from "./AnalyzeView";
-import SizerView from "./SizerView";
-import FrameworksView from "./FrameworksView";
 import AccountView from "./AccountView";
 import ToolPanel from "./ToolPanel";
 import UserMenu from "./UserMenu";
@@ -19,7 +17,7 @@ import CommandPalette, { type PaletteAction } from "./CommandPalette";
 import ChatPanel, { ChatFab } from "./ChatPanel";
 
 type Place = "discover" | "analyze";
-type Tool = null | "sizer" | "frameworks" | "account";
+type Tool = null | "account";
 
 function Clock() {
   const [now, setNow] = useState<Date | null>(null);
@@ -113,8 +111,6 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
     { id: "radar", label: "Radar — tracking & fresh finds", hint: "cockpit", run: () => { setPlace("discover"); setDiscoverTab("radar"); } },
     { id: "news", label: "News — market headlines", hint: "cockpit", run: () => { setPlace("discover"); setDiscoverTab("news"); } },
     { id: "analyze", label: "Analyze — six-lens cockpit", hint: "workspace", run: () => setPlace("analyze") },
-    { id: "sizer", label: "Open Sizer", hint: "sizing & risk", run: () => setTool("sizer") },
-    { id: "frameworks", label: "Open Frameworks", hint: "lens reference", run: () => setTool("frameworks") },
     { id: "discuss", label: "Discuss", hint: "contextual chat", run: () => openChat() },
     { id: "account", label: "Account", hint: "password & sign out", run: () => setTool("account") },
     { id: "help", label: "Keyboard & commands", hint: "?", run: () => setHelpOpen(true) },
@@ -128,8 +124,6 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
       {booting && <Boot onDone={finishBoot} />}
       {helpOpen && <HelpOverlay onClose={() => setHelpOpen(false)} />}
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} actions={paletteActions} onAnalyze={analyzeSym} />
-      <ToolPanel open={tool === "sizer"} title="Sizing & risk" onClose={closeTool}><SizerView /></ToolPanel>
-      <ToolPanel open={tool === "frameworks"} title="The latticework" onClose={closeTool}><FrameworksView /></ToolPanel>
       <ToolPanel open={tool === "account"} title="Account" onClose={closeTool}><AccountView email={userEmail} /></ToolPanel>
       <ChatFab onClick={() => openChat()} hidden={chatOpen || booting} />
       <ChatPanel open={chatOpen} context={chatContext} onClose={closeChat} />
@@ -160,9 +154,6 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
             <button className={`pr-railbtn ${place === "analyze" ? "is-active" : ""}`} aria-current={place === "analyze" ? "page" : undefined} onClick={() => setPlace("analyze")}>
               <span className="pr-railidx">02</span><Search size={17} /><span className="lbl">Analyze</span>
             </button>
-            <div className="pr-railgroup">Tools</div>
-            <button className="pr-railbtn" onClick={() => setTool("frameworks")}><span className="pr-railidx" /><BookOpen size={17} /><span className="lbl">Frameworks</span></button>
-            <button className="pr-railbtn" onClick={() => setTool("sizer")}><span className="pr-railidx" /><Calculator size={17} /><span className="lbl">Sizer</span></button>
             <button className="pr-railbtn" onClick={() => setPaletteOpen(true)}><span className="pr-railidx" /><Command size={17} /><span className="lbl">Search</span><kbd className="pr-railkbd">⌘K</kbd></button>
             <div className="pr-railspacer" />
             <UserMenu email={userEmail} onChangePassword={() => setTool("account")} />

@@ -17,7 +17,6 @@ const HELP_TEXT = `NAVIGATION
   type a ticker  →   six-lens analysis
   Discover           radar dashboard + news
   Analyze            the asset workspace (chart + lenses)
-  Sizer · Frameworks tools — slide over your work
   Discuss            contextual chat (the ● button)
 
 KEYS

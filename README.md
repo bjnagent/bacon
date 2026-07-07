@@ -1,6 +1,6 @@
 # Bacon — Investment Research Tool
 
-> **Status:** Phase 1 + Phase 2 **complete**, plus extras. Every artifact feature is ported (Radar, News, Analyze, Frameworks, Sizer, Discuss, command-line + boot) on top of the self-hosting upgrades (server routes, Supabase auth, daily background sweep, real macro/movers data, embedded live charts). Extras: persona lenses, DCF + Sharpe/VaR, password/account auth, error pages, a health diagnostic, and a Vitest suite (28 tests) with CI.
+> **Status:** an automated opportunity cockpit. The nightly sweep pieces together the day's market signals — real movers, sector rotation, macro, news, SEC insider-buy clusters, tracked voices — into a ranked morning brief, with Analyze (six-lens deep dives), a self-grading track record, Radar, News, and a context-aware Discuss chat on top of the self-hosting layer (server routes, Supabase auth, daily background sweep, embedded live charts). Extras: persona lenses, password/account auth, PWA install, error pages, a health diagnostic, and a Vitest suite with CI.
 
 An **automated opportunity cockpit**: every day the system pieces together real market signals — movers, headlines, the macro backdrop, your themes — and surfaces under-the-radar, coming-up-on-the-horizon opportunities on its own. You open it to *see what it found*, not to search. Deep-dives run through six independent professional lenses (Fundamental, Technical, Factor, Macro/Regulatory, Smart Money/Signals, Risk); conviction comes from **convergence** across independent signals, never a single indicator.
 
@@ -16,7 +16,7 @@ An **automated opportunity cockpit**: every day the system pieces together real 
 | AI | Anthropic Messages API + `web_search` server tool, **server-side only** (`@anthropic-ai/sdk`) |
 | Icons | `lucide-react` |
 | Charts | Embedded TradingView Advanced Chart (`TradingViewChart`) inside Analyze; `TVLink` deep-links as fallback |
-| Navigation | Object + command-driven: **Discover** (Radar + News) and **Analyze** destinations, a **⌘K command palette**, tools (Sizer/Frameworks) as slide-overs, Account in a user menu |
+| Navigation | Object + command-driven: **Discover** (Radar + News) and **Analyze** destinations, a **⌘K command palette**, Account in a user menu |
 | Hosting | Vercel + Vercel Cron (daily background sweep) |
 | Data | Alpha Vantage (movers) · FRED (macro) — the only real-number sources; the model never fabricates figures |
 | Tests / CI | Vitest (parsers, helpers, financial math) · GitHub Actions (lint + test + build) |
@@ -29,14 +29,12 @@ An **automated opportunity cockpit**: every day the system pieces together real 
 - **Analyze (Phase 2 slice):** run any asset through the six-lens cockpit. Calls `/api/analyze` → live web search → parsed briefing with per-lens stances, a convergence gauge, summary + bottom line. **Bull vs Bear** runs `/api/debate`. **Save to radar** persists to `watchlist`.
 - **Background Sweep (auto-scout):** a daily Vercel Cron (`/api/cron/sweep`) that, per user who's enabled it, surfaces a **"fresh finds"** feed — **today's real top movers** (via a market-data provider, the one place real numbers are allowed) enriched with a qualitative "why it's moving / verify" read, plus theme-scout matches — and refreshes tracked names. Toggle it on the Radar; new finds are waiting when you return. No fabricated prices: the % move is attributed to the provider, the rest is grounded by web search.
 - **Today's brief (the cockpit centerpiece):** the nightly sweep now ends with a **synthesis pass** — one AI read across all of the day's signals (real movers, headlines, macro, themes, your tracked names) hunting second-order beneficiaries and convergent setups, each with horizon, converged signals, confirm/kill lines, and one-tap Track / Run lenses. `GET/POST /api/brief`; on-demand "Sweep now" from the Today tab. Stored in `scout_picks` (`kind='opportunity'`/`'brief-intro'`) — zero migration.
-- **Navigation:** an object + command-driven shell — **⌘K / "/" command palette** (type a ticker → analyze, or run a command), **Discover** (Radar + News) and **Analyze** as the two destinations, **Sizer/Frameworks** as slide-over tools, and **Account** in a user menu. Boot animation plays once per session.
+- **Navigation:** an object + command-driven shell — **⌘K / "/" command palette** (type a ticker → analyze, or run a command), **Discover** (Radar + News) and **Analyze** as the two destinations, and **Account** in a user menu. Boot animation plays once per session.
 - **Live prices:** embedded **TradingView Advanced Chart** inside the Analyze readout (real-time prices from a real provider, attribution kept). The constraint stands: the *AI* never fabricates prices.
 - **Macro backdrop (real data):** the Radar home opens with a strip of live macro indicators — Fed funds, 10Y/2Y, the 10Y–2Y curve, CPI YoY, unemployment, VIX — from **FRED** (`/api/macro`, cached). The same snapshot is fed into the Analyze **Macro lens** so it reasons against real rates/inflation, not guesses. Real numbers, attributed; neutral direction arrows (no buy/sell signal).
 - **Health:** `/api/health` probes Anthropic server-side and returns `{ ok, model }`.
 - **News:** paraphrased, attributed business headlines as signals (`/api/news` → `news_items`) — one-tap deep-dive, track, or discuss. Copyright rule enforced in the prompt (never an outlet's exact words).
 - **Discuss (chat):** a context-aware **streaming** chat panel (FAB on every view; `/api/chat` → `chat_messages`) that reasons through the lenses, steelmans both sides, and flags what to verify — grounded in live search, never advice.
-- **Frameworks:** the six lenses as a reference (playbooks, terms, caveats).
-- **Sizer:** risk-based + fractional-Kelly position math on your own inputs — no market data, no guarantees.
 
 ## Setup
 
@@ -159,13 +157,12 @@ Feature port from [`reference/bacon-artifact.jsx`](reference/bacon-artifact.jsx)
 - [x] **Background sweeps** — daily `/api/cron/sweep` (service-role): real top movers (`lib/market.ts`) + theme scout → `scout_picks` "fresh finds" feed, plus tracked-name refresh; per-user opt-in via `settings`. Auto-sweep toggle on the Radar.
 - [x] **News** — paraphrase + attribute (`/api/news`, `news_items`, `NewsView`)
 - [x] **Discuss** — streaming chat (`/api/chat`, `chat_messages`, `ChatPanel`)
-- [x] **Sizer + Frameworks** — static ports (`FRAMEWORKS` data in `lib/lenses.ts`)
 - [x] **TradingView widgets** — embedded Advanced Chart on a **Markets** tab + inside Analyze (`TradingViewChart`); attribution kept; `TVLink` fallback retained
 - [x] **Real data layer** — Alpha Vantage movers (`lib/market.ts`) + FRED macro (`lib/macro.ts`, `/api/macro`, `MacroBackdrop`). _Next connectors (own code, public APIs):_ World Bank / IMF macro, sector movers, crypto movers.
 - [ ] **News** auto-refresh into the sweep (paraphrased headlines → `news_items`)
 - [x] **Command line + boot screen** — terminal-style command bar (type a ticker / `RADAR`/`NEWS`/`MARKETS`/…), `/` + 1–7 + `?` shortcuts, boot animation
 - [x] **Persona lenses** — Buffett/Graham/Lynch/Burry "Investor takes" on Analyze
-- [x] **DCF + Sharpe/VaR** in the Sizer (`lib/calc.ts`, tested)
+- [x] **Signal breadth** — SEC EDGAR insider-buy clusters (`lib/insider.ts`, tested), tracked-voices check, congressional-trade directive → fed into the daily brief
 - [x] **Tests + CI** — Vitest suite + GitHub Actions
 
 Open ideas (need a decision/key): more data connectors (World Bank/IMF, sector & crypto movers), sub-daily sweep (Vercel Pro), custom SMTP for reliable auth emails.

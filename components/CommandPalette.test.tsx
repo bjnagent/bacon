@@ -7,17 +7,17 @@ afterEach(cleanup);
 
 describe("CommandPalette", () => {
   it("filters actions by query and runs the clicked one", () => {
-    const sizerRun = vi.fn();
+    const discussRun = vi.fn();
     const actions = [
-      { id: "sizer", label: "Open Sizer", run: sizerRun },
+      { id: "discuss", label: "Discuss", run: discussRun },
       { id: "news", label: "News — market headlines", run: vi.fn() },
     ];
     const onClose = vi.fn();
     render(<CommandPalette open onClose={onClose} actions={actions} onAnalyze={vi.fn()} />);
-    fireEvent.change(screen.getByRole("textbox"), { target: { value: "sizer" } });
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "discuss" } });
     expect(screen.queryByText("News — market headlines")).toBeNull();
-    fireEvent.click(screen.getByText("Open Sizer"));
-    expect(sizerRun).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByText("Discuss"));
+    expect(discussRun).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalled();
   });
 

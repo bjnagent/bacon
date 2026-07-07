@@ -6,7 +6,7 @@ import { Search, ArrowRight } from "lucide-react";
 export interface PaletteAction { id: string; label: string; hint?: string; run: () => void }
 
 // ⌘K / "/" command palette — the primary way to navigate and act. Type a ticker
-// to analyze it, or a command (scout, news, size, frameworks, discuss).
+// to analyze it, or a command (today, record, radar, news, discuss).
 export default function CommandPalette({ open, onClose, actions, onAnalyze }: {
   open: boolean;
   onClose: () => void;
@@ -55,7 +55,7 @@ export default function CommandPalette({ open, onClose, actions, onAnalyze }: {
       <div className="pr-palette" role="dialog" aria-modal="true" aria-label="Command palette" onClick={(e) => e.stopPropagation()}>
         <div className="pr-palette-input">
           <Search size={16} />
-          <input ref={inputRef} value={q} onChange={(e) => { setQ(e.target.value); setSel(0); }} placeholder="Search a ticker, or a command — scout, news, size, frameworks…" aria-label="Command palette" />
+          <input ref={inputRef} value={q} onChange={(e) => { setQ(e.target.value); setSel(0); }} placeholder="Search a ticker, or a command — today, radar, news, discuss…" aria-label="Command palette" />
         </div>
         <div className="pr-palette-list">
           {results.length === 0 && <div className="pr-palette-empty">No matches.</div>}

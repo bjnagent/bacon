@@ -255,8 +255,6 @@ interface DeriveItem { asset: string }
 export function deriveContext(view: string, target: DeriveTarget | null, items: DeriveItem[] | null): ChatContext {
   if (view === "analyze" && target && target.asset) return { kind: "asset", asset: target.asset, cls: target.cls, title: String(target.asset).toUpperCase(), sub: `six-lens analysis${target.cls ? " · " + target.cls : ""}` };
   if (view === "news") return { kind: "news-feed", title: "Market headlines", sub: "news discussion" };
-  if (view === "frameworks") return { kind: "frameworks", title: "The six lenses", sub: "methodology" };
-  if (view === "sizer") return { kind: "sizing", title: "Position sizing", sub: "risk & sizing" };
   if (view === "radar" && items && items.length) return { kind: "radar", title: "Your radar", sub: `${items.length} tracked`, assets: items.map((i) => i.asset) };
   return { kind: "general", title: "Markets & research", sub: "open discussion" };
 }

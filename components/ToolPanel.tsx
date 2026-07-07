@@ -3,8 +3,8 @@
 import { useEffect } from "react";
 import { X } from "lucide-react";
 
-// Generic right slide-over for utility surfaces (Sizer, Frameworks, Account) so
-// they're tools you pull up over your work — not full-page destinations.
+// Generic right slide-over for utility surfaces (e.g. Account) so they're
+// tools you pull up over your work — not full-page destinations.
 export default function ToolPanel({ open, title, onClose, children }: { open: boolean; title: string; onClose: () => void; children: React.ReactNode }) {
   useEffect(() => {
     if (!open) return;
