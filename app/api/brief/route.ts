@@ -46,11 +46,17 @@ export async function POST() {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
+  // Interactive path: nothing here may hold up the stream's first byte. The
+  // insider fetch (many SEC requests when cold) races a short deadline — if it
+  // loses, this brief just goes without that section; the fetch keeps running
+  // and warms the in-process cache for the next click / the nightly cron.
+  const withDeadline = <T,>(p: Promise<T>, ms: number, fallback: T) =>
+    Promise.race([p, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);
   const [signals, sectors, macro, insiders, themesRes, trackedRes, newsRes, settingsRes] = await Promise.all([
     getMarketSignals(8).catch((): MarketSignals => ({ gainers: [], losers: [], mostActive: [] })),
     getSectorPerformance().catch(() => []),
     getMacroSnapshot().catch(() => []),
-    getInsiderClusters().catch(() => []),
+    withDeadline(getInsiderClusters().catch(() => []), 2500, []),
     sb.from("themes").select("label"),
     sb.from("watchlist").select("symbol"),
     sb.from("news_items").select("headline,source,why").order("created_at", { ascending: false }).limit(10),

@@ -92,21 +92,23 @@ function idxUrl(d: Date): string {
 }
 
 async function fetchText(url: string): Promise<string> {
-  const res = await fetch(url, { headers: SEC_HEADERS, cache: "no-store" });
+  // Hard per-request timeout: one slow SEC response must never stall a brief.
+  const res = await fetch(url, { headers: SEC_HEADERS, cache: "no-store", signal: AbortSignal.timeout(4000) });
   if (!res.ok) throw new Error(`SEC ${res.status}`);
   return res.text();
 }
 
 let cache: { at: number; data: InsiderCluster[] } | null = null;
-const TTL_MS = 60 * 60 * 1000; // 1h — the daily index changes slowly intraday
+const TTL_MS = 60 * 60 * 1000;       // 1h — the daily index changes slowly intraday
+const EMPTY_TTL_MS = 10 * 60 * 1000; // negative cache: don't re-hammer SEC when it's slow/down
 
 export async function getInsiderClusters(max = 6): Promise<InsiderCluster[]> {
-  if (cache && Date.now() - cache.at < TTL_MS) return cache.data;
+  if (cache && Date.now() - cache.at < (cache.data.length ? TTL_MS : EMPTY_TTL_MS)) return cache.data;
   try {
     // Last few trading days of Form 4 filings (holiday gaps just 404 and skip).
-    const idxTexts = await Promise.all(recentWeekdays(4).map((d) => fetchText(idxUrl(d)).catch(() => "")));
+    const idxTexts = await Promise.all(recentWeekdays(3).map((d) => fetchText(idxUrl(d)).catch(() => "")));
     const rows = idxTexts.flatMap(parseFormIdx);
-    const candidates = clusterForm4(rows).slice(0, 10);
+    const candidates = clusterForm4(rows).slice(0, 8);
 
     const out: InsiderCluster[] = [];
     await Promise.all(candidates.map(async (c) => {
@@ -124,9 +126,10 @@ export async function getInsiderClusters(max = 6): Promise<InsiderCluster[]> {
     }));
 
     const data = out.sort((a, b) => b.buys - a.buys || b.filings - a.filings).slice(0, max);
-    if (data.length) cache = { at: Date.now(), data };
+    cache = { at: Date.now(), data }; // empty results cache too (shorter TTL)
     return data;
   } catch {
+    cache = { at: Date.now(), data: [] };
     return []; // degrade exactly like market/macro: the brief just loses one section
   }
 }

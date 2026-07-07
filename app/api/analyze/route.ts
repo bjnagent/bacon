@@ -34,7 +34,7 @@ export async function POST(req: Request) {
       [{ role: "user", content: `Asset: ${asset}\nAsset class: ${assetClass}${macroCtx}\n\nProduce the six-lens BACON briefing using current public information.` }],
       true,
       1300,
-      8
+      6
     )
   );
 }
