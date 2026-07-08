@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { ask } from "@/lib/anthropic";
+import { askCheap } from "@/lib/ai";
 import { scoutPrompt, moversScoutPrompt, trackingUpdatePrompt, newsPrompt } from "@/lib/prompts";
 import { parseScout, parseTrackingUpdate, parseNews, type ScoutResult, type NewsResult } from "@/lib/parsers";
 import { getMarketSignals, getSectorPerformance, MARKET_SOURCE, type MarketSignals } from "@/lib/market";
@@ -41,7 +41,7 @@ export async function GET(req: Request) {
     [signals, sectors, insiders] = await Promise.all([getMarketSignals(8), getSectorPerformance().catch(() => []), getInsiderClusters().catch(() => [])]);
     const movers = signals.gainers;
     if (movers.length) {
-      const text = await ask(moversScoutPrompt(movers), [{ role: "user", content: "Explain today's top movers and what to verify." }], true, 1400, 6);
+      const text = await askCheap(moversScoutPrompt(movers), [{ role: "user", content: "Explain today's top movers and what to verify." }], true, 1400, 6);
       moverPicks = parseScout(text).picks.map((p) => {
         const m = movers.find((mv) => (mv.ticker || "").toUpperCase() === (p.ticker || "").toUpperCase());
         return { name: p.name, ticker: p.ticker, cls: p.cls, why: p.why, now: p.now, check: p.check, change_pct: m?.changePct ?? null };
@@ -69,9 +69,9 @@ async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: st
 
   // Fire the user's AI calls concurrently.
   const themeScoutP: Promise<ScoutResult | null> = themeLabels.length
-    ? ask(scoutPrompt(themeLabels), [{ role: "user", content: `Themes: ${themeLabels.join("; ")}` }], true, 1100, 6).then(parseScout).catch(() => null)
+    ? askCheap(scoutPrompt(themeLabels), [{ role: "user", content: `Themes: ${themeLabels.join("; ")}` }], true, 1100, 6).then(parseScout).catch(() => null)
     : Promise.resolve(null);
-  const newsP: Promise<NewsResult | null> = ask(
+  const newsP: Promise<NewsResult | null> = askCheap(
     newsPrompt(newsSource || "All", newsFocus || ""),
     [{ role: "user", content: `Source focus: ${newsSource || "All"}\nTopic focus: ${newsFocus || "(general markets)"}\n\nSurface the latest market-moving business headlines now.` }],
     true,
@@ -79,7 +79,7 @@ async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: st
     4,
   ).then(parseNews).catch(() => null);
   const trackP = tracked.map((it) =>
-    ask(trackingUpdatePrompt(), [{ role: "user", content: `Asset: ${it.symbol}\nAsset class: ${it.asset_class}\n\nGive the monitoring update from current public information.` }], true, 1100, 3)
+    askCheap(trackingUpdatePrompt(), [{ role: "user", content: `Asset: ${it.symbol}\nAsset class: ${it.asset_class}\n\nGive the monitoring update from current public information.` }], true, 1100, 3)
       .then((text) => ({ it, upd: parseTrackingUpdate(text) }))
       .catch(() => ({ it, upd: null }))
   );
