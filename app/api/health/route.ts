@@ -9,6 +9,7 @@ export const maxDuration = 30;
 export async function GET() {
   const providers = {
     anthropic: !!process.env.ANTHROPIC_API_KEY,
+    gemini: !!process.env.GEMINI_API_KEY,
     supabase: !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     supabase_service_role: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
     market_data: !!process.env.MARKET_DATA_API_KEY,
@@ -18,6 +19,8 @@ export async function GET() {
     site_url: process.env.NEXT_PUBLIC_SITE_URL || null,
   };
   const model = process.env.BACON_MODEL ?? "claude-sonnet-4-6";
+  // Cheap tier for background bulk work (sweep scouts/news/tracking); null when unset.
+  const cheapModel = process.env.GEMINI_API_KEY ? (process.env.GEMINI_MODEL ?? "gemini-2.5-flash") : null;
 
   let anthropicOk = false;
   let anthropicError: string | null = null;
@@ -28,5 +31,5 @@ export async function GET() {
     anthropicError = err instanceof Error ? err.message : String(err);
   }
 
-  return NextResponse.json({ ok: anthropicOk, model, providers, anthropicError });
+  return NextResponse.json({ ok: anthropicOk, model, cheapModel, providers, anthropicError });
 }

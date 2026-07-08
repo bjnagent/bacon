@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { ask } from "@/lib/anthropic";
+import { askCheap } from "@/lib/ai";
 import { newsPrompt } from "@/lib/prompts";
 import { parseNews } from "@/lib/parsers";
 import { NEWS_COLUMNS } from "@/lib/types";
@@ -30,7 +30,7 @@ export async function POST(req: Request) {
   const focus = String(body.focus || "").trim().slice(0, 200);
 
   try {
-    const text = await ask(
+    const text = await askCheap(
       newsPrompt(source, focus),
       [{ role: "user", content: `Source focus: ${source}\nTopic focus: ${focus || "(general markets)"}\n\nSurface the latest market-moving business headlines now.` }],
       true,
