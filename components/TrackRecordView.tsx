@@ -1,16 +1,28 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, History, ChevronDown, AlertTriangle, Microscope } from "lucide-react";
+import { Loader2, History, ChevronDown, AlertTriangle, Microscope, LineChart } from "lucide-react";
 import type { StoredBriefItem } from "@/lib/brief";
 import { fetchJson } from "@/lib/fetchJson";
 import { cachedJson, invalidate } from "@/lib/clientCache";
 
 interface BriefRow { id: string; brief_date: string; intro: string | null; caveat: string | null; items: StoredBriefItem[]; reviewed_at: string | null }
 
+// One opportunity's hypothetical $10K result, or why it couldn't be priced.
+interface RoiResult {
+  name: string; ticker: string;
+  entryDate?: string; entryClose?: number; asOfDate?: string; asOfClose?: number;
+  invested?: number; value?: number; roiPct?: number; skipped?: string;
+}
+interface RoiTotals { count: number; invested: number; value: number; asOf: string; roiPct: number }
+interface RoiData { unavailable?: boolean; error?: string; since?: string; invested?: number; results?: RoiResult[]; totals?: RoiTotals | null }
+
 const VERDICT_TONE: Record<string, string> = {
   "played-out": "is-good", "developing": "is-live", "faded": "is-mute", "invalidated": "is-bad",
 };
+
+const usd = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: n >= 100 ? 0 : 2 });
+const pct = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(1)}%`;
 
 // The track record: every brief the system has produced, by date — and an
 // honest "how did it age?" review pass per brief. Credibility loop.
@@ -21,6 +33,8 @@ export default function TrackRecordView() {
   const [open, setOpen] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [roi, setRoi] = useState<Record<string, RoiData>>({});
+  const [pricing, setPricing] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,6 +60,19 @@ export default function TrackRecordView() {
       setBriefs((prev) => prev.map((b) => b.id === id ? { ...b, items: data.items as StoredBriefItem[], reviewed_at: data.reviewed_at as string } : b));
     } catch (err) { setError(err instanceof Error ? err.message : "Something went wrong"); }
     finally { setReviewing(null); }
+  };
+
+  // "$10K since flagged" — a hypothetical stake at each opportunity's flag-day
+  // close, valued at today's close. Live (real prices), never stored.
+  const priceRoi = async (id: string) => {
+    if (pricing) return;
+    setPricing(id); setError(null);
+    try {
+      const { ok, status, data } = await fetchJson("/api/brief/roi", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+      if (!ok) throw new Error(String(data.error || `Request failed (${status})`));
+      setRoi((prev) => ({ ...prev, [id]: data as RoiData }));
+    } catch (err) { setError(err instanceof Error ? err.message : "Pricing failed"); }
+    finally { setPricing(null); }
   };
 
   return (
@@ -78,10 +105,15 @@ export default function TrackRecordView() {
                   )}
                   <ChevronDown size={16} className={`pr-fw-chev ${isOpen ? "is-open" : ""}`} />
                 </button>
-                {isOpen && (
+                {isOpen && (() => {
+                  const priced = roi[b.id];
+                  const byIndex = priced?.results ?? [];
+                  return (
                   <div className="pr-record-body">
                     {b.intro && <div className="pr-summary">{b.intro}</div>}
-                    {b.items.map((o, i) => (
+                    {b.items.map((o, i) => {
+                      const r = byIndex[i];
+                      return (
                       <div key={i} className="pr-record-item">
                         <div className="pr-record-item-head">
                           <strong>{o.name}</strong>{o.ticker && o.ticker !== "—" && <span className="pr-pick-ticker">{o.ticker}</span>}
@@ -90,15 +122,40 @@ export default function TrackRecordView() {
                         </div>
                         <div className="pr-pick-why">{o.thesis}</div>
                         {o.outcome && <div className="pr-pick-now"><span>SINCE THEN ▸</span> {o.outcome}</div>}
+                        {r && (r.value != null ? (
+                          <div className={`pr-roi ${r.roiPct! >= 0 ? "is-up" : "is-down"}`}>
+                            <span className="pr-roi-lead">$10K → {usd(r.value)}</span>
+                            <em className="pr-roi-delta">{r.roiPct! >= 0 ? "▲" : "▼"} {pct(r.roiPct!)}</em>
+                            <span className="pr-roi-basis">{r.entryClose != null && `${usd(r.entryClose)} on ${r.entryDate} → ${usd(r.asOfClose!)} on ${r.asOfDate}`}</span>
+                          </div>
+                        ) : (
+                          <div className="pr-roi is-skip"><span className="pr-roi-lead">$10K → not priced</span><span className="pr-roi-basis">{r.skipped}</span></div>
+                        ))}
                       </div>
-                    ))}
+                      );
+                    })}
+
+                    {priced?.totals && (
+                      <div className={`pr-roi-total ${priced.totals.roiPct >= 0 ? "is-up" : "is-down"}`}>
+                        Hypothetical {usd(priced.totals.invested)} basket ({priced.totals.count}×$10K) → <strong>{usd(priced.totals.value)}</strong> <em>{priced.totals.roiPct >= 0 ? "▲" : "▼"} {pct(priced.totals.roiPct)}</em> as of {priced.totals.asOf}
+                      </div>
+                    )}
+                    {priced && (priced.unavailable || (!priced.totals && !byIndex.some((r) => r.value != null))) && (
+                      <div className="pr-roi-note">{priced.error || "No opportunities on this day had a priceable US-equity ticker."}</div>
+                    )}
+                    {priced?.totals && <div className="pr-roi-note">Hypothetical entry at that day&apos;s close — excludes fees, dividends and slippage. Real prices via market-data provider. Not advice.</div>}
+
                     <div className="pr-record-actions">
                       <button className="pr-btn-sm" onClick={() => review(b.id)} disabled={reviewing === b.id}>
                         {reviewing === b.id ? <><Loader2 size={13} className="pr-spin" /> Checking what happened…</> : <><Microscope size={13} /> {b.reviewed_at ? "Re-review" : "How did it age?"}</>}
                       </button>
+                      <button className="pr-btn-sm" onClick={() => priceRoi(b.id)} disabled={pricing === b.id}>
+                        {pricing === b.id ? <><Loader2 size={13} className="pr-spin" /> Pricing $10K stakes…</> : <><LineChart size={13} /> {priced ? "Re-price $10K" : "If I'd put $10K in?"}</>}
+                      </button>
                     </div>
                   </div>
-                )}
+                  );
+                })()}
               </div>
             );
           })}

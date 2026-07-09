@@ -770,7 +770,26 @@ body { background: #EBE8E0; color: #1A1712; }
 .pr-record-body{padding:2px 18px 18px;animation:prFade .3s ease}
 .pr-record-item{padding:12px 0;border-top:1px solid var(--line)}
 .pr-record-item-head{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:14px;color:var(--ink);margin-bottom:5px}
-.pr-record-actions{margin-top:14px}
+.pr-record-actions{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap}
+
+/* "$10K since flagged" — hypothetical ROI on a past opportunity. */
+.pr-roi{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;font-size:12px;color:var(--ink);background:var(--paper2);border:1px solid var(--line);border-left:3px solid var(--muted2);border-radius:5px;padding:9px 11px;line-height:1.5;margin-bottom:9px}
+.pr-roi.is-up{border-left-color:var(--good)}
+.pr-roi.is-down{border-left-color:var(--bad)}
+.pr-roi.is-skip{border-left-color:var(--line2)}
+.pr-roi-lead{font-family:var(--fm);font-weight:600;letter-spacing:0.02em}
+.pr-roi-delta{font-style:normal;font-family:var(--fm);font-size:11px;font-weight:600;padding:1px 8px;border-radius:99px}
+.pr-roi.is-up .pr-roi-delta{color:var(--good);background:rgba(30,142,76,0.1)}
+.pr-roi.is-down .pr-roi-delta{color:var(--bad);background:rgba(207,59,44,0.1)}
+.pr-roi-basis{font-family:var(--fm);font-size:10.5px;color:var(--muted);letter-spacing:0.02em}
+.pr-roi-total{font-size:12.5px;color:var(--ink);background:var(--card);border:1px solid var(--line2);border-radius:7px;padding:11px 13px;line-height:1.55;margin:4px 0 8px}
+.pr-roi-total.is-up{border-color:rgba(30,142,76,0.4)}
+.pr-roi-total.is-down{border-color:rgba(207,59,44,0.4)}
+.pr-roi-total strong{font-family:var(--fm);font-size:14px}
+.pr-roi-total em{font-style:normal;font-family:var(--fm);font-weight:600;margin-left:2px}
+.pr-roi-total.is-up em{color:var(--good)}
+.pr-roi-total.is-down em{color:var(--bad)}
+.pr-roi-note{font-family:var(--fm);font-size:10.5px;color:var(--muted2);letter-spacing:0.02em;line-height:1.5;margin-bottom:10px}
 
 .pr-mailtoggle{display:inline-flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--line2);color:var(--muted);font-family:var(--fm);font-size:11px;letter-spacing:0.04em;padding:9px 12px;border-radius:99px;cursor:pointer;transition:all .14s;text-transform:uppercase}
 .pr-mailtoggle:hover{border-color:var(--accent);color:var(--ink)}
