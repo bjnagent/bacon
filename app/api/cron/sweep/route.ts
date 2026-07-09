@@ -5,6 +5,7 @@ import { scoutPrompt, moversScoutPrompt, trackingUpdatePrompt, newsPrompt } from
 import { parseScout, parseTrackingUpdate, parseNews, type ScoutResult, type NewsResult } from "@/lib/parsers";
 import { getMarketSignals, getSectorPerformance, MARKET_SOURCE, type MarketSignals } from "@/lib/market";
 import { getMacroSnapshot } from "@/lib/macro";
+import { getCommodityFxSignals } from "@/lib/commodities";
 import { getInsiderClusters, type InsiderCluster } from "@/lib/insider";
 import { generateBrief, briefToRows, briefToDailyRow, splitVoices } from "@/lib/brief";
 import { sendBriefEmail, emailEnabled } from "@/lib/email";
@@ -58,11 +59,12 @@ export async function GET(req: Request) {
 }
 
 async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: string, moverPicks: MoverPick[], newsSource: string | null, newsFocus: string | null, signals: MarketSignals, sectors: { sector: string; changePct: string }[], emailOptIn: boolean, insiders: InsiderCluster[], voices: string[]) {
-  const [{ data: themes }, { data: items }, { data: cachedNews }, macro] = await Promise.all([
+  const [{ data: themes }, { data: items }, { data: cachedNews }, macro, commodityFx] = await Promise.all([
     admin.from("themes").select("label").eq("user_id", userId),
     admin.from("watchlist").select("id,symbol,asset_class").eq("user_id", userId).order("last_scan_at", { ascending: true, nullsFirst: true }).limit(6),
     admin.from("news_items").select("headline,source,why").eq("user_id", userId).order("created_at", { ascending: false }).limit(10),
     getMacroSnapshot().catch(() => [] as Awaited<ReturnType<typeof getMacroSnapshot>>),
+    getCommodityFxSignals().catch(() => ({ commodities: [], fx: [] })),
   ]);
   const themeLabels = (themes ?? []).map((t) => t.label as string);
   const tracked = (items ?? []) as { id: string; symbol: string; asset_class: string }[];
@@ -97,6 +99,8 @@ async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: st
     tracked: tracked.map((t) => t.symbol),
     insiders,
     voices,
+    commodities: commodityFx.commodities,
+    fx: commodityFx.fx,
   }).catch(() => null);
 
   const [themeRes, newsRes, trackResults, brief] = await Promise.all([themeScoutP, newsP, Promise.all(trackP), briefP]);

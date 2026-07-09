@@ -8,6 +8,7 @@ import { parseOpportunities, type OpportunityBrief } from "./parsers";
 import type { Mover } from "./market";
 import type { MacroIndicator } from "./macro";
 import type { InsiderCluster } from "./insider";
+import type { InstrumentQuote } from "./commodities";
 
 export interface SignalBundle {
   movers: Mover[];
@@ -18,8 +19,10 @@ export interface SignalBundle {
   macro: MacroIndicator[];
   themes: string[];
   tracked: string[];
-  insiders?: InsiderCluster[]; // real Form 4 clusters via SEC EDGAR
-  voices?: string[];           // public commentators the investor follows
+  insiders?: InsiderCluster[];      // real Form 4 clusters via SEC EDGAR
+  voices?: string[];                // public commentators the investor follows
+  commodities?: InstrumentQuote[];  // real commodity levels via FRED
+  fx?: InstrumentQuote[];           // real FX rates via FRED
 }
 
 // Split the comma-separated settings.voices column into clean labels.
@@ -34,6 +37,8 @@ export function buildSignalBundle(b: SignalBundle): string {
   if (b.losers?.length) parts.push("REAL DECLINERS TODAY (contrarian / second-order clues):\n" + b.losers.map((m) => `- ${m.ticker}: ${m.changePct}`).join("\n"));
   if (b.mostActive?.length) parts.push("MOST ACTIVELY TRADED (attention flow):\n" + b.mostActive.map((m) => `- ${m.ticker}: ${m.changePct}`).join("\n"));
   if (b.sectors?.length) parts.push("SECTOR ROTATION (real-time performance):\n" + b.sectors.map((x) => `- ${x.sector}: ${x.changePct}`).join("\n"));
+  if (b.commodities?.length) parts.push("REAL COMMODITY LEVELS (via FRED — spot/reference prices):\n" + b.commodities.map((q) => `- ${q.label}: ${q.value}${q.unit}${q.changePct ? ` (${q.changePct} vs prior)` : ""}`).join("\n"));
+  if (b.fx?.length) parts.push("REAL FX RATES (via FRED):\n" + b.fx.map((q) => `- ${q.label}: ${q.value}${q.changePct ? ` (${q.changePct} vs prior)` : ""}`).join("\n"));
   if (b.headlines.length) parts.push("CURRENT HEADLINES (paraphrased, attributed):\n" + b.headlines.slice(0, 10).map((n) => `- ${n.head} (${n.source})${n.why ? " — " + n.why : ""}`).join("\n"));
   if (b.macro.length) parts.push("MACRO BACKDROP (real data via FRED):\n" + b.macro.map((m) => `- ${m.label}: ${m.value}${m.unit}${m.change != null ? ` (${m.change >= 0 ? "+" : ""}${m.change.toFixed(2)} vs prior)` : ""}`).join("\n"));
   if (b.insiders?.length) parts.push("INSIDER FILING CLUSTERS (real, from SEC EDGAR Form 4 filings over the last few trading days — clustered open-market BUYING is the notable signal; sampled counts, not totals):\n" + b.insiders.map((i) => `- ${i.company} (${i.ticker}): ${i.filings} filings; sampled filings show ${i.buys} open-market buy${i.buys === 1 ? "" : "s"}, ${i.sells} sale${i.sells === 1 ? "" : "s"}`).join("\n"));

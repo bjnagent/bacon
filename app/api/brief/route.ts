@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getMarketSignals, getSectorPerformance, type MarketSignals } from "@/lib/market";
 import { getMacroSnapshot } from "@/lib/macro";
+import { getCommodityFxSignals } from "@/lib/commodities";
 import { getInsiderClusters } from "@/lib/insider";
 import { buildSignalBundle, briefToRows, briefToDailyRow, splitVoices } from "@/lib/brief";
 import { parseOpportunities } from "@/lib/parsers";
@@ -52,10 +53,11 @@ export async function POST() {
   // and warms the in-process cache for the next click / the nightly cron.
   const withDeadline = <T,>(p: Promise<T>, ms: number, fallback: T) =>
     Promise.race([p, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);
-  const [signals, sectors, macro, insiders, themesRes, trackedRes, newsRes, settingsRes] = await Promise.all([
+  const [signals, sectors, macro, commodityFx, insiders, themesRes, trackedRes, newsRes, settingsRes] = await Promise.all([
     getMarketSignals(8).catch((): MarketSignals => ({ gainers: [], losers: [], mostActive: [] })),
     getSectorPerformance().catch(() => []),
     getMacroSnapshot().catch(() => []),
+    getCommodityFxSignals().catch(() => ({ commodities: [], fx: [] })),
     withDeadline(getInsiderClusters().catch(() => []), 2500, []),
     sb.from("themes").select("label"),
     sb.from("watchlist").select("symbol"),
@@ -73,6 +75,8 @@ export async function POST() {
     tracked: (trackedRes.data ?? []).map((t) => t.symbol),
     insiders,
     voices: splitVoices((settingsRes.data as { voices?: string } | null)?.voices),
+    commodities: commodityFx.commodities,
+    fx: commodityFx.fx,
   });
 
   return textStreamResponse(
