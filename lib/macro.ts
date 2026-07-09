@@ -35,6 +35,7 @@ const SERIES: SeriesCfg[] = [
   { key: "cpi",      id: "CPIAUCSL", label: "CPI YoY",   unit: "%", decimals: 1, units: "pc1" },
   { key: "unrate",   id: "UNRATE",   label: "Unemployment", unit: "%", decimals: 1 },
   { key: "vix",      id: "VIXCLS",   label: "VIX",       unit: "",  decimals: 1 },
+  { key: "usd",      id: "DTWEXBGS", label: "US Dollar", unit: "",  decimals: 2 }, // broad trade-weighted dollar index
 ];
 
 async function fetchSeries(cfg: SeriesCfg): Promise<MacroIndicator | null> {

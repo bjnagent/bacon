@@ -13,6 +13,7 @@ interface RoiResult {
   name: string; ticker: string;
   entryDate?: string; entryClose?: number; asOfDate?: string; asOfClose?: number;
   invested?: number; value?: number; roiPct?: number; skipped?: string;
+  quoteKind?: "commodity" | "fx"; entryQuote?: string; asOfQuote?: string; // commodity/FX basis, in the instrument's own unit
 }
 interface RoiTotals { count: number; invested: number; value: number; asOf: string; roiPct: number }
 interface RoiData { unavailable?: boolean; error?: string; since?: string; invested?: number; results?: RoiResult[]; totals?: RoiTotals | null }
@@ -137,7 +138,9 @@ export default function TrackRecordView() {
                           <div className={`pr-roi ${r.roiPct! >= 0 ? "is-up" : "is-down"}`}>
                             <span className="pr-roi-lead">{usd(r.invested!)} → {usd(r.value!)}</span>
                             <em className="pr-roi-delta">{r.roiPct! >= 0 ? "▲" : "▼"} {signedUsd(r.value! - r.invested!)} · {pct(r.roiPct!)}</em>
-                            <span className="pr-roi-basis">{r.entryClose != null && `entry ${usd(r.entryClose)} on ${r.entryDate} → ${usd(r.asOfClose!)} on ${r.asOfDate}`}</span>
+                            <span className="pr-roi-basis">{r.entryClose != null && (r.entryQuote
+                              ? `entry ${r.entryQuote} on ${r.entryDate} → ${r.asOfQuote} on ${r.asOfDate}`
+                              : `entry ${usd(r.entryClose)} on ${r.entryDate} → ${usd(r.asOfClose!)} on ${r.asOfDate}`)}</span>
                           </div>
                         ) : (
                           <div className="pr-roi is-skip"><span className="pr-roi-lead">{usd(10000)} → not priced</span><span className="pr-roi-basis">{r.skipped}</span></div>
