@@ -4,6 +4,28 @@
 
 import { normStance, type StanceKey } from "./lenses";
 
+// Remove inline markdown emphasis the model sometimes slips into free-text
+// fields (**bold**, __bold__, `code`) — every surface renders these as plain
+// text, so the raw markers would show literally (e.g. "**Investor theme**").
+function stripMd(s: string): string {
+  return s.replace(/\*\*(.+?)\*\*/g, "$1").replace(/__(.+?)__/g, "$1").replace(/`([^`]+)`/g, "$1");
+}
+
+// Read a labelled field out of a delimited block. Unlike a naive
+// /key:\s*(.+)/ — which stops at the first newline and silently truncates
+// multi-line values (a numbered signals list, wrapped prose) — this captures
+// through to the next KNOWN label or the block end. `keys` is the block's full
+// label set, so a value is only ever bounded by a real following field.
+function blockReader(block: string, keys: string[]) {
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const labels = keys.map(esc).join("|");
+  return (key: string): string => {
+    const re = new RegExp(`${esc(key)}\\s*:\\s*([\\s\\S]*?)(?=\\r?\\n[ \\t]*(?:${labels})[ \\t]*:|$)`, "i");
+    const m = block.match(re);
+    return m ? stripMd(m[1].trim()) : "";
+  };
+}
+
 export interface LensSection {
   stance: StanceKey;
   body: string;
@@ -68,7 +90,7 @@ export function parseScout(text: string): ScoutResult {
   const blocks = text.split(/@@PICK@@/i).slice(1);
   const picks = blocks.map((raw) => {
     const b = raw.split(/===\s*CAVEAT/i)[0];
-    const get = (k: string) => { const m = b.match(new RegExp(k + "\\s*:\\s*(.+)", "i")); return m ? m[1].trim() : ""; };
+    const get = blockReader(b, ["name", "ticker", "class", "why", "now", "check"]);
     return { name: get("name"), ticker: get("ticker"), cls: get("class"), why: get("why"), now: get("now"), check: get("check") };
   }).filter((p) => p.name || (p.ticker && p.ticker !== "—"));
   return { intro, picks, caveat };
@@ -100,7 +122,7 @@ export function parseOpportunities(text: string): OpportunityBrief {
   const blocks = text.split(/@@OPP@@/i).slice(1);
   const items = blocks.map((raw) => {
     const b = raw.split(/===\s*CAVEAT/i)[0];
-    const get = (k: string) => { const m = b.match(new RegExp(k + "\\s*:\\s*(.+)", "i")); return m ? m[1].trim() : ""; };
+    const get = blockReader(b, ["name", "ticker", "class", "horizon", "thesis", "signals", "confirm", "kill"]);
     return { name: get("name"), ticker: get("ticker"), cls: get("class"), horizon: get("horizon"), thesis: get("thesis"), signals: get("signals"), confirm: get("confirm"), kill: get("kill") };
   }).filter((o) => o.name || (o.ticker && o.ticker !== "—"));
   return { intro, items, caveat };
@@ -114,7 +136,7 @@ export function parseBriefReview(text: string): { items: ReviewItem[]; note: str
   const blocks = text.split(/@@ITEM@@/i).slice(1);
   const items = blocks.map((raw) => {
     const b = raw.split(/===\s*NOTE/i)[0];
-    const get = (k: string) => { const m = b.match(new RegExp(k + "\\s*:\\s*(.+)", "i")); return m ? m[1].trim() : ""; };
+    const get = blockReader(b, ["ticker", "outcome", "verdict"]);
     return { ticker: get("ticker"), outcome: get("outcome"), verdict: get("verdict").toLowerCase() };
   }).filter((r) => r.ticker);
   return { items, note };
@@ -165,7 +187,7 @@ export function parseNews(text: string): NewsResult {
   const blocks = text.split(/@@ITEM@@/i).slice(1);
   const items = blocks.map((raw) => {
     const b = raw.split(/===\s*NOTE/i)[0];
-    const get = (k: string) => { const m = b.match(new RegExp(k + "\\s*:\\s*(.+)", "i")); return m ? m[1].trim() : ""; };
+    const get = blockReader(b, ["head", "source", "why", "ticker", "class", "signal", "when"]);
     return { head: get("head"), source: get("source"), why: get("why"), ticker: get("ticker"), cls: get("class"), signal: get("signal"), when: get("when") };
   }).filter((n) => n.head);
   return { intro, items, note };

@@ -153,6 +153,29 @@ starting points, not advice`;
     expect(out.items[0].kill).toBe("contract loss to rival");
     expect(out.items[1].name).toBe("NoTicker Play");
   });
+
+  it("keeps the whole multi-line signals list (no first-line truncation)", () => {
+    const out = parseOpportunities(`@@OPP@@
+name: MLCC Names
+ticker: —
+class: Equity
+horizon: weeks
+thesis: passive components under the radar
+signals: (1) **Investor theme: MLCC** — directly flagged.
+(2) Book-to-bill at multi-year highs (Reuters).
+(3) Lead times stretching to 20–40 weeks.
+confirm: allocation letters from Murata
+kill: hyperscaler capex pause
+@@OPP@@`);
+    expect(out.items[0].signals).toContain("(1)");
+    expect(out.items[0].signals).toContain("(2)");
+    expect(out.items[0].signals).toContain("(3)");
+    expect(out.items[0].signals).toContain("Lead times");
+    expect(out.items[0].signals).not.toContain("**"); // markdown emphasis stripped
+    expect(out.items[0].signals).toContain("Investor theme: MLCC");
+    expect(out.items[0].confirm).toBe("allocation letters from Murata"); // later fields still bound correctly
+    expect(out.items[0].kill).toBe("hyperscaler capex pause");
+  });
 });
 
 describe("parseBriefReview", () => {

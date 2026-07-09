@@ -60,6 +60,89 @@ export async function getTopGainers(limit = 8): Promise<Mover[]> {
   return (await getMarketSignals(limit)).gainers;
 }
 
+// --- Historical daily closes (for the track record's "$10K since flagged" math) ---
+// Real prices only, per the no-fabricated-numbers rule. One TIME_SERIES_DAILY
+// call per ticker yields BOTH the flag-day close and today's close, so ROI is
+// derived, never guessed.
+
+export interface DailyBar { date: string; close: number } // date: YYYY-MM-DD
+export interface DailySeries { ticker: string; bars: DailyBar[] }  // bars sorted newest-first
+
+// Extract a plausible US-equity symbol from a stored ticker field (which may be
+// "—", empty, a pair like "ORKA / SPYR", or "BRK.B"). Returns null if none.
+export function cleanTicker(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const m = String(raw).toUpperCase().match(/[A-Z]{1,5}(?:\.[A-Z])?/);
+  const t = m ? m[0] : "";
+  return t && t !== "—" ? t : null;
+}
+
+// Per-ticker cache: daily bars change at most once a day, and Alpha Vantage's
+// free tier is 25 requests/DAY — so an uncached ROI pass would burn the budget.
+const seriesCache = new Map<string, { at: number; data: DailySeries }>();
+const SERIES_TTL_MS = 30 * 60 * 1000;
+
+async function fetchDailyBars(ticker: string, full: boolean): Promise<DailyBar[]> {
+  const size = full ? "full" : "compact"; // compact = last 100 trading days
+  const res = await fetch(`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodeURIComponent(ticker)}&outputsize=${size}&apikey=${KEY}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`market data request failed (${res.status})`);
+  const data = await res.json();
+  if (data?.Information) throw new Error(`market data: ${String(data.Information).slice(0, 120)}`);
+  const ts = data?.["Time Series (Daily)"];
+  if (!ts || typeof ts !== "object") return [];
+  return Object.entries(ts as Record<string, Record<string, string>>)
+    .map(([date, bar]) => ({ date, close: parseFloat(bar?.["4. close"]) }))
+    .filter((b) => Number.isFinite(b.close))
+    .sort((a, b) => (a.date < b.date ? 1 : -1)); // newest-first
+}
+
+// Daily close series for one ticker. `since` (YYYY-MM-DD) is the flag date we
+// must reach back to: the compact window covers ~100 trading days; if `since`
+// predates that, we fetch the full history once so the entry price still exists.
+export async function getDailySeries(rawTicker: string, since?: string): Promise<DailySeries | null> {
+  if (!KEY || PROVIDER !== "alphavantage") return null;
+  const ticker = cleanTicker(rawTicker);
+  if (!ticker) return null;
+  const reaches = (bars: DailyBar[]) => bars.length > 0 && (!since || bars[bars.length - 1].date <= since);
+  const cached = seriesCache.get(ticker);
+  if (cached && Date.now() - cached.at < SERIES_TTL_MS && reaches(cached.data.bars)) return cached.data;
+  let bars = await fetchDailyBars(ticker, false);
+  if (bars.length && !reaches(bars)) bars = await fetchDailyBars(ticker, true);
+  if (!bars.length) return null;
+  const out: DailySeries = { ticker, bars };
+  seriesCache.set(ticker, { at: Date.now(), data: out });
+  return out;
+}
+
+// Close on `date`, or the nearest earlier trading day (weekends/holidays/flag
+// dates that fell after the close). bars are newest-first.
+export function closeOnOrBefore(series: DailySeries, date: string): DailyBar | null {
+  for (const b of series.bars) if (b.date <= date) return b;
+  return null;
+}
+
+export interface RoiPoint {
+  ticker: string;
+  entryDate: string; entryClose: number;
+  asOfDate: string; asOfClose: number;
+  invested: number; value: number; roiPct: number;
+}
+
+// What a hypothetical `invested` at the flag-day close is worth at the latest
+// close. No fees/dividends/slippage — an honest back-of-envelope, not a return.
+export function computeRoi(series: DailySeries, since: string, invested: number): RoiPoint | null {
+  const entry = closeOnOrBefore(series, since);
+  const latest = series.bars[0];
+  if (!entry || !latest || !(entry.close > 0)) return null;
+  const ratio = latest.close / entry.close;
+  return {
+    ticker: series.ticker,
+    entryDate: entry.date, entryClose: entry.close,
+    asOfDate: latest.date, asOfClose: latest.close,
+    invested, value: invested * ratio, roiPct: (ratio - 1) * 100,
+  };
+}
+
 // Real-time sector performance (one call) — feeds rotation context to the brief.
 export async function getSectorPerformance(): Promise<{ sector: string; changePct: string }[]> {
   if (!KEY || PROVIDER !== "alphavantage") return [];
