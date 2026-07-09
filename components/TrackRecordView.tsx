@@ -21,8 +21,10 @@ const VERDICT_TONE: Record<string, string> = {
   "played-out": "is-good", "developing": "is-live", "faded": "is-mute", "invalidated": "is-bad",
 };
 
-const usd = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: n >= 100 ? 0 : 2 });
-const pct = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(1)}%`;
+// Exact to the cent — this is a money figure, not a rounded headline.
+const usd = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const signedUsd = (n: number) => `${n >= 0 ? "+" : "−"}${usd(Math.abs(n))}`;
+const pct = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
 
 // The track record: every brief the system has produced, by date — and an
 // honest "how did it age?" review pass per brief. Credibility loop.
@@ -63,7 +65,8 @@ export default function TrackRecordView() {
   };
 
   // "$10K since flagged" — a hypothetical stake at each opportunity's flag-day
-  // close, valued at today's close. Live (real prices), never stored.
+  // close, valued at today's close. Live (real prices), never stored — so the
+  // money value is exact as of the moment you look.
   const priceRoi = async (id: string) => {
     if (pricing) return;
     setPricing(id); setError(null);
@@ -73,6 +76,14 @@ export default function TrackRecordView() {
       setRoi((prev) => ({ ...prev, [id]: data as RoiData }));
     } catch (err) { setError(err instanceof Error ? err.message : "Pricing failed"); }
     finally { setPricing(null); }
+  };
+
+  // Expand a record and, the first time it opens, price it automatically so the
+  // exact ROI + money value are already on screen — no extra click.
+  const toggleRecord = (id: string) => {
+    const next = open === id ? null : id;
+    setOpen(next);
+    if (next && !roi[next] && !pricing) priceRoi(next);
   };
 
   return (
@@ -95,7 +106,7 @@ export default function TrackRecordView() {
             const verdicts = b.items.filter((i) => i.verdict);
             return (
               <div key={b.id} className={`pr-record ${isOpen ? "is-open" : ""}`}>
-                <button className="pr-record-head" onClick={() => setOpen(isOpen ? null : b.id)} aria-expanded={isOpen}>
+                <button className="pr-record-head" onClick={() => toggleRecord(b.id)} aria-expanded={isOpen}>
                   <span className="pr-record-date">{b.brief_date}</span>
                   <span className="pr-record-sum">{b.items.length} opportunities{b.reviewed_at ? ` · reviewed` : ""}</span>
                   {verdicts.length > 0 && (
@@ -124,33 +135,36 @@ export default function TrackRecordView() {
                         {o.outcome && <div className="pr-pick-now"><span>SINCE THEN ▸</span> {o.outcome}</div>}
                         {r && (r.value != null ? (
                           <div className={`pr-roi ${r.roiPct! >= 0 ? "is-up" : "is-down"}`}>
-                            <span className="pr-roi-lead">$10K → {usd(r.value)}</span>
-                            <em className="pr-roi-delta">{r.roiPct! >= 0 ? "▲" : "▼"} {pct(r.roiPct!)}</em>
-                            <span className="pr-roi-basis">{r.entryClose != null && `${usd(r.entryClose)} on ${r.entryDate} → ${usd(r.asOfClose!)} on ${r.asOfDate}`}</span>
+                            <span className="pr-roi-lead">{usd(r.invested!)} → {usd(r.value!)}</span>
+                            <em className="pr-roi-delta">{r.roiPct! >= 0 ? "▲" : "▼"} {signedUsd(r.value! - r.invested!)} · {pct(r.roiPct!)}</em>
+                            <span className="pr-roi-basis">{r.entryClose != null && `entry ${usd(r.entryClose)} on ${r.entryDate} → ${usd(r.asOfClose!)} on ${r.asOfDate}`}</span>
                           </div>
                         ) : (
-                          <div className="pr-roi is-skip"><span className="pr-roi-lead">$10K → not priced</span><span className="pr-roi-basis">{r.skipped}</span></div>
+                          <div className="pr-roi is-skip"><span className="pr-roi-lead">{usd(10000)} → not priced</span><span className="pr-roi-basis">{r.skipped}</span></div>
                         ))}
                       </div>
                       );
                     })}
 
+                    {pricing === b.id && !priced && (
+                      <div className="pr-roi-loading"><Loader2 size={13} className="pr-spin" /> Pricing a {usd(10000)} stake in each at that day&apos;s close…</div>
+                    )}
                     {priced?.totals && (
                       <div className={`pr-roi-total ${priced.totals.roiPct >= 0 ? "is-up" : "is-down"}`}>
-                        Hypothetical {usd(priced.totals.invested)} basket ({priced.totals.count}×$10K) → <strong>{usd(priced.totals.value)}</strong> <em>{priced.totals.roiPct >= 0 ? "▲" : "▼"} {pct(priced.totals.roiPct)}</em> as of {priced.totals.asOf}
+                        Hypothetical {usd(priced.totals.invested)} basket ({priced.totals.count}×{usd(10000)}) → <strong>{usd(priced.totals.value)}</strong> <em>{priced.totals.roiPct >= 0 ? "▲" : "▼"} {signedUsd(priced.totals.value - priced.totals.invested)} · {pct(priced.totals.roiPct)}</em> as of {priced.totals.asOf}
                       </div>
                     )}
                     {priced && (priced.unavailable || (!priced.totals && !byIndex.some((r) => r.value != null))) && (
                       <div className="pr-roi-note">{priced.error || "No opportunities on this day had a priceable US-equity ticker."}</div>
                     )}
-                    {priced?.totals && <div className="pr-roi-note">Hypothetical entry at that day&apos;s close — excludes fees, dividends and slippage. Real prices via market-data provider. Not advice.</div>}
+                    {priced?.totals && <div className="pr-roi-note">Exact money value, live as of {priced.totals.asOf}. Hypothetical entry at that day&apos;s close — excludes fees, dividends and slippage. Real prices via market-data provider. Not advice.</div>}
 
                     <div className="pr-record-actions">
                       <button className="pr-btn-sm" onClick={() => review(b.id)} disabled={reviewing === b.id}>
                         {reviewing === b.id ? <><Loader2 size={13} className="pr-spin" /> Checking what happened…</> : <><Microscope size={13} /> {b.reviewed_at ? "Re-review" : "How did it age?"}</>}
                       </button>
                       <button className="pr-btn-sm" onClick={() => priceRoi(b.id)} disabled={pricing === b.id}>
-                        {pricing === b.id ? <><Loader2 size={13} className="pr-spin" /> Pricing $10K stakes…</> : <><LineChart size={13} /> {priced ? "Re-price $10K" : "If I'd put $10K in?"}</>}
+                        {pricing === b.id ? <><Loader2 size={13} className="pr-spin" /> Pricing…</> : <><LineChart size={13} /> {priced ? "Re-price $10K" : "Price $10K"}</>}
                       </button>
                     </div>
                   </div>

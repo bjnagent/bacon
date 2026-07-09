@@ -790,6 +790,7 @@ body { background: #EBE8E0; color: #1A1712; }
 .pr-roi-total.is-up em{color:var(--good)}
 .pr-roi-total.is-down em{color:var(--bad)}
 .pr-roi-note{font-family:var(--fm);font-size:10.5px;color:var(--muted2);letter-spacing:0.02em;line-height:1.5;margin-bottom:10px}
+.pr-roi-loading{display:flex;align-items:center;gap:8px;font-family:var(--fm);font-size:11px;color:var(--muted);letter-spacing:0.02em;padding:8px 0 12px}
 
 .pr-mailtoggle{display:inline-flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--line2);color:var(--muted);font-family:var(--fm);font-size:11px;letter-spacing:0.04em;padding:9px 12px;border-radius:99px;cursor:pointer;transition:all .14s;text-transform:uppercase}
 .pr-mailtoggle:hover{border-color:var(--accent);color:var(--ink)}
