@@ -515,6 +515,14 @@ body { background: #EBE8E0; color: #1A1712; }
 /* Macro backdrop strip (real FRED indicators) */
 .pr-macro{background:var(--card);border:1px solid var(--line2);border-radius:9px;padding:13px 16px;margin-bottom:22px}
 .pr-macro-head{font-family:var(--fm);font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted2);margin-bottom:10px}
+.pr-macro-bar{display:flex;align-items:center;gap:12px;width:100%;background:none;border:none;padding:0;cursor:pointer;color:inherit;text-align:left;font-family:var(--fb)}
+.pr-macro-bar .pr-macro-head{margin:0;flex-shrink:0}
+.pr-macro-bar:hover .pr-macro-head,.pr-macro-bar:hover .pr-fw-chev{color:var(--ink)}
+.pr-macro-bar .pr-fw-chev{margin-left:auto;flex-shrink:0}
+.pr-macro-peek{flex:1;min-width:0;font-family:var(--fm);font-size:11px;color:var(--muted2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:0.02em}
+.pr-macro.is-collapsed{padding-top:12px;padding-bottom:12px}
+.pr-macro.is-collapsed .pr-macro-drawer{display:none}
+.pr-macro-drawer{margin-top:11px}
 .pr-macro-strip{display:flex;flex-wrap:wrap;gap:9px}
 .pr-macro-item{display:flex;flex-direction:column;gap:2px;background:var(--paper2);border:1px solid var(--line);border-radius:6px;padding:8px 12px;min-width:92px}
 .pr-macro-lbl{font-family:var(--fm);font-size:10.5px;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted)}
