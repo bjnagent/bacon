@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Loader2, ArrowRight, ArrowUpRight, AlertTriangle, Scale, LayoutGrid, Bookmark, MessageCircle, Users } from "lucide-react";
 import { LENSES, STANCES, ASSET_CLASSES, PERSONAS, overallLean, type LensKey, type StanceKey } from "@/lib/lenses";
 import { toPoints, parseBriefing, type Briefing, type Debate } from "@/lib/parsers";
+import { auditBriefingText } from "@/lib/verify";
 import { readTextStream } from "@/lib/readStream";
 import type { ChatContext } from "@/lib/prompts";
 import Spectrum from "./Spectrum";
@@ -106,6 +107,10 @@ export default function AnalyzeView({ target, onDiscuss, quickSyms = [] }: { tar
   const analysisNotes = hasBriefing && briefing
     ? [briefing.SUMMARY && `Summary: ${briefing.SUMMARY}`, `Lens leans — ${LENSES.map((l) => `${l.name}: ${briefing.lenses[l.key]?.stance || "mixed"}`).join("; ")}`, briefing.BOTTOMLINE && `Bottom line: ${briefing.BOTTOMLINE}`].filter(Boolean).join("\n")
     : undefined;
+  // Verification gate: audit the read for hard figures that don't cite a source.
+  const dataCheck = hasBriefing && briefing
+    ? auditBriefingText({ summary: briefing.SUMMARY, bottomline: briefing.BOTTOMLINE, lensBodies: LENSES.map((l) => briefing!.lenses[l.key]?.body || "") })
+    : null;
 
   return (
     <div className="pr-view">
@@ -204,6 +209,22 @@ export default function AnalyzeView({ target, onDiscuss, quickSyms = [] }: { tar
                   </div>); })}
               </div>
               {briefing.BOTTOMLINE && <div className="pr-bottomline"><div className="pr-bottomline-label">Bottom line</div>{briefing.BOTTOMLINE}</div>}
+              {dataCheck && dataCheck.total > 0 && (
+                <div className={`pr-datacheck ${dataCheck.flagged.length ? "has-flags" : "is-clean"}`}>
+                  <div className="pr-datacheck-head">
+                    {dataCheck.flagged.length > 0 && <AlertTriangle size={13} />}
+                    <span className="pr-datacheck-title">Data check</span>
+                    <span className="pr-datacheck-sum">{dataCheck.total} hard figure{dataCheck.total === 1 ? "" : "s"} · {dataCheck.cited} cite a source · {dataCheck.flagged.length} to verify</span>
+                  </div>
+                  {dataCheck.flagged.length > 0 && (
+                    <ul className="pr-datacheck-list">
+                      {dataCheck.flagged.slice(0, 6).map((f, i) => <li key={i}><strong>{f.figure}</strong> — {f.snippet}</li>)}
+                      {dataCheck.flagged.length > 6 && <li className="pr-datacheck-more">+{dataCheck.flagged.length - 6} more…</li>}
+                    </ul>
+                  )}
+                  <div className="pr-datacheck-foot">{dataCheck.flagged.length ? "These figures don't cite a source in the text — confirm each independently before relying on it." : "Every hard figure here names a source or the live data. Still verify what matters."}</div>
+                </div>
+              )}
               <div className="pr-disclaimer">BACON synthesizes public information and may be incomplete or out of date. Live prices/charts are from TradingView; Bacon&apos;s analysis stays qualitative and is not financial advice. The lenses can disagree — confirm every figure independently and decide for yourself.</div>
             </>
           )}

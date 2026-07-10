@@ -5,6 +5,7 @@ import { Loader2, Sparkles, ArrowRight, Plus, AlertTriangle, RefreshCw, Mail, Ma
 import { mapClass, relTime } from "@/lib/lenses";
 import type { ChatContext } from "@/lib/prompts";
 import { parseOpportunities } from "@/lib/parsers";
+import { auditFigures } from "@/lib/verify";
 import { readTextStream } from "@/lib/readStream";
 import { cachedJson, invalidate } from "@/lib/clientCache";
 import MacroBackdrop from "./MacroBackdrop";
@@ -155,6 +156,26 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
                 );
               })}
             </div>
+            {(() => {
+              // Verification gate: flag any hard figure across today's ideas that
+              // doesn't cite a source. Only surfaces when there's something to check.
+              const check = auditFigures(brief!.items.map((o) => `${o.thesis} ${o.signals}`).join(" \n "));
+              if (!check.flagged.length) return null;
+              return (
+                <div className="pr-datacheck has-flags">
+                  <div className="pr-datacheck-head">
+                    <AlertTriangle size={13} />
+                    <span className="pr-datacheck-title">Data check</span>
+                    <span className="pr-datacheck-sum">{check.total} hard figure{check.total === 1 ? "" : "s"} in today&apos;s ideas · {check.flagged.length} without a cited source</span>
+                  </div>
+                  <ul className="pr-datacheck-list">
+                    {check.flagged.slice(0, 5).map((f, i) => <li key={i}><strong>{f.figure}</strong> — {f.snippet}</li>)}
+                    {check.flagged.length > 5 && <li className="pr-datacheck-more">+{check.flagged.length - 5} more…</li>}
+                  </ul>
+                  <div className="pr-datacheck-foot">Bacon grounds figures in real signals; these appear without an inline source — verify each before acting.</div>
+                </div>
+              );
+            })()}
             {brief!.caveat && <div className="pr-disclaimer">{brief!.caveat}</div>}
           </>
         )}
