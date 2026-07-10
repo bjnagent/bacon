@@ -142,6 +142,20 @@ export function parseBriefReview(text: string): { items: ReviewItem[]; note: str
   return { items, note };
 }
 
+export interface KillAlertItem { ticker: string; why: string }
+
+export function parseKillWatch(text: string): { items: KillAlertItem[]; note: string | null } {
+  const nm = text.match(/===\s*NOTE\s*===([\s\S]*)$/i);
+  const note = nm ? nm[1].trim() : null;
+  const blocks = text.split(/@@KILL@@/i).slice(1);
+  const items = blocks.map((raw) => {
+    const b = raw.split(/===\s*NOTE/i)[0];
+    const get = blockReader(b, ["ticker", "why"]);
+    return { ticker: get("ticker"), why: get("why") };
+  }).filter((k) => k.ticker && k.why);
+  return { items, note };
+}
+
 export interface TrackingUpdate {
   update: string;
   watch: string;

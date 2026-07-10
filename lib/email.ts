@@ -43,3 +43,33 @@ export async function sendBriefEmail(to: string, brief: OpportunityBrief, dateLa
   });
   return res.ok;
 }
+
+// Kill-condition watch alert — sent when the watcher flags a triggered kill.
+export async function sendKillAlertEmail(to: string, alerts: { ticker: string; name?: string; why: string }[], dateLabel: string): Promise<boolean> {
+  if (!KEY || !to || !alerts.length) return false;
+  const rows = alerts.map((a) => `
+    <tr><td style="padding:12px 0;border-bottom:1px solid #E8E4D8">
+      <div style="font:600 15px 'Segoe UI',system-ui,sans-serif;color:#CF3B2C">${a.ticker && a.ticker !== "—" ? a.ticker : a.name || a.ticker}</div>
+      <div style="font:400 13px 'Segoe UI',system-ui,sans-serif;color:#2E2A22;margin-top:4px">${a.why}</div>
+    </td></tr>`).join("");
+  const one = alerts.length === 1;
+  const html = `
+  <div style="background:#EBE8E0;padding:28px 16px">
+    <div style="max-width:560px;margin:0 auto;background:#F7F5EF;border:1px solid #1A1712;border-radius:12px;overflow:hidden">
+      <div style="height:5px;background:#CF3B2C"></div>
+      <div style="padding:22px 26px">
+        <div style="font:700 18px 'Segoe UI',system-ui,sans-serif;color:#1A1712">BACON · Kill-condition watch</div>
+        <div style="font:400 11px monospace;color:#6E6658;margin-top:2px;text-transform:uppercase;letter-spacing:.08em">${dateLabel}</div>
+        <div style="font:400 13.5px 'Segoe UI',system-ui,sans-serif;color:#2E2A22;margin-top:14px">A kill condition may have triggered on the following idea${one ? "" : "s"}. Re-check before relying on ${one ? "it" : "them"}.</div>
+        <table style="width:100%;border-collapse:collapse;margin-top:8px">${rows}</table>
+        <div style="font:400 10.5px monospace;color:#6E6658;margin-top:16px;line-height:1.6">Qualitative, from public reporting — verify everything yourself. Not financial advice.</div>
+      </div>
+    </div>
+  </div>`;
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ from: FROM, to: [to], subject: `Bacon · kill-condition watch — ${alerts.length} alert${one ? "" : "s"}`, html }),
+  });
+  return res.ok;
+}

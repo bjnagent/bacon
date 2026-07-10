@@ -202,6 +202,22 @@ verdict: <played-out | developing | faded | invalidated>
 <one line: outcomes summarized from public reporting; qualitative; not advice>`;
 }
 
+export function killWatchPrompt(briefDate: string): string {
+  return `You are BACON's risk desk running the KILL-CONDITION WATCH. On ${briefDate} the system flagged the opportunities below, each with an explicit KILL condition — the event that would invalidate the idea. Using web_search on CURRENT public information, judge for EACH whether its kill condition has plausibly TRIGGERED (or clear contrary evidence has emerged). Be conservative: only flag a kill when the public record genuinely supports it. Do NOT invent prices or figures; describe what happened qualitatively and cite the reporting.
+
+Emit a @@KILL@@ block ONLY for opportunities whose kill condition looks triggered — omit the ones still intact. If none are triggered, emit no @@KILL@@ blocks.
+
+Output ONLY in this exact format:
+===ALERTS===
+@@KILL@@
+ticker: <ticker or name as given>
+why: <one line: what public info indicates the kill condition triggered, cite the source>
+@@KILL@@
+...
+===NOTE===
+<one line: what you checked; if nothing triggered, say so plainly. Qualitative; not advice.>`;
+}
+
 export function trackingUpdatePrompt(): string {
   return `You are BACON monitoring an asset the investor is TRACKING on their radar. Using web_search, report ONLY what is NOTABLE and RECENT (roughly the past few weeks): news, filings, earnings, catalysts, insider/institutional activity, regulatory or macro moves relevant to this asset. Do NOT report live prices or price targets — this is a qualitative monitoring update, not advice.
 

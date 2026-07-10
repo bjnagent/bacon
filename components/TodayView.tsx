@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Sparkles, ArrowRight, Plus, AlertTriangle, RefreshCw, Mail, MailX } from "lucide-react";
+import { Loader2, Sparkles, ArrowRight, Plus, AlertTriangle, RefreshCw, Mail, MailX, ShieldAlert, ShieldOff } from "lucide-react";
 import { mapClass, relTime } from "@/lib/lenses";
 import type { ChatContext } from "@/lib/prompts";
 import { parseOpportunities } from "@/lib/parsers";
@@ -26,6 +26,8 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
   const [emailOn, setEmailOn] = useState(false);
   const [emailErr, setEmailErr] = useState<string | null>(null);
   const [savingEmail, setSavingEmail] = useState(false);
+  const [watchOn, setWatchOn] = useState(false);
+  const [savingWatch, setSavingWatch] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -33,11 +35,11 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
       try {
         const [bd, wd, std] = await Promise.all([
           cachedJson("/api/brief", 60_000), cachedJson("/api/watchlist", 30_000), cachedJson("/api/settings", 60_000),
-        ]) as [Record<string, unknown> & { brief?: Brief }, { items?: { symbol: string }[] }, { settings?: { brief_email_enabled?: boolean } }];
+        ]) as [Record<string, unknown> & { brief?: Brief }, { items?: { symbol: string }[] }, { settings?: { brief_email_enabled?: boolean; watch_enabled?: boolean } }];
         if (cancelled) return;
         if (bd.brief) setBrief(bd.brief);
         if (Array.isArray(wd.items)) { const t: Record<string, boolean> = {}; wd.items.forEach((it: { symbol: string }) => { t[it.symbol.toUpperCase()] = true; }); setTracked(t); }
-        if (std.settings) setEmailOn(!!std.settings.brief_email_enabled);
+        if (std.settings) { setEmailOn(!!std.settings.brief_email_enabled); setWatchOn(!!std.settings.watch_enabled); }
       } catch { /* empty state handles it */ }
       finally { if (!cancelled) setLoaded(true); }
     })();
@@ -92,6 +94,20 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
     } finally { setSavingEmail(false); }
   };
 
+  const toggleWatch = async () => {
+    if (savingWatch) return;
+    const next = !watchOn;
+    setSavingWatch(true); setEmailErr(null); setWatchOn(next);
+    try {
+      const res = await fetch("/api/settings", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ watch_enabled: next }) });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error || "save failed"); }
+      invalidate("/api/settings");
+    } catch (err) {
+      setWatchOn(!next);
+      setEmailErr(err instanceof Error && /column|schema/i.test(err.message) ? "Run the latest supabase/schema.sql once to enable the watcher." : "Couldn't save — try again.");
+    } finally { setSavingWatch(false); }
+  };
+
   const track = async (ticker: string, cls: string) => {
     const sym = ticker.toUpperCase();
     if (tracked[sym]) return;
@@ -110,6 +126,9 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
           <h2 className="pr-section-title">Today&apos;s brief</h2>
           <div className="pr-sec-actions">
             {hasBrief && brief!.generatedAt && <span className="pr-auto-lbl">assembled {relTime(brief!.generatedAt)}</span>}
+            <button className={`pr-mailtoggle ${watchOn ? "is-on" : ""}`} onClick={toggleWatch} disabled={savingWatch} title={watchOn ? "Kill-condition watch is ON — the system re-checks each idea's kill trigger daily and flags it on Record (and emails if email is on)" : "Kill-condition watch is OFF"}>
+              {watchOn ? <ShieldAlert size={13} /> : <ShieldOff size={13} />} {watchOn ? "Watch: ON" : "Watch: OFF"}
+            </button>
             <button className={`pr-mailtoggle ${emailOn ? "is-on" : ""}`} onClick={toggleEmail} disabled={savingEmail} title={emailOn ? "Morning email is ON — the brief lands in your inbox after each sweep" : "Morning email is OFF"}>
               {emailOn ? <Mail size={13} /> : <MailX size={13} />} {emailOn ? "Email: ON" : "Email: OFF"}
             </button>

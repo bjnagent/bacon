@@ -85,8 +85,14 @@ export async function POST(req: Request) {
     invested: priced.reduce((s, r) => s + r.invested, 0),
     value: priced.reduce((s, r) => s + r.value, 0),
     asOf: priced.reduce((d, r) => (r.asOfDate > d ? r.asOfDate : d), ""),
+    roiPct: 0,
   } : null;
-  if (totals) (totals as { roiPct?: number }).roiPct = (totals.value / totals.invested - 1) * 100;
+  if (totals) {
+    totals.roiPct = (totals.value / totals.invested - 1) * 100;
+    // Snapshot the day's totals so the all-time scoreboard aggregates without
+    // re-pricing (and re-burning provider rate limits). Best-effort.
+    try { await sb.from("daily_briefs").update({ roi: { ...totals, since, at: new Date().toISOString() } }).eq("id", id); } catch { /* additive */ }
+  }
 
   return NextResponse.json({ since, invested: INVESTED, results, totals });
 }

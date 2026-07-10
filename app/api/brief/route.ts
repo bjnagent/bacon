@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getMarketSignals, getSectorPerformance, type MarketSignals } from "@/lib/market";
-import { getMacroSnapshot } from "@/lib/macro";
-import { getCommodityFxSignals } from "@/lib/commodities";
-import { getInsiderClusters } from "@/lib/insider";
+import { readMarketWide, fetchMarketWide } from "@/lib/snapshot";
 import { buildSignalBundle, briefToRows, briefToDailyRow, splitVoices } from "@/lib/brief";
 import { parseOpportunities } from "@/lib/parsers";
 import { opportunityBriefPrompt } from "@/lib/prompts";
@@ -47,36 +44,30 @@ export async function POST() {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  // Interactive path: nothing here may hold up the stream's first byte. The
-  // insider fetch (many SEC requests when cold) races a short deadline — if it
-  // loses, this brief just goes without that section; the fetch keeps running
-  // and warms the in-process cache for the next click / the nightly cron.
-  const withDeadline = <T,>(p: Promise<T>, ms: number, fallback: T) =>
-    Promise.race([p, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);
-  const [signals, sectors, macro, commodityFx, insiders, themesRes, trackedRes, newsRes, settingsRes] = await Promise.all([
-    getMarketSignals(8).catch((): MarketSignals => ({ gainers: [], losers: [], mostActive: [] })),
-    getSectorPerformance().catch(() => []),
-    getMacroSnapshot().catch(() => []),
-    getCommodityFxSignals().catch(() => ({ commodities: [], fx: [] })),
-    withDeadline(getInsiderClusters().catch(() => []), 2500, []),
+  // Market-wide signals: reuse today's cached snapshot (warmed by the nightly
+  // cron) so Sweep-now doesn't refetch every external provider on a cold
+  // instance. On a miss, fetch live with a short insider deadline so the stream's
+  // first byte isn't held up. The user-specific parts below stay live and cheap.
+  const [marketWide, themesRes, trackedRes, newsRes, settingsRes] = await Promise.all([
+    readMarketWide(sb).then((cached) => cached ?? fetchMarketWide(2500)),
     sb.from("themes").select("label"),
     sb.from("watchlist").select("symbol"),
     sb.from("news_items").select("headline,source,why").order("created_at", { ascending: false }).limit(10),
     sb.from("settings").select("*").eq("user_id", user.id).maybeSingle(),
   ]);
   const bundle = buildSignalBundle({
-    movers: signals.gainers,
-    losers: signals.losers,
-    mostActive: signals.mostActive,
-    sectors,
+    movers: marketWide.movers,
+    losers: marketWide.losers,
+    mostActive: marketWide.mostActive,
+    sectors: marketWide.sectors,
     headlines: (newsRes.data ?? []).map((n) => ({ head: n.headline, source: n.source, why: n.why })),
-    macro,
+    macro: marketWide.macro,
     themes: (themesRes.data ?? []).map((t) => t.label),
     tracked: (trackedRes.data ?? []).map((t) => t.symbol),
-    insiders,
+    insiders: marketWide.insiders,
     voices: splitVoices((settingsRes.data as { voices?: string } | null)?.voices),
-    commodities: commodityFx.commodities,
-    fx: commodityFx.fx,
+    commodities: marketWide.commodities,
+    fx: marketWide.fx,
   });
 
   return textStreamResponse(
