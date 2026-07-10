@@ -26,7 +26,7 @@ export default function CommandPalette({ open, onClose, actions, onAnalyze }: {
   const ql = q.trim().toLowerCase();
   const filtered = actions.filter((a) => !ql || a.label.toLowerCase().includes(ql) || a.id.includes(ql));
   const results: PaletteAction[] = [
-    ...(q.trim() ? [{ id: "__analyze", label: `Analyze “${q.trim().toUpperCase()}”`, hint: "six-lens deep-dive", run: () => onAnalyze(q.trim()) }] : []),
+    ...(q.trim() ? [{ id: "__analyze", label: `Analyze “${q.trim().toUpperCase()}”`, hint: "multi-lens deep-dive", run: () => onAnalyze(q.trim()) }] : []),
     ...filtered,
   ];
   const clampSel = Math.min(sel, Math.max(results.length - 1, 0));

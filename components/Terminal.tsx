@@ -14,7 +14,7 @@ const BOOT_LINES = [
 
 const HELP_TEXT = `NAVIGATION
   ⌘K  or  /          open the command palette
-  type a ticker  →   six-lens analysis
+  type a ticker  →   multi-lens analysis
   Discover           radar dashboard + news
   Analyze            the asset workspace (chart + lenses)
   Discuss            contextual chat (the ● button)

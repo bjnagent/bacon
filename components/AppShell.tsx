@@ -110,7 +110,7 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
     { id: "record", label: "Track record — how past briefs aged", hint: "cockpit", run: () => { setPlace("discover"); setDiscoverTab("record"); } },
     { id: "radar", label: "Radar — tracking & fresh finds", hint: "cockpit", run: () => { setPlace("discover"); setDiscoverTab("radar"); } },
     { id: "news", label: "News — market headlines", hint: "cockpit", run: () => { setPlace("discover"); setDiscoverTab("news"); } },
-    { id: "analyze", label: "Analyze — six-lens cockpit", hint: "workspace", run: () => setPlace("analyze") },
+    { id: "analyze", label: "Analyze — multi-lens cockpit", hint: "workspace", run: () => setPlace("analyze") },
     { id: "discuss", label: "Discuss", hint: "contextual chat", run: () => openChat() },
     { id: "account", label: "Account", hint: "password & sign out", run: () => setTool("account") },
     { id: "help", label: "Keyboard & commands", hint: "?", run: () => setHelpOpen(true) },

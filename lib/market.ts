@@ -143,6 +143,58 @@ export function computeRoi(series: DailySeries, since: string, invested: number)
   };
 }
 
+// --- Moving-average structure (grounds the GF-DMA "trend health" lens) ---
+// Real 20/50/100/200-day simple moving averages from Alpha Vantage daily closes,
+// plus a mechanical trend classification. Numbers only — the model reads them.
+
+export const MA_PERIODS = [20, 50, 100, 200] as const;
+
+export interface MovingAverages {
+  ticker: string;
+  asOf: string;
+  price: number;
+  smas: { period: number; value: number; abovePct: number }[]; // price vs each SMA, %
+  classification: "orderly uptrend" | "overheated" | "weakening" | "downtrend" | "mixed / consolidating";
+}
+
+// Pure: derive the MA structure from a newest-first close series. Exposed for tests.
+export function movingAveragesFrom(bars: DailyBar[]): MovingAverages | null {
+  if (!bars.length) return null;
+  const price = bars[0].close;
+  if (!(price > 0)) return null;
+  const smas = MA_PERIODS
+    .filter((p) => bars.length >= p)
+    .map((period) => {
+      const value = bars.slice(0, period).reduce((s, b) => s + b.close, 0) / period;
+      return { period, value, abovePct: (price / value - 1) * 100 };
+    });
+  if (!smas.length) return null;
+  const by = (p: number) => smas.find((s) => s.period === p)?.value;
+  const s20 = by(20), s50 = by(50), s100 = by(100), s200 = by(200);
+  const ext50 = s50 ? (price / s50 - 1) * 100 : 0; // extension above the 50-DMA
+  const stackedUp = [s20, s50, s100, s200].filter((v): v is number => v != null);
+  const isUp = stackedUp.every((v, i, a) => i === 0 || a[i - 1] >= v);   // 20≥50≥100≥200
+  const isDown = stackedUp.every((v, i, a) => i === 0 || a[i - 1] <= v);
+  let classification: MovingAverages["classification"] = "mixed / consolidating";
+  if (isUp && s20 && price >= s20) classification = ext50 > 20 ? "overheated" : "orderly uptrend";
+  else if (isDown && s20 && price < s20) classification = "downtrend";
+  else if ((s50 && price < s50) || (s20 && s100 && s20 < s100)) classification = "weakening";
+  return { ticker: "", asOf: "", price, smas, classification };
+}
+
+export async function getMovingAverages(rawTicker: string): Promise<MovingAverages | null> {
+  const ticker = cleanTicker(rawTicker);
+  if (!ticker) return null;
+  // Reach back ~300 calendar days so the 200-day window is fully covered (compact
+  // is only 100 bars). `since` forces getDailySeries to fall back to full history.
+  const since = new Date(Date.now() - 300 * 86_400_000).toISOString().slice(0, 10);
+  const series = await getDailySeries(ticker, since);
+  if (!series) return null;
+  const base = movingAveragesFrom(series.bars);
+  if (!base) return null;
+  return { ...base, ticker: series.ticker, asOf: series.bars[0].date };
+}
+
 // Real-time sector performance (one call) — feeds rotation context to the brief.
 export async function getSectorPerformance(): Promise<{ sector: string; changePct: string }[]> {
   if (!KEY || PROVIDER !== "alphavantage") return [];

@@ -111,8 +111,8 @@ export default function AnalyzeView({ target, onDiscuss, quickSyms = [] }: { tar
     <div className="pr-view">
       {!hasBriefing && !rawFallback && !loading && (
         <div className="pr-hero">
-          <div className="pr-hero-eyebrow">Deep-dive · six-lens cockpit</div>
-          <h1 className="pr-hero-title">Run any asset through six professional lenses.</h1>
+          <div className="pr-hero-eyebrow">Deep-dive · multi-lens cockpit</div>
+          <h1 className="pr-hero-title">Run any asset through eight professional lenses.</h1>
           <Spectrum height={6} className="pr-hero-spectrum" />
           <p className="pr-hero-sub">For when you want the full read on one name. BACON pulls live public data to show what each lens sees, where they converge, and what you must verify — then save it to your radar to keep tracking it.</p>
         </div>
@@ -139,7 +139,7 @@ export default function AnalyzeView({ target, onDiscuss, quickSyms = [] }: { tar
       {loading && !hasBriefing && (
         <div className="pr-loading">
           <div className="pr-loading-lenses">{LENSES.map((l, i) => <div key={l.key} className="pr-loading-lens" style={{ animationDelay: `${i * 0.18}s` }}><span className="pr-loading-dot" style={{ background: l.hue }} />{l.short}</div>)}</div>
-          <div className="pr-loading-text">Sizzling through all six lenses — live search on the wire…</div>
+          <div className="pr-loading-text">Sizzling through every lens — live search on the wire…</div>
         </div>
       )}
       {error && <div className="pr-error"><AlertTriangle size={18} /><div><strong>Couldn&apos;t complete the analysis.</strong><div className="pr-error-detail">{error}. Check your connection and try again — the live search occasionally times out.</div></div></div>}
@@ -155,10 +155,10 @@ export default function AnalyzeView({ target, onDiscuss, quickSyms = [] }: { tar
             <div className="pr-readout-lean">
               <div className="pr-readout-leanlabel">Aggregate lens lean</div>
               <div className="pr-readout-leanval" style={{ color: lean!.tone }}>{lean!.label}</div>
-              <div className="pr-readout-leannote">synthesis of the six stances — not a rating or signal</div>
+              <div className="pr-readout-leannote">synthesis of the lens stances — not a rating or signal</div>
             </div>
             <TVLink sym={analyzed} square />
-            <button className="pr-readout-discuss" onClick={() => onDiscuss({ kind: "asset", asset: analyzed, cls: assetClass, title: analyzed.toUpperCase(), sub: "six-lens analysis", notes: analysisNotes })} title="Discuss this asset"><MessageCircle size={16} /></button>
+            <button className="pr-readout-discuss" onClick={() => onDiscuss({ kind: "asset", asset: analyzed, cls: assetClass, title: analyzed.toUpperCase(), sub: "multi-lens analysis", notes: analysisNotes })} title="Discuss this asset"><MessageCircle size={16} /></button>
             <button className={`pr-readout-save ${saved ? "is-saved" : ""}`} onClick={save} disabled={saved} title={saved ? "On radar" : "Track on radar"}><Bookmark size={16} /></button>
           </div>
 

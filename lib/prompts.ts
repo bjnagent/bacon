@@ -27,6 +27,10 @@ Use the web_search tool to ground the briefing in CURRENT facts. Prefer the most
 
 Adapt each lens to the asset class. For FX: "Fundamental" = rate differentials / PPP fair value, "Factor" = carry/momentum/value FX factors, "Signals" = COT positioning. For commodities: supply/demand, inventories, weather. For crypto: on-chain/adoption/regulation. For funds/ETFs: holdings, factor exposure, flows.
 
+Two lenses are sharper, quantified instruments:
+- VALUATION (TAM-Adjusted PEG): value the GROWTH, not just the multiple. Start from PEG, then adjust for TAM runway (how large and durable the addressable market), growth durability (how long it can compound), profit realization (is growth converting to margin/free cash flow), and competitive pressure. Conclude whether the price embeds too much or too little of that runway. Use web_search for real figures and attribute them; NEVER invent a P/E, growth rate, or TAM number — if you can't source them, say [Limited-data].
+- HEALTH (GF-DMA trend health): good fundamentals ≠ a healthy chart. Combine the growth read with the 20/50/100/200-day moving-average structure PROVIDED BELOW (if given): orderly (price above a rising, stacked set), overheated (over-extended above the 50-day), or weakening (losing the 50/100-day, the stack rolling over). If no MA data is provided, say [Limited-data]. For non-equities without MAs, read trend structure qualitatively.
+
 For EACH lens, begin the body with a stance tag in square brackets, chosen from EXACTLY one of: [Constructive] [Mixed] [Cautious] [Limited-data]. Then write at most 2 sentences. Then a line "Verify: <where to confirm>".
 
 Be concise. Output ONLY in this exact delimited format:
@@ -35,8 +39,14 @@ Be concise. Output ONLY in this exact delimited format:
 ===FUNDAMENTAL===
 [Stance] <read>
 Verify: <pointer>
+===VALUATION===
+[Stance] <TAM-adjusted PEG read: growth-adjusted value, runway, quality, competition>
+Verify: <pointer>
 ===TECHNICAL===
 [Stance] <read>
+Verify: <pointer>
+===HEALTH===
+[Stance] <GF-DMA read: fundamental growth vs the 20/50/100/200-day MA structure — orderly / overheated / weakening>
 Verify: <pointer>
 ===FACTOR===
 [Stance] <read>
@@ -116,7 +126,7 @@ export function moversScoutPrompt(movers: Mover[]): string {
   return `You are BACON, a research SCOUT. The names below are among TODAY'S top price gainers; their real percentage move is provided by a market-data provider:
 ${list}
 
-For EACH name, use web_search to explain WHY it is moving right now (earnings, news, catalyst) and the first thing to verify. These are momentum-driven STARTING POINTS for the user's own six-lens analysis — NOT recommendations, and momentum decays fast.
+For EACH name, use web_search to explain WHY it is moving right now (earnings, news, catalyst) and the first thing to verify. These are momentum-driven STARTING POINTS for the user's own multi-lens analysis — NOT recommendations, and momentum decays fast.
 
 CRITICAL: Do NOT invent or estimate any prices, targets, levels or figures. The percentage move is already given; every other claim must be grounded via web_search or omitted. Stay qualitative.
 
@@ -138,6 +148,8 @@ check: <one line: the first thing to verify before acting>
 
 export function opportunityBriefPrompt(): string {
   return `You are BACON's overnight desk. You are handed TODAY'S raw market signals (real equity movers with real % moves, real commodity levels and FX rates, current headlines, the live macro backdrop, the investor's themes and tracked names). Your job is to PIECE THEM TOGETHER into the day's opportunity brief — the investor does not know what to look for; you do the looking. Commodities and FX are in scope: when the commodity/FX levels converge with a headline or a macro move, a Commodity or FX opportunity is as valid as an equity.
+
+CHAIN DISCIPLINE (Serenity-style): never jump from a headline to a conclusion. For each idea, trace the chain before you commit it: (1) is the demand REAL and durable, or just narrative? (2) WHO actually captures it — the supplier, the bottleneck, the toll-taker — rather than the obvious name? (3) WHICH revenue line or segment does it flow into, and is it material to that company? (4) WHAT observable data would confirm or kill it next (a filing line item, a shipment/utilization stat, a price series) — that goes in confirm/kill. Prefer under-followed beneficiaries with a falsifiable next checkpoint over crowded, already-repriced names.
 
 Hunt specifically for what is NOT obvious:
 - Second-order beneficiaries: not the headline name, but its supplier, customer, or competitor that the tape hasn't repriced yet.
@@ -231,12 +243,12 @@ when: <relative recency if known, e.g. "2h", "today", or —>
 export function chatSystemPrompt(ctx: ChatContext | null): string {
   let focus = "Open discussion about markets, investing methodology, or whatever the user is researching.";
   if (ctx) {
-    if (ctx.kind === "asset") focus = `The user is analyzing ${ctx.asset}${ctx.cls ? ` (${ctx.cls})` : ""} through BACON's six lenses. Center the discussion on this asset unless they steer elsewhere.`;
+    if (ctx.kind === "asset") focus = `The user is analyzing ${ctx.asset}${ctx.cls ? ` (${ctx.cls})` : ""} through BACON's lenses. Center the discussion on this asset unless they steer elsewhere.`;
     else if (ctx.kind === "tracked") focus = `The user is tracking ${ctx.asset} on their radar.${ctx.thesis ? ` Their own thesis note: "${ctx.thesis}".` : ""}${ctx.update ? ` Latest development they've seen: "${ctx.update}".` : ""} Help them pressure-test this name.`;
     else if (ctx.kind === "radar") focus = `The user is looking at their watchlist: ${(ctx.assets || []).join(", ")}. Help them think across these names — concentration, shared catalysts, what to prioritize.`;
     else if (ctx.kind === "news") focus = `The user wants to discuss a news item: "${ctx.headline}"${ctx.ticker ? ` (most-implicated: ${ctx.ticker})` : ""}. Help them assess what it actually means and what to verify.`;
     else if (ctx.kind === "news-feed") focus = `The user is browsing current market headlines. Help them connect the news to opportunities and to what they should verify.`;
-    else if (ctx.kind === "frameworks") focus = `The user is studying the six analytical lenses (fundamental, technical, factor, macro, smart-money, risk). Help them understand and apply the methodology.`;
+    else if (ctx.kind === "frameworks") focus = `The user is studying BACON's analytical lenses (fundamental, valuation/TAM-adjusted PEG, technical, trend-health/GF-DMA, factor, macro, smart-money, risk). Help them understand and apply the methodology.`;
     else if (ctx.kind === "sizing") focus = `The user is thinking about position sizing and risk. Reason about sizing, fractional Kelly, correlation and risk budgets — always as math on their own inputs, never a specific bet recommendation.`;
   }
   const grounding = ctx?.notes ? `\n\nWhat the user is currently looking at (use it as grounding — build on it, don't just repeat it, and still point them to verify):\n${ctx.notes}` : "";
@@ -253,7 +265,7 @@ interface DeriveTarget { asset?: string; cls?: string }
 interface DeriveItem { asset: string }
 
 export function deriveContext(view: string, target: DeriveTarget | null, items: DeriveItem[] | null): ChatContext {
-  if (view === "analyze" && target && target.asset) return { kind: "asset", asset: target.asset, cls: target.cls, title: String(target.asset).toUpperCase(), sub: `six-lens analysis${target.cls ? " · " + target.cls : ""}` };
+  if (view === "analyze" && target && target.asset) return { kind: "asset", asset: target.asset, cls: target.cls, title: String(target.asset).toUpperCase(), sub: `multi-lens analysis${target.cls ? " · " + target.cls : ""}` };
   if (view === "news") return { kind: "news-feed", title: "Market headlines", sub: "news discussion" };
   if (view === "radar" && items && items.length) return { kind: "radar", title: "Your radar", sub: `${items.length} tracked`, assets: items.map((i) => i.asset) };
   return { kind: "general", title: "Markets & research", sub: "open discussion" };
@@ -261,7 +273,7 @@ export function deriveContext(view: string, target: DeriveTarget | null, items: 
 
 export function chatStarters(ctx: ChatContext | null): string[] {
   switch (ctx && ctx.kind) {
-    case "asset": return ["What's the strongest bull and bear case?", "What would break this thesis?", "What should I verify first?", "How do the six lenses line up here?"];
+    case "asset": return ["What's the strongest bull and bear case?", "What would break this thesis?", "What should I verify first?", "How do the lenses line up here?"];
     case "tracked": return ["What's changed recently that matters?", "What's the next catalyst to watch?", "What would make me wrong?", "Give me the bull vs bear in brief."];
     case "radar": return ["Where might I be over-concentrated?", "Which name has the most event risk soon?", "What themes connect these?", "Which deserves a deeper look first?"];
     case "news": return ["What does this actually mean for the stock?", "Is this likely already priced in?", "What should I verify before acting?", "Who else does this affect?"];

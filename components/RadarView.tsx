@@ -238,7 +238,7 @@ export default function RadarView({ onAnalyze }: { onAnalyze: (t: { asset: strin
                   <span className="pr-trk-when">{rel ? `scanned ${rel}` : "never scanned"}</span>
                   <div className="pr-trk-btns">
                     <button onClick={() => scanItem(it.id, it.symbol, it.asset_class)} disabled={isScan} title="Rescan"><RefreshCw size={13} /> rescan</button>
-                    <button onClick={() => onAnalyze({ asset: it.symbol, cls: it.asset_class })} title="Open six-lens cockpit"><LayoutGrid size={13} /> lenses</button>
+                    <button onClick={() => onAnalyze({ asset: it.symbol, cls: it.asset_class })} title="Open multi-lens cockpit"><LayoutGrid size={13} /> lenses</button>
                     <TVLink sym={it.symbol} />
                     <button onClick={() => setExpanded(expanded === it.id ? null : it.id)} title="Thesis"><ChevronRight size={13} className={expanded === it.id ? "pr-rot" : ""} /> thesis</button>
                     <button onClick={() => remove(it.id)} className="is-danger" title="Remove"><Trash2 size={13} /></button>
