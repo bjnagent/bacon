@@ -800,6 +800,21 @@ body { background: #EBE8E0; color: #1A1712; }
 .pr-roi-note{font-family:var(--fm);font-size:10.5px;color:var(--muted2);letter-spacing:0.02em;line-height:1.5;margin-bottom:10px}
 .pr-roi-loading{display:flex;align-items:center;gap:8px;font-family:var(--fm);font-size:11px;color:var(--muted);letter-spacing:0.02em;padding:8px 0 12px}
 
+/* Verification gate — the per-figure "data check" under an analysis. */
+.pr-datacheck{margin:16px 0 6px;background:var(--card);border:1px solid var(--line2);border-radius:8px;padding:12px 14px}
+.pr-datacheck.has-flags{border-color:rgba(176,122,18,0.5)}
+.pr-datacheck.is-clean{border-color:rgba(30,142,76,0.4)}
+.pr-datacheck-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pr-datacheck-head svg{color:var(--warn);flex-shrink:0}
+.pr-datacheck-title{font-family:var(--fm);font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink)}
+.pr-datacheck.is-clean .pr-datacheck-title{color:var(--good)}
+.pr-datacheck-sum{font-family:var(--fm);font-size:10.5px;color:var(--muted);letter-spacing:0.02em}
+.pr-datacheck-list{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:7px}
+.pr-datacheck-list li{font-size:12px;color:var(--ink);line-height:1.45;padding-left:11px;border-left:2px solid rgba(176,122,18,0.55)}
+.pr-datacheck-list li strong{font-family:var(--fm);color:var(--warn);font-weight:600}
+.pr-datacheck-more{border-left-color:transparent!important;color:var(--muted)!important;font-family:var(--fm);font-size:11px}
+.pr-datacheck-foot{font-family:var(--fm);font-size:10.5px;color:var(--muted2);letter-spacing:0.02em;margin-top:10px;line-height:1.5}
+
 .pr-mailtoggle{display:inline-flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--line2);color:var(--muted);font-family:var(--fm);font-size:11px;letter-spacing:0.04em;padding:9px 12px;border-radius:99px;cursor:pointer;transition:all .14s;text-transform:uppercase}
 .pr-mailtoggle:hover{border-color:var(--accent);color:var(--ink)}
 .pr-mailtoggle.is-on{color:var(--good);border-color:rgba(30,142,76,0.5);background:rgba(30,142,76,0.07)}
