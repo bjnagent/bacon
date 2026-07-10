@@ -42,11 +42,12 @@ export default function AnalyzeView({ target, onDiscuss, quickSyms = [] }: { tar
     setSaved(false); setSubView("lenses"); setDebate(null); setDebateError(null); setPersonas(null); setPersonasError(null);
     setAnalyzed(asset); // header + live chart mount immediately; lenses stream in
     try {
-      const full = await readTextStream("/api/analyze", { asset, assetClass: klass }, (acc) => {
-        // Progressive parse: panels appear the moment their ===SECTION=== lands.
-        const partial = parseBriefing(acc);
-        if (partial.SUMMARY || Object.keys(partial.lenses).length > 0) setBriefing(partial);
-      });
+      // Progressive parse: panels appear as ===SECTION===s land — throttled to
+      // one parse per frame rather than one per streamed chunk.
+      let rafId = 0, last = "";
+      const flush = () => { rafId = 0; const partial = parseBriefing(last); if (partial.SUMMARY || Object.keys(partial.lenses).length > 0) setBriefing(partial); };
+      const full = await readTextStream("/api/analyze", { asset, assetClass: klass }, (acc) => { last = acc; if (!rafId) rafId = requestAnimationFrame(flush); });
+      if (rafId) cancelAnimationFrame(rafId);
       const parsed = parseBriefing(full);
       if (parsed.SUMMARY || Object.keys(parsed.lenses).length >= 3) setBriefing(parsed);
       else { setBriefing(null); setRawFallback(full); }

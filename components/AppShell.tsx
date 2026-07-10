@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Sunrise, Search, Command } from "lucide-react";
+import { Sunrise, Search, Command, History, Radar as RadarIcon, Newspaper } from "lucide-react";
 import { deriveContext, type ChatContext } from "@/lib/prompts";
 import { splitSymCls } from "@/lib/lenses";
 import { cachedJson } from "@/lib/clientCache";
@@ -19,6 +19,12 @@ import ChatPanel, { ChatFab } from "./ChatPanel";
 type Place = "discover" | "analyze";
 type Tool = null | "account";
 
+// Resolve the timezone label ONCE — Intl.resolvedOptions() is slow and never
+// changes within a session, so it must not run inside the 1Hz clock render.
+const LOCAL_TZ = (() => {
+  try { return (Intl.DateTimeFormat().resolvedOptions().timeZone || "LOCAL").split("/").pop()!.replace("_", " "); } catch { return "LOCAL"; }
+})();
+
 function Clock() {
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => {
@@ -28,9 +34,7 @@ function Clock() {
   }, []);
   if (!now) return <span className="pr-clock">--:--:--</span>;
   const p = (n: number) => String(n).padStart(2, "0");
-  let tz = "LOCAL";
-  try { tz = (Intl.DateTimeFormat().resolvedOptions().timeZone || "LOCAL").split("/").pop()!.replace("_", " "); } catch { /* ignore */ }
-  return <span className="pr-clock">{p(now.getHours())}:{p(now.getMinutes())}:{p(now.getSeconds())}<em>{tz}</em></span>;
+  return <span className="pr-clock">{p(now.getHours())}:{p(now.getMinutes())}:{p(now.getSeconds())}<em>{LOCAL_TZ}</em></span>;
 }
 
 function StatusBar({ module }: { module: string }) {
@@ -80,6 +84,18 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
     setAnalyzeTarget({ ...t, token: Date.now() });
     setPlace("analyze");
   }, []);
+
+  // Mobile bottom-bar destinations — the real places, one tap each. Setting the
+  // discover tab and the place together means "Record" jumps straight there
+  // instead of Today→segment→Record.
+  const goTab = useCallback((p: Place, t?: DiscoverTab) => { if (t) setDiscoverTab(t); setPlace(p); }, []);
+  const MOBILE_TABS: { id: string; label: string; icon: React.ReactNode; active: boolean; go: () => void }[] = [
+    { id: "today", label: "Today", icon: <Sunrise size={19} />, active: place === "discover" && discoverTab === "today", go: () => goTab("discover", "today") },
+    { id: "record", label: "Record", icon: <History size={19} />, active: place === "discover" && discoverTab === "record", go: () => goTab("discover", "record") },
+    { id: "radar", label: "Radar", icon: <RadarIcon size={19} />, active: place === "discover" && discoverTab === "radar", go: () => goTab("discover", "radar") },
+    { id: "news", label: "News", icon: <Newspaper size={19} />, active: place === "discover" && discoverTab === "news", go: () => goTab("discover", "news") },
+    { id: "analyze", label: "Analyze", icon: <Search size={19} />, active: place === "analyze", go: () => setPlace("analyze") },
+  ];
   const analyzeSym = useCallback((sym: string) => { const { sym: s, cls } = splitSymCls(sym); openAnalyze({ asset: s, cls }); }, [openAnalyze]);
 
   const openChat = useCallback((ctx?: ChatContext) => {
@@ -116,7 +132,7 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
     { id: "help", label: "Keyboard & commands", hint: "?", run: () => setHelpOpen(true) },
   ];
 
-  const moduleLabel = place === "analyze" ? "ANALYZE · SIX-LENS DEEP DIVE" : `COCKPIT · ${discoverTab.toUpperCase()}`;
+  const moduleLabel = place === "analyze" ? "ANALYZE · MULTI-LENS DEEP DIVE" : `COCKPIT · ${discoverTab.toUpperCase()}`;
 
   return (
     <div className="pr-app">
@@ -131,11 +147,24 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
       <div className="pr-mobilehead">
         <Link href="/welcome" className="pr-brandlink" aria-label="About Bacon — intro and install">
           <div className="pr-brand">
-            <div className="pr-logo"><BaconMark size={26} /></div>
+            <div className="pr-logo"><BaconMark size={24} /></div>
             <div className="pr-brand-text"><div className="pr-brand-name">BACON</div><div className="pr-brand-tag">research radar</div></div>
           </div>
         </Link>
+        <div className="pr-mobilehead-actions">
+          <button className="pr-iconbtn" aria-label="Search & commands" onClick={() => setPaletteOpen(true)}><Search size={18} /></button>
+          <UserMenu email={userEmail} onChangePassword={() => setTool("account")} />
+        </div>
       </div>
+
+      {/* Mobile primary navigation — one tap to each destination. */}
+      <nav className="pr-tabbar" aria-label="Primary">
+        {MOBILE_TABS.map((t) => (
+          <button key={t.id} className={`pr-tabbtn ${t.active ? "is-active" : ""}`} aria-current={t.active ? "page" : undefined} onClick={t.go}>
+            {t.icon}<span>{t.label}</span>
+          </button>
+        ))}
+      </nav>
 
       <div className="pr-shell">
         <nav className="pr-rail">

@@ -81,7 +81,8 @@ export async function POST() {
 
   return textStreamResponse(
     askStream(opportunityBriefPrompt(), [{ role: "user", content: bundle }], true, 1800, 6),
-    async (full) => {
+    async (full, ok) => {
+      if (!ok) return; // stream errored mid-flight — don't persist a truncated brief
       const brief = parseOpportunities(full);
       if (!brief.items.length) return;
       await sb.from("daily_briefs").upsert({ ...briefToDailyRow(user.id, brief), brief_date: new Date().toISOString().slice(0, 10) }, { onConflict: "user_id,brief_date" });

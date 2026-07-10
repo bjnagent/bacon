@@ -32,7 +32,7 @@ export default function DiscoverView({ tab, setTab, onAnalyze, onDiscuss }: {
 
   return (
     <div>
-      <div className="pr-seg" role="tablist" aria-label="Cockpit sections">
+      <div className="pr-seg pr-seg-discover" role="tablist" aria-label="Cockpit sections">
         <button role="tab" aria-selected={tab === "today"} className={`pr-seg-btn ${tab === "today" ? "is-on" : ""}`} onClick={() => setTab("today")}><Sunrise size={14} /> Today</button>
         <button role="tab" aria-selected={tab === "record"} className={`pr-seg-btn ${tab === "record" ? "is-on" : ""}`} onClick={() => setTab("record")}><History size={14} /> Record</button>
         <button role="tab" aria-selected={tab === "radar"} className={`pr-seg-btn ${tab === "radar" ? "is-on" : ""}`} onClick={() => setTab("radar")}><RadarIcon size={14} /> Radar</button>

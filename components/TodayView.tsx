@@ -60,8 +60,13 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
       };
     };
     try {
-      // Cards materialize as the synthesis writes them.
-      await readTextStream("/api/brief", undefined, (acc) => { const b = toItems(acc); if (b) setBrief(b); });
+      // Cards materialize as the synthesis writes them — but parse at most once
+      // per frame instead of on every chunk (hundreds of parses otherwise).
+      let rafId = 0, last = "";
+      const flush = () => { rafId = 0; const b = toItems(last); if (b) setBrief(b); };
+      await readTextStream("/api/brief", undefined, (acc) => { last = acc; if (!rafId) rafId = requestAnimationFrame(flush); });
+      if (rafId) cancelAnimationFrame(rafId);
+      const bEnd = toItems(last); if (bEnd) setBrief(bEnd);
       invalidate("/api/brief");
       // Swap in the persisted canonical brief (real row ids + timestamp).
       try {
