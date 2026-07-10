@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { cleanTicker, closeOnOrBefore, computeRoi, type DailySeries } from "./market";
+import { cleanTicker, closeOnOrBefore, computeRoi, movingAveragesFrom, type DailySeries, type DailyBar } from "./market";
 
 describe("cleanTicker", () => {
   it("pulls a plausible symbol out of the stored ticker field", () => {
@@ -47,5 +47,34 @@ describe("computeRoi", () => {
   });
   it("returns null when the flag date has no reachable price", () => {
     expect(computeRoi(series, "2026-01-01", 10_000)).toBeNull();
+  });
+});
+
+// newest-first synthetic bars (index 0 = latest), matching getDailySeries order.
+const maBars = (n: number, priceAt: (i: number) => number): DailyBar[] =>
+  Array.from({ length: n }, (_, i) => ({ date: `d${String(n - i).padStart(4, "0")}`, close: priceAt(i) }));
+
+describe("movingAveragesFrom", () => {
+  it("returns null without enough bars for even the 20-day", () => {
+    expect(movingAveragesFrom(maBars(10, () => 100))).toBeNull();
+  });
+  it("computes the full SMA set and flags an orderly uptrend", () => {
+    const ma = movingAveragesFrom(maBars(200, (i) => 200 - i))!; // newest = highest
+    expect(ma.smas.map((s) => s.period)).toEqual([20, 50, 100, 200]);
+    expect(ma.price).toBe(200);
+    expect(ma.smas[0].value).toBeCloseTo(190.5, 6); // mean of 200..181
+    expect(ma.classification).toBe("orderly uptrend");
+  });
+  it("flags overheated when price is far above the 50-day", () => {
+    const ma = movingAveragesFrom(maBars(200, (i) => (i === 0 ? 260 : 200 - i)))!;
+    expect(ma.classification).toBe("overheated");
+  });
+  it("flags a downtrend when the stack is inverted and price sits below it", () => {
+    const ma = movingAveragesFrom(maBars(200, (i) => i + 1))!; // newest = lowest
+    expect(ma.classification).toBe("downtrend");
+  });
+  it("uses only the MA windows it has data for", () => {
+    const ma = movingAveragesFrom(maBars(60, (i) => 100 - i * 0.1))!;
+    expect(ma.smas.map((s) => s.period)).toEqual([20, 50]);
   });
 });

@@ -1,10 +1,12 @@
 import { LENSES, STANCES, type LensKey, type StanceKey } from "@/lib/lenses";
 
-// SVG convergence gauge: a hexagonal radar whose shape shows how the six lens
-// stances line up. Ported from the artifact. Not a score — a convergence map.
+// SVG convergence gauge: a radar whose shape shows how the lens stances line up.
+// Ported from the artifact; the polygon adapts to however many lenses there are.
+// Not a score — a convergence map.
 export default function ConvictionRadar({ stances }: { stances: Partial<Record<LensKey, StanceKey>> }) {
   const cx = 170, cy = 138, R = 86;
-  const ang = (i: number) => (-90 + i * 60) * Math.PI / 180;
+  const step = 360 / LENSES.length;
+  const ang = (i: number) => (-90 + i * step) * Math.PI / 180;
   const pt = (i: number, frac: number): [number, number] => [cx + R * frac * Math.cos(ang(i)), cy + R * frac * Math.sin(ang(i))];
   const rings = [0.34, 0.67, 1];
   const dataPts = LENSES.map((l, i) => pt(i, STANCES[stances[l.key] || "mixed"].frac));

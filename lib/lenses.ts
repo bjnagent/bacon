@@ -2,7 +2,7 @@
 // The six lenses, asset classes, stances, frameworks, and the small pure helpers
 // the UI and parsers rely on. Keep these in sync with the artifact.
 
-export type LensKey = "FUNDAMENTAL" | "TECHNICAL" | "FACTOR" | "MACRO" | "SIGNALS" | "RISK";
+export type LensKey = "FUNDAMENTAL" | "VALUATION" | "TECHNICAL" | "HEALTH" | "FACTOR" | "MACRO" | "SIGNALS" | "RISK";
 export type StanceKey = "constructive" | "mixed" | "cautious" | "limited-data";
 
 export interface Lens {
@@ -13,9 +13,14 @@ export interface Lens {
   blurb: string;
 }
 
+// The lens panel. VALUATION (TAM-Adj PEG) sits beside FUNDAMENTAL; HEALTH
+// (GF-DMA) beside TECHNICAL — each is a sharper, more quantified instrument than
+// its qualitative neighbour.
 export const LENSES: Lens[] = [
   { key: "FUNDAMENTAL", name: "Fundamental", short: "FND", hue: "#E0A33E", blurb: "Value vs price — cash flows, multiples, moat." },
+  { key: "VALUATION",   name: "Valuation",   short: "TAM", hue: "#C98A2E", blurb: "TAM-adjusted PEG — growth runway, quality & competition vs price." },
   { key: "TECHNICAL",   name: "Technical",   short: "TEC", hue: "#38B6C4", blurb: "Trend, momentum, volume, volatility." },
+  { key: "HEALTH",      name: "Trend health",short: "DMA", hue: "#3FA98A", blurb: "GF-DMA — fundamental growth vs 20/50/100/200-day moving averages." },
   { key: "FACTOR",      name: "Factor",      short: "FAC", hue: "#9B86E0", blurb: "Value, momentum, quality, size, low-vol." },
   { key: "MACRO",       name: "Macro / Reg", short: "MAC", hue: "#E2685C", blurb: "Rates, policy, regulation, supply chain." },
   { key: "SIGNALS",     name: "Smart-money", short: "FLW", hue: "#5FB97E", blurb: "Insider, 13F, COT, congressional, alt-data." },
