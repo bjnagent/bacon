@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, History, ChevronDown, AlertTriangle, Microscope, LineChart } from "lucide-react";
+import { Loader2, History, ChevronDown, AlertTriangle, Microscope, LineChart, ShieldAlert } from "lucide-react";
 import type { StoredBriefItem } from "@/lib/brief";
+import { computeScoreboard, type DayTotals } from "@/lib/scoreboard";
 import { fetchJson } from "@/lib/fetchJson";
 import { cachedJson, invalidate } from "@/lib/clientCache";
 
-interface BriefRow { id: string; brief_date: string; intro: string | null; caveat: string | null; items: StoredBriefItem[]; reviewed_at: string | null }
+interface KillAlert { at?: string; note?: string; items?: { ticker?: string; name?: string; why?: string }[] }
+interface BriefRow { id: string; brief_date: string; intro: string | null; caveat: string | null; items: StoredBriefItem[]; reviewed_at: string | null; roi?: (DayTotals & { asOf?: string }) | null; kill_alert?: KillAlert | null }
 
 // One opportunity's hypothetical $10K result, or why it couldn't be priced.
 interface RoiResult {
@@ -87,10 +89,28 @@ export default function TrackRecordView() {
     if (next && !roi[next] && !pricing) priceRoi(next);
   };
 
+  const liveTotals: Record<string, DayTotals | undefined> = {};
+  briefs.forEach((b) => { const t = roi[b.id]?.totals; if (t) liveTotals[b.id] = t; });
+  const score = computeScoreboard(briefs, liveTotals);
+
   return (
     <div className="pr-view">
       <div className="pr-sec pr-sec-flush">
         <div className="pr-sec-head"><h2 className="pr-section-title">Track record</h2></div>
+
+        {(score.pricedDays > 0 || score.graded > 0) && (
+          <div className="pr-score">
+            {score.pricedDays > 0 && <>
+              <div className="pr-score-cell"><span className="pr-score-lbl">Hypothetically staked</span><span className="pr-score-val">{usd(score.invested)}</span></div>
+              <div className="pr-score-cell"><span className="pr-score-lbl">Worth today</span><span className={`pr-score-val ${score.roiPct >= 0 ? "is-up" : "is-down"}`}>{usd(score.value)}</span></div>
+              <div className="pr-score-cell"><span className="pr-score-lbl">Return</span><span className={`pr-score-val ${score.roiPct >= 0 ? "is-up" : "is-down"}`}>{score.roiPct >= 0 ? "▲" : "▼"} {pct(score.roiPct)}</span></div>
+            </>}
+            {score.hitRatePct != null && (
+              <div className="pr-score-cell"><span className="pr-score-lbl">Hit rate</span><span className="pr-score-val">{Math.round(score.hitRatePct)}% <em>({score.wins}/{score.graded})</em></span></div>
+            )}
+            <div className="pr-score-note">Across {score.pricedDays > 0 ? `${score.pricedDays} priced day${score.pricedDays === 1 ? "" : "s"}` : "graded calls"} — hypothetical $10K per idea, real prices, excludes fees. Not advice.</div>
+          </div>
+        )}
 
         {migrationNeeded && (
           <div className="pr-nudge"><AlertTriangle size={14} /> The track record needs one schema update: run the latest <strong>supabase/schema.sql</strong> in the Supabase SQL editor (it&apos;s idempotent). Briefs start recording from the next sweep.</div>
@@ -115,6 +135,8 @@ export default function TrackRecordView() {
                       {verdicts.map((i, n) => <em key={n} className={`pr-verdict ${VERDICT_TONE[i.verdict || ""] || "is-mute"}`}>{i.verdict}</em>)}
                     </span>
                   )}
+                  {b.kill_alert?.items?.length ? <span className="pr-record-killflag" title="Kill-condition watch flagged this brief"><ShieldAlert size={13} /></span> : null}
+                  {(() => { const t = roi[b.id]?.totals ?? b.roi; return t && t.invested ? <span className={`pr-record-roi ${t.roiPct >= 0 ? "is-up" : "is-down"}`}>{t.roiPct >= 0 ? "▲" : "▼"} {pct(t.roiPct)}</span> : null; })()}
                   <ChevronDown size={16} className={`pr-fw-chev ${isOpen ? "is-open" : ""}`} />
                 </button>
                 {isOpen && (() => {
@@ -122,6 +144,15 @@ export default function TrackRecordView() {
                   const byIndex = priced?.results ?? [];
                   return (
                   <div className="pr-record-body">
+                    {b.kill_alert?.items?.length ? (
+                      <div className="pr-killalert">
+                        <div className="pr-killalert-head"><ShieldAlert size={14} /> Kill-condition watch</div>
+                        <ul className="pr-killalert-list">
+                          {b.kill_alert.items.map((k, n) => <li key={n}><strong>{k.ticker && k.ticker !== "—" ? k.ticker : k.name}</strong> — {k.why}</li>)}
+                        </ul>
+                        <div className="pr-killalert-note">{b.kill_alert.note || "A kill condition may have triggered — re-check before relying on this idea."}</div>
+                      </div>
+                    ) : null}
                     {b.intro && <div className="pr-summary">{b.intro}</div>}
                     {b.items.map((o, i) => {
                       const r = byIndex[i];

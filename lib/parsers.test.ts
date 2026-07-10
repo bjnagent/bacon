@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseBriefing, parseDebate, parseScout, parseNews, parseTrackingUpdate, parseOpportunities, parseBriefReview, toPoints } from "./parsers";
+import { parseBriefing, parseDebate, parseScout, parseNews, parseTrackingUpdate, parseOpportunities, parseBriefReview, parseKillWatch, toPoints } from "./parsers";
 
 describe("parseBriefing", () => {
   const sample = `===SUMMARY===
@@ -175,6 +175,32 @@ kill: hyperscaler capex pause
     expect(out.items[0].signals).toContain("Investor theme: MLCC");
     expect(out.items[0].confirm).toBe("allocation letters from Murata"); // later fields still bound correctly
     expect(out.items[0].kill).toBe("hyperscaler capex pause");
+  });
+});
+
+describe("parseKillWatch", () => {
+  it("returns only triggered kills, with the note", () => {
+    const out = parseKillWatch(`===ALERTS===
+@@KILL@@
+ticker: WSC
+why: Lost the anchor contract to a rival (Reuters, this week) — the kill condition.
+@@KILL@@
+ticker: ORKA
+why: Phase 2 readout missed its primary endpoint, per the company 8-K.
+===NOTE===
+Checked all five; two look triggered.`);
+    expect(out.items).toHaveLength(2);
+    expect(out.items[0]).toMatchObject({ ticker: "WSC" });
+    expect(out.items[1].why).toContain("8-K");
+    expect(out.note).toContain("two look triggered");
+  });
+
+  it("is empty when nothing triggered", () => {
+    const out = parseKillWatch(`===ALERTS===
+===NOTE===
+Nothing triggered — all kill conditions intact.`);
+    expect(out.items).toHaveLength(0);
+    expect(out.note).toContain("intact");
   });
 });
 

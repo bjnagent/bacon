@@ -86,6 +86,28 @@ alter table settings add column if not exists brief_email_enabled boolean defaul
 -- tracked voices: comma-separated public commentators the sweep checks
 alter table settings add column if not exists voices text default '';
 
+-- kill-condition watcher opt-in (the cron re-checks each brief's kill triggers)
+alter table settings add column if not exists watch_enabled boolean default false;
+
+-- scoreboard: last-priced $10K ROI totals per brief, so the all-time record
+-- aggregates without re-pricing. kill_alert: what the watcher flagged.
+alter table daily_briefs add column if not exists roi jsonb;
+alter table daily_briefs add column if not exists kill_alert jsonb;
+
+-- market-wide signal cache (one row per day): the expensive external fetches
+-- (Alpha Vantage, FRED, SEC EDGAR) shared across users + Sweep-now, so they
+-- run once/day instead of per request. Not per-user; read-only to clients,
+-- written by the service role (cron / server admin).
+create table if not exists market_snapshots (
+  snap_date date primary key default (now() at time zone 'utc')::date,
+  bundle jsonb not null default '{}'::jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+alter table market_snapshots enable row level security;
+drop policy if exists "read snapshots" on market_snapshots;
+create policy "read snapshots" on market_snapshots for select using (auth.role() = 'authenticated');
+
 -- discuss chat history
 create table if not exists chat_messages (
   id uuid primary key default gen_random_uuid(),

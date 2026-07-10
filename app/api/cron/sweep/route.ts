@@ -3,10 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { askCheap } from "@/lib/ai";
 import { scoutPrompt, moversScoutPrompt, trackingUpdatePrompt, newsPrompt } from "@/lib/prompts";
 import { parseScout, parseTrackingUpdate, parseNews, type ScoutResult, type NewsResult } from "@/lib/parsers";
-import { getMarketSignals, getSectorPerformance, MARKET_SOURCE, type MarketSignals } from "@/lib/market";
-import { getMacroSnapshot } from "@/lib/macro";
-import { getCommodityFxSignals } from "@/lib/commodities";
-import { getInsiderClusters, type InsiderCluster } from "@/lib/insider";
+import { MARKET_SOURCE } from "@/lib/market";
+import { readMarketWide, fetchMarketWide, cacheMarketWide, type MarketWide } from "@/lib/snapshot";
 import { generateBrief, briefToRows, briefToDailyRow, splitVoices } from "@/lib/brief";
 import { sendBriefEmail, emailEnabled } from "@/lib/email";
 import { mapClass } from "@/lib/lenses";
@@ -33,18 +31,17 @@ export async function GET(req: Request) {
   const due = (users ?? []).filter((u) => !u.last_sweep_at || now - new Date(u.last_sweep_at).getTime() >= u.scout_interval_minutes * 60000);
   if (!due.length) return NextResponse.json({ ok: true, swept: 0 });
 
-  // Market-wide signals → fetch and enrich once, reuse across users.
+  // Market-wide signals → build the day's snapshot ONCE (and cache it so
+  // Sweep-now reuses it), then reuse across every user in this sweep.
+  const empty: MarketWide = { movers: [], losers: [], mostActive: [], sectors: [], macro: [], commodities: [], fx: [], insiders: [] };
+  let mw: MarketWide = empty;
   let moverPicks: MoverPick[] = [];
-  let signals: MarketSignals = { gainers: [], losers: [], mostActive: [] };
-  let sectors: { sector: string; changePct: string }[] = [];
-  let insiders: InsiderCluster[] = [];
   try {
-    [signals, sectors, insiders] = await Promise.all([getMarketSignals(8), getSectorPerformance().catch(() => []), getInsiderClusters().catch(() => [])]);
-    const movers = signals.gainers;
-    if (movers.length) {
-      const text = await askCheap(moversScoutPrompt(movers), [{ role: "user", content: "Explain today's top movers and what to verify." }], true, 1400, 6);
+    mw = (await readMarketWide(admin)) ?? await (async () => { const b = await fetchMarketWide(); await cacheMarketWide(admin, b); return b; })();
+    if (mw.movers.length) {
+      const text = await askCheap(moversScoutPrompt(mw.movers), [{ role: "user", content: "Explain today's top movers and what to verify." }], true, 1400, 6);
       moverPicks = parseScout(text).picks.map((p) => {
-        const m = movers.find((mv) => (mv.ticker || "").toUpperCase() === (p.ticker || "").toUpperCase());
+        const m = mw.movers.find((mv) => (mv.ticker || "").toUpperCase() === (p.ticker || "").toUpperCase());
         return { name: p.name, ticker: p.ticker, cls: p.cls, why: p.why, now: p.now, check: p.check, change_pct: m?.changePct ?? null };
       });
     }
@@ -52,19 +49,17 @@ export async function GET(req: Request) {
 
   let swept = 0;
   for (const u of due) {
-    await sweepUser(admin, u.user_id, moverPicks, u.news_source, u.news_focus, signals, sectors, !!u.brief_email_enabled, insiders, splitVoices(u.voices));
+    await sweepUser(admin, u.user_id, moverPicks, u.news_source, u.news_focus, mw, !!u.brief_email_enabled, splitVoices(u.voices));
     swept++;
   }
   return NextResponse.json({ ok: true, swept });
 }
 
-async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: string, moverPicks: MoverPick[], newsSource: string | null, newsFocus: string | null, signals: MarketSignals, sectors: { sector: string; changePct: string }[], emailOptIn: boolean, insiders: InsiderCluster[], voices: string[]) {
-  const [{ data: themes }, { data: items }, { data: cachedNews }, macro, commodityFx] = await Promise.all([
+async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: string, moverPicks: MoverPick[], newsSource: string | null, newsFocus: string | null, mw: MarketWide, emailOptIn: boolean, voices: string[]) {
+  const [{ data: themes }, { data: items }, { data: cachedNews }] = await Promise.all([
     admin.from("themes").select("label").eq("user_id", userId),
     admin.from("watchlist").select("id,symbol,asset_class").eq("user_id", userId).order("last_scan_at", { ascending: true, nullsFirst: true }).limit(6),
     admin.from("news_items").select("headline,source,why").eq("user_id", userId).order("created_at", { ascending: false }).limit(10),
-    getMacroSnapshot().catch(() => [] as Awaited<ReturnType<typeof getMacroSnapshot>>),
-    getCommodityFxSignals().catch(() => ({ commodities: [], fx: [] })),
   ]);
   const themeLabels = (themes ?? []).map((t) => t.label as string);
   const tracked = (items ?? []) as { id: string; symbol: string; asset_class: string }[];
@@ -89,18 +84,18 @@ async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: st
   // headlines — decoupling it from the fresh news fetch keeps the sweep's
   // wall-clock at the slowest single call, not the sum.
   const briefP = generateBrief({
-    movers: signals.gainers.length ? signals.gainers : moverPicks.map((p) => ({ ticker: p.ticker, price: "", changePct: p.change_pct ?? "" })),
-    losers: signals.losers,
-    mostActive: signals.mostActive,
-    sectors,
+    movers: mw.movers.length ? mw.movers : moverPicks.map((p) => ({ ticker: p.ticker, price: "", changePct: p.change_pct ?? "" })),
+    losers: mw.losers,
+    mostActive: mw.mostActive,
+    sectors: mw.sectors,
     headlines: (cachedNews ?? []).map((n) => ({ head: n.headline, source: n.source, why: n.why })),
-    macro,
+    macro: mw.macro,
     themes: themeLabels,
     tracked: tracked.map((t) => t.symbol),
-    insiders,
+    insiders: mw.insiders,
     voices,
-    commodities: commodityFx.commodities,
-    fx: commodityFx.fx,
+    commodities: mw.commodities,
+    fx: mw.fx,
   }).catch(() => null);
 
   const [themeRes, newsRes, trackResults, brief] = await Promise.all([themeScoutP, newsP, Promise.all(trackP), briefP]);

@@ -10,7 +10,7 @@ export async function GET() {
 
   const { data, error } = await sb
     .from("daily_briefs")
-    .select("id,brief_date,intro,caveat,items,reviewed_at,created_at")
+    .select("id,brief_date,intro,caveat,items,reviewed_at,created_at,roi,kill_alert")
     .order("brief_date", { ascending: false })
     .limit(30);
   if (error) return NextResponse.json({ briefs: [], migrationNeeded: true });

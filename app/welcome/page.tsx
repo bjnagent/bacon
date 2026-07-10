@@ -43,10 +43,10 @@ export default async function WelcomePage() {
             </div>
             <div className="pr-w-card">
               <div className="pr-w-card-kicker">One click deeper</div>
-              <div className="pr-w-card-title">Six-lens analysis</div>
+              <div className="pr-w-card-title">Multi-lens analysis</div>
               <div className="pr-w-card-body">
-                Any name gets the full latticework — business, valuation, momentum, macro,
-                sentiment, risk — with live web research and charts.
+                Any name gets the full latticework — business, valuation, momentum, trend
+                health, macro, sentiment, risk — with live web research and charts.
               </div>
             </div>
             <div className="pr-w-card">

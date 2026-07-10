@@ -762,6 +762,33 @@ body { background: #EBE8E0; color: #1A1712; }
 .pr-opp-horizon{font-family:var(--fm);font-size:10px;color:var(--muted);border:1px solid var(--line2);border-radius:99px;padding:2px 9px;text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap}
 @media (max-width:880px){.pr-opp{flex-direction:column;gap:8px}.pr-opp-rank{font-size:18px}}
 
+/* All-time scoreboard — the headline strip above the record list. */
+.pr-score{display:flex;flex-wrap:wrap;align-items:stretch;gap:0;background:var(--card);border:1px solid var(--line2);border-radius:10px;overflow:hidden;margin-bottom:16px}
+.pr-score-cell{flex:1;min-width:110px;display:flex;flex-direction:column;gap:3px;padding:13px 16px;border-right:1px solid var(--line)}
+.pr-score-cell:last-of-type{border-right:none}
+.pr-score-lbl{font-family:var(--fm);font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted2)}
+.pr-score-val{font-family:var(--fm);font-weight:600;font-size:19px;color:var(--ink);letter-spacing:0.01em}
+.pr-score-val.is-up{color:var(--good)}
+.pr-score-val.is-down{color:var(--bad)}
+.pr-score-val em{font-style:normal;font-size:12px;color:var(--muted);font-weight:500}
+.pr-score-note{flex-basis:100%;font-family:var(--fm);font-size:10px;color:var(--muted2);letter-spacing:0.02em;line-height:1.5;padding:0 16px 12px}
+@media (max-width:880px){.pr-score-cell{min-width:46%;border-right:none;border-bottom:1px solid var(--line)}.pr-score-val{font-size:17px}}
+
+/* Record head extras — a glanceable return chip + kill-watch flag. */
+.pr-record-roi{font-family:var(--fm);font-size:11px;font-weight:600;padding:2px 9px;border-radius:99px;white-space:nowrap;flex-shrink:0}
+.pr-record-roi.is-up{color:var(--good);background:rgba(30,142,76,0.1)}
+.pr-record-roi.is-down{color:var(--bad);background:rgba(207,59,44,0.1)}
+.pr-record-killflag{display:inline-flex;color:var(--bad);flex-shrink:0}
+
+/* Kill-condition watch alert (inside a record). */
+.pr-killalert{background:rgba(207,59,44,0.06);border:1px solid rgba(207,59,44,0.35);border-radius:8px;padding:11px 13px;margin:6px 0 12px}
+.pr-killalert-head{display:flex;align-items:center;gap:7px;font-family:var(--fm);font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--bad);font-weight:600}
+.pr-killalert-head svg{flex-shrink:0}
+.pr-killalert-list{list-style:none;margin:9px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.pr-killalert-list li{font-size:12.5px;color:var(--ink);line-height:1.45;padding-left:11px;border-left:2px solid rgba(207,59,44,0.5)}
+.pr-killalert-list li strong{font-family:var(--fm);color:var(--bad);font-weight:600}
+.pr-killalert-note{font-family:var(--fm);font-size:10.5px;color:var(--muted2);letter-spacing:0.02em;margin-top:9px;line-height:1.5}
+
 /* Track record + morning-email toggle. */
 .pr-record-list{display:flex;flex-direction:column;gap:11px;margin-top:6px}
 .pr-record{background:var(--card);border:1px solid var(--line2);border-radius:9px;overflow:hidden;transition:border-color .2s}
@@ -894,4 +921,70 @@ body { background: #EBE8E0; color: #1A1712; }
   .pr-trk:hover,.pr-pick:hover,.pr-news:hover,.pr-panel:hover,.pr-chip:hover,.pr-railbtn:hover svg{transform:none}
   .pr-w-hero,.pr-w-hero .pr-prism,.pr-w-card,.pr-w-grid>*{animation:none}
   .pr-w-card:hover,.pr-w-btn:hover{transform:none}
+}
+
+/* ============================================================
+   MOBILE NAVIGATION — a real bottom tab bar (one tap per
+   destination) + compact header, replacing the old double-nav.
+   Desktop keeps the left rail; these only switch on <=880px.
+   ============================================================ */
+.pr-tabbar{display:none}
+.pr-mobilehead-actions{display:none;align-items:center;gap:7px}
+.pr-iconbtn{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;background:var(--card);border:1px solid var(--line2);color:var(--muted);border-radius:9px;cursor:pointer;transition:color .14s,border-color .14s}
+.pr-iconbtn:hover,.pr-iconbtn:active{color:var(--accent);border-color:var(--accent)}
+
+@media (max-width:880px){
+  .pr-rail{display:none}                 /* retired in favour of the tab bar */
+  .pr-seg-discover{display:none}         /* its tabs now live in the bottom bar */
+  .pr-mobilehead{justify-content:space-between}
+  .pr-mobilehead-actions{display:flex}
+
+  .pr-tabbar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:35;
+    justify-content:space-around;gap:2px;
+    background:color-mix(in srgb,var(--paper2) 90%,transparent);
+    -webkit-backdrop-filter:saturate(1.5) blur(12px);backdrop-filter:saturate(1.5) blur(12px);
+    border-top:1px solid var(--line2);
+    padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
+  .pr-tabbtn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;position:relative;
+    background:none;border:none;cursor:pointer;color:var(--muted);
+    font-family:var(--fb);font-size:10.5px;font-weight:600;letter-spacing:0.01em;
+    padding:7px 2px 4px;border-radius:10px;min-height:54px;transition:color .14s,background .14s}
+  .pr-tabbtn svg{transition:transform .18s var(--pop)}
+  .pr-tabbtn.is-active{color:var(--accent)}
+  .pr-tabbtn.is-active svg{transform:translateY(-1px) scale(1.08)}
+  .pr-tabbtn.is-active::before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);width:24px;height:3px;border-radius:0 0 3px 3px;background:var(--spectrum)}
+  .pr-tabbtn:active{background:var(--sink)}
+
+  .pr-canvas{padding:18px 16px calc(84px + env(safe-area-inset-bottom))}
+  .pr-fab{bottom:calc(76px + env(safe-area-inset-bottom));right:16px}
+
+  /* Readability + tap targets on small screens. */
+  .pr-app{font-size:14px}
+  .pr-pick-why,.pr-panel-body{font-size:13.5px;line-height:1.62}
+  .pr-btn-sm,.pr-tv,.pr-mailtoggle{min-height:40px}
+  .pr-seg-btn{padding:9px 14px}
+  /* Account menu now lives in the TOP header — open it downward, not up. */
+  .pr-mobilehead .pr-usermenu-pop{top:calc(100% + 8px);bottom:auto;right:0;left:auto;width:220px}
+}
+
+/* ============================================================
+   DARK MODE — "Midnight Instrument". The whole system is driven
+   by the .pr-app variable block, so a warm-charcoal swap + a few
+   depth fixes is all it takes. Same spectrum, same grid texture.
+   ============================================================ */
+@media (prefers-color-scheme:dark){
+  body{background:#16140E;color:#ECE7DB}
+  .pr-app{
+    --paper:#16140E; --paper2:#1E1B15; --card:#232019; --sink:#2E2A21;
+    --ink:#ECE7DB; --ink2:#D8D2C4; --muted:#A39B8A; --muted2:#847C6D;
+    --line:#2C2820; --line2:#3B352A; --gridline:rgba(236,231,219,0.038);
+    --good:#46C07C; --bad:#F2685C; --warn:#E2AC3E;
+    color-scheme:dark;
+  }
+  .pr-skel::after{background:linear-gradient(90deg,transparent,rgba(255,255,255,0.06),transparent)}
+  /* Hard offset shadows vanish on dark — swap to soft elevation. */
+  .pr-trk:hover,.pr-pick:hover,.pr-news:hover,.pr-opp:hover,.pr-w-card:hover{box-shadow:0 12px 32px rgba(0,0,0,0.55)}
+  .pr-login-card{box-shadow:0 18px 50px rgba(0,0,0,0.6)}
+  .pr-logo,.pr-tabbar{background:var(--card)}
+  .pr-msg.is-user .pr-msg-body{background:var(--accent);color:#fff}
 }
