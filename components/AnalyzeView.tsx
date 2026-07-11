@@ -8,6 +8,7 @@ import { auditBriefingText } from "@/lib/verify";
 import { readTextStream } from "@/lib/readStream";
 import type { ChatContext } from "@/lib/prompts";
 import Spectrum from "./Spectrum";
+import BaconMark from "./BaconMark";
 import ConvictionRadar from "./ConvictionRadar";
 import TVLink from "./TVLink";
 import TradingViewChart from "./TradingViewChart";
@@ -144,6 +145,7 @@ export default function AnalyzeView({ target, onDiscuss, quickSyms = [] }: { tar
 
       {loading && !hasBriefing && (
         <div className="pr-loading">
+          <div className="pr-bacon-bounce"><BaconMark size={46} /></div>
           <div className="pr-loading-lenses">{LENSES.map((l, i) => <div key={l.key} className="pr-loading-lens" style={{ animationDelay: `${i * 0.18}s` }}><span className="pr-loading-dot" style={{ background: l.hue }} />{l.short}</div>)}</div>
           <div className="pr-loading-text">Sizzling through every lens — live search on the wire…</div>
         </div>

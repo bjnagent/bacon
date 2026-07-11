@@ -48,6 +48,16 @@ export async function POST(req: Request) {
     return { kind: "equity", ticker };
   });
 
+  // Turn a provider error into a short, friendly reason — the free Alpha Vantage
+  // tier answers a hit limit with a chatty "Thank you for using…" note we don't
+  // want to dump verbatim into the UI.
+  const RATE_LIMIT = "Rate-limited by the market-data provider — try again in a bit";
+  const isRateLimit = (m: string) => /alpha vantage|rate limit|per day|per minute|spreading out|premium|thank you for using|standard api/i.test(m);
+  const skipReason = (err: unknown) => {
+    const m = err instanceof Error ? err.message : "lookup failed";
+    return isRateLimit(m) ? RATE_LIMIT : m.slice(0, 90);
+  };
+
   const results: RoiResult[] = new Array(items.length);
 
   // FRED (commodities/FX): generous rate limits → price in parallel.
@@ -60,22 +70,27 @@ export async function POST(req: Request) {
         ? { name: o.name, ...roi, quoteKind: plan.ins.kind, entryQuote: formatLevel(plan.ins, roi.entryClose), asOfQuote: formatLevel(plan.ins, roi.asOfClose) }
         : { name: o.name, ticker: plan.ins.label, skipped: "no price history" };
     } catch (err) {
-      results[i] = { name: o.name, ticker: plan.ins.label, skipped: err instanceof Error ? err.message.slice(0, 90) : "lookup failed" };
+      results[i] = { name: o.name, ticker: plan.ins.label, skipped: skipReason(err) };
     }
   }));
 
-  // Equities: Alpha Vantage is rate-limited (5/min, 25/day) → keep sequential.
+  // Equities: Alpha Vantage is rate-limited (5/min, 25/day) → keep sequential,
+  // and once the limit is hit, stop calling (every extra call just burns budget).
+  let rateLimited = false;
   for (let i = 0; i < plans.length; i++) {
     const plan = plans[i];
     if (plan.kind === "skip") { results[i] = { name: items[i].name, ticker: plan.ticker, skipped: plan.reason }; continue; }
     if (plan.kind !== "equity") continue;
     const o = items[i];
+    if (rateLimited) { results[i] = { name: o.name, ticker: plan.ticker, skipped: RATE_LIMIT }; continue; }
     try {
       const series = await getDailySeries(plan.ticker, since);
       const roi = series && computeRoi(series, since, INVESTED);
       results[i] = roi ? { name: o.name, ...roi } : { name: o.name, ticker: plan.ticker, skipped: "no price history" };
     } catch (err) {
-      results[i] = { name: o.name, ticker: plan.ticker, skipped: err instanceof Error ? err.message.slice(0, 90) : "lookup failed" };
+      const reason = skipReason(err);
+      if (reason === RATE_LIMIT) rateLimited = true;
+      results[i] = { name: o.name, ticker: plan.ticker, skipped: reason };
     }
   }
 

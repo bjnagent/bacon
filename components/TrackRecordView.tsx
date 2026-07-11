@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, History, ChevronDown, AlertTriangle, Microscope, LineChart, ShieldAlert } from "lucide-react";
+import { Loader2, ChevronDown, AlertTriangle, Microscope, LineChart, ShieldAlert } from "lucide-react";
 import type { StoredBriefItem } from "@/lib/brief";
+import BaconMark from "./BaconMark";
 import { computeScoreboard, type DayTotals } from "@/lib/scoreboard";
 import { fetchJson } from "@/lib/fetchJson";
 import { cachedJson, invalidate } from "@/lib/clientCache";
@@ -47,7 +48,17 @@ export default function TrackRecordView() {
       try {
         const data = await cachedJson<{ briefs?: BriefRow[]; migrationNeeded?: boolean }>("/api/brief/history", 60_000);
         if (cancelled) return;
-        if (Array.isArray(data.briefs)) setBriefs(data.briefs);
+        if (Array.isArray(data.briefs)) {
+          setBriefs(data.briefs);
+          // Seed the stored ROI snapshots so already-priced days show their total
+          // instantly and DON'T re-hit the rate-limited provider on expand. A
+          // manual "Re-price" still refreshes to the latest value.
+          const seeded: Record<string, RoiData> = {};
+          for (const b of data.briefs) {
+            if (b.roi && b.roi.invested) seeded[b.id] = { results: [], totals: { count: b.roi.count ?? 1, invested: b.roi.invested, value: b.roi.value, asOf: b.roi.asOf ?? "", roiPct: b.roi.roiPct } };
+          }
+          if (Object.keys(seeded).length) setRoi(seeded);
+        }
         if (data.migrationNeeded) setMigrationNeeded(true);
       } catch { /* empty state */ }
       finally { if (!cancelled) setLoaded(true); }
@@ -118,7 +129,7 @@ export default function TrackRecordView() {
         {error && <div className="pr-error"><AlertTriangle size={18} /><div><strong>Review failed.</strong><div className="pr-error-detail">{error}. Try again.</div></div></div>}
 
         {loaded && !migrationNeeded && briefs.length === 0 && (
-          <div className="pr-empty"><History size={26} /><div>No briefs recorded yet. Each daily sweep (or <strong>Sweep now</strong> on Today) files its brief here — then ask <strong>How did it age?</strong> to grade the calls against what actually happened.</div></div>
+          <div className="pr-empty"><BaconMark size={46} /><div>No briefs recorded yet. Each daily sweep (or <strong>Sweep now</strong> on Today) files its brief here — then ask <strong>How did it age?</strong> to grade the calls against what actually happened.</div></div>
         )}
 
         <div className="pr-record-list">
