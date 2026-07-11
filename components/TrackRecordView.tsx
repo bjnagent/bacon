@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, History, ChevronDown, AlertTriangle, Microscope, LineChart, ShieldAlert } from "lucide-react";
+import { Loader2, ChevronDown, AlertTriangle, Microscope, LineChart, ShieldAlert } from "lucide-react";
 import type { StoredBriefItem } from "@/lib/brief";
+import BaconMark from "./BaconMark";
 import { computeScoreboard, type DayTotals } from "@/lib/scoreboard";
 import { fetchJson } from "@/lib/fetchJson";
 import { cachedJson, invalidate } from "@/lib/clientCache";
@@ -118,7 +119,7 @@ export default function TrackRecordView() {
         {error && <div className="pr-error"><AlertTriangle size={18} /><div><strong>Review failed.</strong><div className="pr-error-detail">{error}. Try again.</div></div></div>}
 
         {loaded && !migrationNeeded && briefs.length === 0 && (
-          <div className="pr-empty"><History size={26} /><div>No briefs recorded yet. Each daily sweep (or <strong>Sweep now</strong> on Today) files its brief here — then ask <strong>How did it age?</strong> to grade the calls against what actually happened.</div></div>
+          <div className="pr-empty"><BaconMark size={46} /><div>No briefs recorded yet. Each daily sweep (or <strong>Sweep now</strong> on Today) files its brief here — then ask <strong>How did it age?</strong> to grade the calls against what actually happened.</div></div>
         )}
 
         <div className="pr-record-list">

@@ -139,7 +139,7 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
         </div>
 
         {generating && !hasBrief && (
-          <div className="pr-loading"><div className="pr-loading-text">Reading the movers, the tape, and the macro backdrop — piecing today&apos;s signals together…</div></div>
+          <div className="pr-loading"><div className="pr-bacon-bounce"><BaconMark size={46} /></div><div className="pr-loading-text">Reading the movers, the tape, and the macro backdrop — piecing today&apos;s signals together…</div></div>
         )}
         {emailErr && <div className="pr-nudge"><AlertTriangle size={14} /> {emailErr}</div>}
         {error && <div className="pr-error"><AlertTriangle size={18} /><div><strong>Couldn&apos;t assemble the brief.</strong><div className="pr-error-detail">{error}. Try again.</div></div></div>}

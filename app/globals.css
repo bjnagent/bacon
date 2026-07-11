@@ -15,10 +15,12 @@ body { background: #EBE8E0; color: #1A1712; }
 
 .pr-app *{box-sizing:border-box;margin:0;padding:0}
 .pr-app{
-  --paper:#EBE8E0; --paper2:#F2F0E9; --card:#F7F5EF; --sink:#E3DFD4;
-  --ink:#1A1712; --ink2:#2E2A22; --muted:#6E6658; --muted2:#6C6757;
-  --line:#D8D3C6; --line2:#C3BDAD; --gridline:rgba(26,23,18,0.04);
-  --accent:#EE4310; --accent2:#CC3608; --good:#1E8E4C; --bad:#CF3B2C; --warn:#B07A12;
+  /* Warm "kitchen" tone — toasty cream surfaces, warm-brown ink, bacon accents. */
+  --paper:#ECE4D3; --paper2:#F4EDDE; --card:#FBF5E8; --sink:#E6DAC3;
+  --ink:#241B0F; --ink2:#3C2F1E; --muted:#7C6B52; --muted2:#8C7A5F;
+  --line:#E1D4BC; --line2:#CCBB9A; --gridline:rgba(92,56,26,0.05);
+  --accent:#EE4310; --accent2:#CC3608; --good:#2E8B57; --bad:#C0473A; --warn:#BE8A2C;
+  --bacon:#C0473A; --crisp:#E9C99C; /* playful accents: meaty red + fatty cream */
   --spectrum:linear-gradient(90deg,#E2685C 0%,#E0A33E 20%,#5FB97E 42%,#38B6C4 62%,#6FA1CE 80%,#9B86E0 100%);
   --fd:'Space Grotesk',system-ui,sans-serif;
   --fb:'IBM Plex Sans',system-ui,sans-serif;
@@ -968,17 +970,18 @@ body { background: #EBE8E0; color: #1A1712; }
 }
 
 /* ============================================================
-   DARK MODE — "Midnight Instrument". The whole system is driven
-   by the .pr-app variable block, so a warm-charcoal swap + a few
-   depth fixes is all it takes. Same spectrum, same grid texture.
+   DARK MODE — "Cast Iron". Warm toasty near-black, same tokens.
+   The whole system is variable-driven, so this swap restyles
+   every screen. Same spectrum, same grid texture.
    ============================================================ */
 @media (prefers-color-scheme:dark){
-  body{background:#16140E;color:#ECE7DB}
+  body{background:#181109;color:#F1E7D6}
   .pr-app{
-    --paper:#16140E; --paper2:#1E1B15; --card:#232019; --sink:#2E2A21;
-    --ink:#ECE7DB; --ink2:#D8D2C4; --muted:#A39B8A; --muted2:#847C6D;
-    --line:#2C2820; --line2:#3B352A; --gridline:rgba(236,231,219,0.038);
-    --good:#46C07C; --bad:#F2685C; --warn:#E2AC3E;
+    --paper:#181109; --paper2:#211910; --card:#2A2014; --sink:#372B1B;
+    --ink:#F1E7D6; --ink2:#DCCFB8; --muted:#A99A80; --muted2:#8A7B62;
+    --line:#332617; --line2:#463823; --gridline:rgba(241,231,214,0.04);
+    --good:#57C98A; --bad:#EE6E5C; --warn:#E6B04A;
+    --bacon:#D06450; --crisp:#E9C99C;
     color-scheme:dark;
   }
   .pr-skel::after{background:linear-gradient(90deg,transparent,rgba(255,255,255,0.06),transparent)}
@@ -987,4 +990,66 @@ body { background: #EBE8E0; color: #1A1712; }
   .pr-login-card{box-shadow:0 18px 50px rgba(0,0,0,0.6)}
   .pr-logo,.pr-tabbar{background:var(--card)}
   .pr-msg.is-user .pr-msg-body{background:var(--accent);color:#fff}
+}
+
+/* ============================================================
+   WARM & COZY PASS — rounder, softer, friendlier surfaces to
+   match the bacon mark's playful tone. The warm tokens above do
+   the colour; these round the corners and warm the depth.
+   ============================================================ */
+.pr-opp,.pr-pick,.pr-trk,.pr-news,.pr-record,.pr-panel,.pr-score,.pr-w-card,.pr-macro,.pr-datacheck,.pr-killalert,.pr-roi-total,.pr-nudge,.pr-error,.pr-empty{border-radius:15px}
+.pr-btn,.pr-btn-sm,.pr-seg,.pr-mailtoggle,.pr-iconbtn,.pr-command-row,.pr-add,.pr-chip,.pr-pick-track,.pr-pick-lenses{border-radius:11px}
+.pr-logo{border-radius:13px}
+.pr-section-title::before{border-radius:4px}
+/* Warm, soft elevation for overlays (was flat grey). */
+.pr-tool,.pr-chat,.pr-palette,.pr-help,.pr-usermenu-pop{box-shadow:0 22px 54px rgba(74,32,16,0.24)}
+/* A whisper of warmth behind the whole canvas. */
+.pr-app{background-image:
+  radial-gradient(120% 80% at 50% -10%, rgba(238,67,16,0.05), transparent 60%),
+  linear-gradient(var(--gridline) 1px,transparent 1px),
+  linear-gradient(90deg,var(--gridline) 1px,transparent 1px);
+  background-size:auto,28px 28px,28px 28px}
+
+/* ============================================================
+   PLAYFUL PASS — chunky "sticker" tactility + springy bounce +
+   the bacon showing up to say hi. Fun without hurting the data.
+   ============================================================ */
+/* One easing swap makes every hover/pop-in overshoot & settle. */
+.pr-app{--pop:cubic-bezier(.34,1.55,.6,1)}
+
+/* Cards are stickers at REST: chunky border + a hard warm offset shadow. */
+.pr-opp,.pr-pick,.pr-trk,.pr-news,.pr-record,.pr-score,.pr-w-card,.pr-macro{
+  border-width:1.5px;box-shadow:3px 4px 0 var(--line2)}
+.pr-opp:hover,.pr-pick:hover,.pr-trk:hover,.pr-news:hover,.pr-w-card:hover{
+  transform:translateY(-4px) rotate(-0.7deg);box-shadow:7px 9px 0 var(--line2)}
+.pr-record:hover{transform:translateY(-2px);box-shadow:5px 6px 0 var(--line2)}
+
+/* Push-button toys: a fat bottom lip and a satisfying squish. */
+.pr-btn{box-shadow:0 4px 0 var(--accent2)}
+.pr-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 5px 0 var(--accent2)}
+.pr-btn:active:not(:disabled){transform:translateY(3px);box-shadow:0 1px 0 var(--accent2)}
+.pr-pick-track{box-shadow:0 4px 0 var(--accent2)}
+.pr-pick-track:active{transform:translateY(3px);box-shadow:0 1px 0 var(--accent2)}
+.pr-btn-sm,.pr-pick-lenses{box-shadow:0 3px 0 var(--line2)}
+.pr-btn-sm:active,.pr-pick-lenses:active{transform:translateY(2px);box-shadow:0 1px 0 var(--line2)}
+
+/* Chips + tickers become bouncy pills that wobble on hover. */
+.pr-pick-ticker,.pr-opp-horizon,.pr-verdict,.pr-record-roi{transition:transform .16s var(--pop)}
+.pr-pick-ticker:hover,.pr-opp-horizon:hover,.pr-record-roi:hover{transform:rotate(-3deg) scale(1.06)}
+
+/* The section marker is a little rasher that wiggles when greeted. */
+.pr-section-title:hover::before{animation:prWiggle .5s ease}
+
+/* A happy bouncing bacon for loading + empty states. */
+@keyframes prBaconBounce{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-10px) rotate(4deg)}}
+.pr-bacon-bounce{display:inline-flex;animation:prBaconBounce .95s var(--pop) infinite}
+.pr-empty .pr-prism{animation:prBaconBounce 2.6s var(--pop) infinite}
+
+/* Pop-ins get a touch more life (overshoot handled by --pop). */
+@keyframes prPopIn{from{opacity:0;transform:translateY(14px) scale(.94)}}
+
+@media (prefers-reduced-motion:reduce){
+  .pr-bacon-bounce,.pr-empty .pr-prism{animation:none}
+  .pr-opp:hover,.pr-pick:hover,.pr-trk:hover,.pr-news:hover,.pr-w-card:hover,.pr-record:hover{transform:none}
+  .pr-pick-ticker:hover,.pr-opp-horizon:hover,.pr-record-roi:hover{transform:none}
 }
