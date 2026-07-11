@@ -48,7 +48,17 @@ export default function TrackRecordView() {
       try {
         const data = await cachedJson<{ briefs?: BriefRow[]; migrationNeeded?: boolean }>("/api/brief/history", 60_000);
         if (cancelled) return;
-        if (Array.isArray(data.briefs)) setBriefs(data.briefs);
+        if (Array.isArray(data.briefs)) {
+          setBriefs(data.briefs);
+          // Seed the stored ROI snapshots so already-priced days show their total
+          // instantly and DON'T re-hit the rate-limited provider on expand. A
+          // manual "Re-price" still refreshes to the latest value.
+          const seeded: Record<string, RoiData> = {};
+          for (const b of data.briefs) {
+            if (b.roi && b.roi.invested) seeded[b.id] = { results: [], totals: { count: b.roi.count ?? 1, invested: b.roi.invested, value: b.roi.value, asOf: b.roi.asOf ?? "", roiPct: b.roi.roiPct } };
+          }
+          if (Object.keys(seeded).length) setRoi(seeded);
+        }
         if (data.migrationNeeded) setMigrationNeeded(true);
       } catch { /* empty state */ }
       finally { if (!cancelled) setLoaded(true); }
