@@ -59,13 +59,14 @@ export async function generateBrief(bundle: SignalBundle): Promise<OpportunityBr
 export interface StoredBriefItem {
   name: string; ticker: string; cls: string; horizon: string;
   thesis: string; signals: string; checks: string;
+  action?: string; target?: string;   // the call: Buy/Accumulate/Watch + 12-mo est.
   outcome?: string; verdict?: string; // played-out | developing | faded | invalidated
 }
 
 export function briefToDailyRow(userId: string, brief: OpportunityBrief) {
   const items: StoredBriefItem[] = brief.items.map((o) => ({
     name: o.name, ticker: o.ticker, cls: o.cls, horizon: o.horizon,
-    thesis: o.thesis, signals: o.signals,
+    thesis: o.thesis, signals: o.signals, action: o.action, target: o.target,
     checks: [o.confirm && `Confirm: ${o.confirm}`, o.kill && `Kill: ${o.kill}`].filter(Boolean).join(" · "),
   }));
   return { user_id: userId, intro: brief.intro ?? "", caveat: brief.caveat ?? "", items };
@@ -83,6 +84,8 @@ export function briefToRows(userId: string, brief: OpportunityBrief) {
     why: o.thesis,
     now_catalyst: o.signals,
     check_text: [o.confirm && `Confirm: ${o.confirm}`, o.kill && `Kill: ${o.kill}`].filter(Boolean).join(" · "),
+    action: o.action || null,
+    target: o.target || null,
     change_pct: null,
     data_source: o.horizon || null, // horizon rides the free-text source column
     kind: "opportunity",

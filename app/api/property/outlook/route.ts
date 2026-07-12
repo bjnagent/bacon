@@ -30,16 +30,22 @@ export async function POST(req: Request) {
     : "no index data available right now — say so and rely only on attributed web_search findings";
 
   return textStreamResponse(
-    askStream(propertyOutlookPrompt(market.label, statsLine), [{ role: "user", content: `Write the current outlook for ${market.label}.` }], true, 900, 5),
+    askStream(propertyOutlookPrompt(market.label, statsLine), [{ role: "user", content: `Write the current deep view for ${market.label} — policy, rates, supply, sentiment, rentals, scenarios, verdict.` }], true, 1500, 6),
     async (full, ok) => {
       if (!ok) return; // don't persist a truncated outlook
       const sec = parseDebate(full); // generic ===SECTION=== splitter
       if (!sec.READ) return;
       const bodyJson = {
-        read: sec.READ, drivers: sec.DRIVERS || "", confirm: sec.CONFIRM || "", kill: sec.KILL || "",
-        stance: normStance((sec.STANCE || "").split(/[—-]/)[0]),
-        stanceWhy: (sec.STANCE || "").replace(/^[^—-]*[—-]\s*/, "").trim(),
+        read: sec.READ, policy: sec.POLICY || "", rates: sec.RATES || "", supply: sec.SUPPLY || "",
+        sentiment: sec.SENTIMENT || "", rental: sec.RENTAL || "", scenarios: sec.SCENARIOS || "",
+        verdict: sec.VERDICT || "", confirm: sec.CONFIRM || "", kill: sec.KILL || "",
+        stance: normStance((sec.VERDICT || "").split(/[·—-]/)[0]), // buy→constructive, avoid→cautious via normStance synonyms? map below
       };
+      // normStance doesn't know buy/avoid — map the verdict head explicitly.
+      const head = (sec.VERDICT || "").trim().toLowerCase();
+      if (head.startsWith("buy")) bodyJson.stance = "constructive";
+      else if (head.startsWith("avoid") || head.startsWith("sell")) bodyJson.stance = "cautious";
+      else if (head.startsWith("hold")) bodyJson.stance = "mixed";
       await sb.from("property_outlooks").upsert({ user_id: user.id, market_key: market.key, body: bodyJson, created_at: new Date().toISOString() }, { onConflict: "user_id,market_key" });
     }
   );

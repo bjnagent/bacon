@@ -20,6 +20,7 @@ function assemble(rows: ScoutPickRow[]) {
     items: items.map((r) => ({
       id: r.id, name: r.name, ticker: r.symbol, cls: r.asset_class,
       horizon: r.data_source || "", thesis: r.why, signals: r.now_catalyst, checks: r.check_text,
+      action: r.action || "", target: r.target || "",
     })),
   };
 }

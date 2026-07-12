@@ -175,6 +175,12 @@ export default function TrackRecordView() {
                           {o.verdict && <em className={`pr-verdict ${VERDICT_TONE[o.verdict] || "is-mute"}`}>{o.verdict}</em>}
                         </div>
                         <div className="pr-pick-why">{o.thesis}</div>
+                        {(o.action || o.target) && (
+                          <div className={`pr-call ${(o.action || "").toLowerCase().startsWith("watch") ? "is-hold" : "is-buy"}`}>
+                            {o.action && <span className="pr-call-action">{o.action}</span>}
+                            {o.target && <span className="pr-call-target">◎ {o.target}</span>}
+                          </div>
+                        )}
                         {o.outcome && <div className="pr-pick-now"><span>SINCE THEN ▸</span> {o.outcome}</div>}
                         {r && (r.value != null ? (
                           <div className={`pr-roi ${r.roiPct! >= 0 ? "is-up" : "is-down"}`}>

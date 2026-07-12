@@ -47,6 +47,19 @@ Synthesis of public info, not advice.`;
     expect(out2.lenses.FUNDAMENTAL.stance).toBe("mixed");
     expect(out2.lenses.FUNDAMENTAL.body).toBe("No stance tag here.");
   });
+
+  it("captures the VERDICT section as a top-level call, not a lens", () => {
+    const out = parseBriefing(`===SUMMARY===
+ok
+===VERDICT===
+Buy · conviction 4/5
+12-mo estimates: bear $120, base $160, bull $210 — est.
+===BOTTOMLINE===
+own it`);
+    expect(out.VERDICT).toContain("Buy · conviction 4/5");
+    expect(out.VERDICT).toContain("base $160");
+    expect(out.lenses.VERDICT).toBeUndefined();
+  });
 });
 
 describe("parseDebate", () => {
@@ -152,6 +165,24 @@ starting points, not advice`;
     expect(out.items[0].confirm).toBe("Q3 backlog numbers");
     expect(out.items[0].kill).toBe("contract loss to rival");
     expect(out.items[1].name).toBe("NoTicker Play");
+  });
+
+  it("parses the action + target call fields", () => {
+    const out = parseOpportunities(`@@OPP@@
+name: Micron
+ticker: MU
+class: Equity
+horizon: weeks
+thesis: HBM cycle underpriced
+signals: peer +12% (provider)
+action: Buy — catalyst tonight, risk skewed up
+target: $160 base est. (12-mo), bull $210
+confirm: Q4 guide
+kill: HBM pricing rolls over
+@@OPP@@`);
+    expect(out.items[0].action).toContain("Buy");
+    expect(out.items[0].target).toContain("$160");
+    expect(out.items[0].kill).toBe("HBM pricing rolls over");
   });
 
   it("keeps the whole multi-line signals list (no first-line truncation)", () => {

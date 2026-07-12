@@ -57,6 +57,9 @@ create table if not exists scout_picks (
 alter table scout_picks add column if not exists change_pct text;   -- real % move, via provider
 alter table scout_picks add column if not exists data_source text;  -- e.g. "Alpha Vantage"
 alter table scout_picks add column if not exists kind text default 'theme';  -- theme | mover
+-- opinionated bacon: explicit call per opportunity
+alter table scout_picks add column if not exists action text;  -- Buy | Accumulate | Watch — why
+alter table scout_picks add column if not exists target text;  -- 12-mo estimate (est.)
 
 -- cached news items
 create table if not exists news_items (

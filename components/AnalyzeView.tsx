@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Loader2, ArrowRight, ArrowUpRight, AlertTriangle, Scale, LayoutGrid, Bookmark, MessageCircle, Users } from "lucide-react";
+import { Loader2, ArrowRight, ArrowUpRight, AlertTriangle, Scale, LayoutGrid, Bookmark, MessageCircle, Users, ShieldAlert, Network } from "lucide-react";
 import { LENSES, STANCES, ASSET_CLASSES, PERSONAS, overallLean, type LensKey, type StanceKey } from "@/lib/lenses";
 import { toPoints, parseBriefing, type Briefing, type Debate } from "@/lib/parsers";
 import { auditBriefingText } from "@/lib/verify";
@@ -25,7 +25,7 @@ export default function AnalyzeView({ target, onDiscuss, quickSyms = [] }: { tar
   const [rawFallback, setRawFallback] = useState<string | null>(null);
   const [analyzed, setAnalyzed] = useState("");
   const [ranAt, setRanAt] = useState("");
-  const [subView, setSubView] = useState<"lenses" | "debate" | "personas">("lenses");
+  const [subView, setSubView] = useState<"lenses" | "debate" | "personas" | "redteam" | "chain">("lenses");
   const [saved, setSaved] = useState(false);
   const [debate, setDebate] = useState<Debate | null>(null);
   const [debateLoading, setDebateLoading] = useState(false);
@@ -33,6 +33,12 @@ export default function AnalyzeView({ target, onDiscuss, quickSyms = [] }: { tar
   const [personas, setPersonas] = useState<Record<string, string> | null>(null);
   const [personasLoading, setPersonasLoading] = useState(false);
   const [personasError, setPersonasError] = useState<string | null>(null);
+  const [redteam, setRedteam] = useState<Debate | null>(null);
+  const [redteamLoading, setRedteamLoading] = useState(false);
+  const [redteamError, setRedteamError] = useState<string | null>(null);
+  const [chain, setChain] = useState<Debate | null>(null);
+  const [chainLoading, setChainLoading] = useState(false);
+  const [chainError, setChainError] = useState<string | null>(null);
   const prevToken = useRef(0);
 
   const run = async (assetArg?: string, clsArg?: string) => {
@@ -41,6 +47,7 @@ export default function AnalyzeView({ target, onDiscuss, quickSyms = [] }: { tar
     if (!asset || loading) return;
     setLoading(true); setError(null); setBriefing(null); setRawFallback(null);
     setSaved(false); setSubView("lenses"); setDebate(null); setDebateError(null); setPersonas(null); setPersonasError(null);
+    setRedteam(null); setRedteamError(null); setChain(null); setChainError(null);
     setAnalyzed(asset); // header + live chart mount immediately; lenses stream in
     try {
       // Progressive parse: panels appear as ===SECTION===s land — throttled to
@@ -81,6 +88,32 @@ export default function AnalyzeView({ target, onDiscuss, quickSyms = [] }: { tar
       setPersonas(data.personas as Record<string, string>);
     } catch (err) { setPersonasError(err instanceof Error ? err.message : "Something went wrong"); }
     finally { setPersonasLoading(false); }
+  };
+
+  const openRedteam = async () => {
+    setSubView("redteam");
+    if (redteam || redteamLoading || !analyzed) return;
+    setRedteamLoading(true); setRedteamError(null);
+    try {
+      const res = await fetch("/api/redteam", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ asset: analyzed, assetClass }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+      setRedteam(data.redteam as Debate);
+    } catch (err) { setRedteamError(err instanceof Error ? err.message : "Something went wrong"); }
+    finally { setRedteamLoading(false); }
+  };
+
+  const openChain = async () => {
+    setSubView("chain");
+    if (chain || chainLoading || !analyzed) return;
+    setChainLoading(true); setChainError(null);
+    try {
+      const res = await fetch("/api/chain", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ asset: analyzed, assetClass }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+      setChain(data.chain as Debate);
+    } catch (err) { setChainError(err instanceof Error ? err.message : "Something went wrong"); }
+    finally { setChainLoading(false); }
   };
 
   const save = async () => {
@@ -163,18 +196,31 @@ export default function AnalyzeView({ target, onDiscuss, quickSyms = [] }: { tar
             <div className="pr-readout-lean">
               <div className="pr-readout-leanlabel">Aggregate lens lean</div>
               <div className="pr-readout-leanval" style={{ color: lean!.tone }}>{lean!.label}</div>
-              <div className="pr-readout-leannote">synthesis of the lens stances — not a rating or signal</div>
+              <div className="pr-readout-leannote">how the lenses vote — the verdict below is the call</div>
             </div>
             <TVLink sym={analyzed} square />
             <button className="pr-readout-discuss" onClick={() => onDiscuss({ kind: "asset", asset: analyzed, cls: assetClass, title: analyzed.toUpperCase(), sub: "multi-lens analysis", notes: analysisNotes })} title="Discuss this asset"><MessageCircle size={16} /></button>
             <button className={`pr-readout-save ${saved ? "is-saved" : ""}`} onClick={save} disabled={saved} title={saved ? "On radar" : "Track on radar"}><Bookmark size={16} /></button>
           </div>
 
+          {briefing.VERDICT && (() => {
+            const head = briefing.VERDICT.split(/[·\n]/)[0].trim().toLowerCase();
+            const tone = head.startsWith("buy") ? "is-buy" : head.startsWith("sell") ? "is-sell" : "is-hold";
+            return (
+              <div className={`pr-verdict-banner ${tone}`}>
+                <div className="pr-verdict-call">{briefing.VERDICT.split("\n")[0]}</div>
+                {briefing.VERDICT.split("\n").slice(1).map((l, i) => <div key={i} className="pr-verdict-line">{l}</div>)}
+              </div>
+            );
+          })()}
+
           <div className="pr-result-chart"><TradingViewChart symbol={analyzed} height={360} /></div>
 
           <div className="pr-subnav">
             <button className={`pr-subnav-btn ${subView === "lenses" ? "is-active" : ""}`} onClick={() => setSubView("lenses")}><LayoutGrid size={14} /> Lens cockpit</button>
             <button className={`pr-subnav-btn ${subView === "debate" ? "is-active" : ""}`} onClick={openDebate}><Scale size={14} /> Bull vs Bear</button>
+            <button className={`pr-subnav-btn ${subView === "redteam" ? "is-active" : ""}`} onClick={openRedteam}><ShieldAlert size={14} /> Red team</button>
+            <button className={`pr-subnav-btn ${subView === "chain" ? "is-active" : ""}`} onClick={openChain}><Network size={14} /> Chain map</button>
             <button className={`pr-subnav-btn ${subView === "personas" ? "is-active" : ""}`} onClick={openPersonas}><Users size={14} /> Investor takes</button>
           </div>
 
@@ -217,7 +263,7 @@ export default function AnalyzeView({ target, onDiscuss, quickSyms = [] }: { tar
                   <div className="pr-datacheck-head">
                     {dataCheck.flagged.length > 0 && <AlertTriangle size={13} />}
                     <span className="pr-datacheck-title">Data check</span>
-                    <span className="pr-datacheck-sum">{dataCheck.total} hard figure{dataCheck.total === 1 ? "" : "s"} · {dataCheck.cited} cite a source · {dataCheck.flagged.length} to verify</span>
+                    <span className="pr-datacheck-sum">{dataCheck.total} hard figure{dataCheck.total === 1 ? "" : "s"} · {dataCheck.cited} sourced · {dataCheck.estimates} labeled estimates · {dataCheck.flagged.length} to verify</span>
                   </div>
                   {dataCheck.flagged.length > 0 && (
                     <ul className="pr-datacheck-list">
@@ -225,10 +271,10 @@ export default function AnalyzeView({ target, onDiscuss, quickSyms = [] }: { tar
                       {dataCheck.flagged.length > 6 && <li className="pr-datacheck-more">+{dataCheck.flagged.length - 6} more…</li>}
                     </ul>
                   )}
-                  <div className="pr-datacheck-foot">{dataCheck.flagged.length ? "These figures don't cite a source in the text — confirm each independently before relying on it." : "Every hard figure here names a source or the live data. Still verify what matters."}</div>
+                  <div className="pr-datacheck-foot">{dataCheck.flagged.length ? "These figures are stated as fact without a source — confirm before relying on them. (Labeled estimates are opinions, not facts, and aren't flagged.)" : "Every factual figure names a source or the live data; the rest are labeled estimates. Verify what matters."}</div>
                 </div>
               )}
-              <div className="pr-disclaimer">BACON synthesizes public information and may be incomplete or out of date. Live prices/charts are from TradingView; Bacon&apos;s analysis stays qualitative and is not financial advice. The lenses can disagree — confirm every figure independently and decide for yourself.</div>
+              <div className="pr-disclaimer">AI-generated opinion: current facts are web-grounded, forward targets are estimates. Charts are live via TradingView. You own the final decision.</div>
             </>
           )}
 
@@ -242,8 +288,45 @@ export default function AnalyzeView({ target, onDiscuss, quickSyms = [] }: { tar
                     <div className="pr-debate-card is-bull"><div className="pr-debate-head"><ArrowUpRight size={16} /> The bull case</div><ul>{toPoints(debate.BULL).map((p, i) => <li key={i}>{p}</li>)}</ul></div>
                     <div className="pr-debate-card is-bear"><div className="pr-debate-head"><ArrowRight size={16} style={{ transform: "rotate(45deg)" }} /> The bear case</div><ul>{toPoints(debate.BEAR).map((p, i) => <li key={i}>{p}</li>)}</ul></div>
                   </div>
-                  {debate.SYNTHESIS && <div className="pr-bottomline"><div className="pr-bottomline-label">Where it hinges</div>{debate.SYNTHESIS}</div>}
-                  <div className="pr-disclaimer">This steelmans both sides from public information to expose the real disagreement. It is not a recommendation — a convincing argument is not the same as a correct one.</div>
+                  {debate.SYNTHESIS && <div className="pr-bottomline"><div className="pr-bottomline-label">Who wins &amp; why</div>{debate.SYNTHESIS}</div>}
+                  <div className="pr-disclaimer">Both sides steelmanned from public information, then judged. A convincing argument still isn&apos;t a guarantee — watch the flip condition.</div>
+                </>
+              )}
+            </div>
+          )}
+
+          {subView === "redteam" && (
+            <div className="pr-debate">
+              {redteamLoading && <div className="pr-loading"><div className="pr-loading-text"><Loader2 size={16} className="pr-spin" style={{ verticalAlign: "-3px", marginRight: 8 }} />Attacking the investment — worst case first…</div></div>}
+              {redteamError && <div className="pr-error"><AlertTriangle size={18} /><div><strong>Couldn&apos;t run the red team.</strong><div className="pr-error-detail">{redteamError}. Try again.</div></div></div>}
+              {redteam && (
+                <>
+                  <div className="pr-debate-card is-bear"><div className="pr-debate-head"><ShieldAlert size={16} /> 10 ways this loses your money</div><ul>{toPoints(redteam.RISKS).map((p, i) => <li key={i}>{p}</li>)}</ul></div>
+                  {redteam.ODDS && <div className="pr-bottomline"><div className="pr-bottomline-label">Which are actually likely</div>{redteam.ODDS}</div>}
+                  {redteam.VERDICT && (() => {
+                    const head = redteam.VERDICT.toLowerCase();
+                    const tone = head.startsWith("proceed") ? (head.startsWith("proceed smaller") ? "is-hold" : "is-buy") : "is-sell";
+                    return <div className={`pr-verdict-banner ${tone}`}><div className="pr-verdict-call">{redteam.VERDICT}</div></div>;
+                  })()}
+                  <div className="pr-disclaimer">The red team argues the downside on purpose — weigh it against the lens read before acting.</div>
+                </>
+              )}
+            </div>
+          )}
+
+          {subView === "chain" && (
+            <div className="pr-debate">
+              {chainLoading && <div className="pr-loading"><div className="pr-loading-text"><Loader2 size={16} className="pr-spin" style={{ verticalAlign: "-3px", marginRight: 8 }} />Mapping second- and third-degree winners &amp; losers…</div></div>}
+              {chainError && <div className="pr-error"><AlertTriangle size={18} /><div><strong>Couldn&apos;t map the chain.</strong><div className="pr-error-detail">{chainError}. Try again.</div></div></div>}
+              {chain && (
+                <>
+                  {chain.MAP && <div className="pr-summary">{chain.MAP}</div>}
+                  <div className="pr-debate-cols">
+                    <div className="pr-debate-card is-bull"><div className="pr-debate-head"><ArrowUpRight size={16} /> Non-obvious winners</div><ul>{toPoints(chain.WINNERS).map((p, i) => <li key={i}>{p}</li>)}</ul></div>
+                    <div className="pr-debate-card is-bear"><div className="pr-debate-head"><ArrowRight size={16} style={{ transform: "rotate(45deg)" }} /> Gets disrupted</div><ul>{toPoints(chain.LOSERS).map((p, i) => <li key={i}>{p}</li>)}</ul></div>
+                  </div>
+                  {chain.TOPPICKS && <div className="pr-bottomline"><div className="pr-bottomline-label">Real setups now</div>{chain.TOPPICKS}</div>}
+                  <div className="pr-disclaimer">Chain names are one-step-removed candidates — run the full lens read on anything before buying.</div>
                 </>
               )}
             </div>
@@ -266,7 +349,7 @@ export default function AnalyzeView({ target, onDiscuss, quickSyms = [] }: { tar
                       </div>
                     ))}
                   </div>
-                  <div className="pr-disclaimer">Stylized analytical lenses in the spirit of well-known disciplines — not the actual views of any person, and not advice. Steelman each, then verify independently.</div>
+                  <div className="pr-disclaimer">Stylized disciplines, not the actual views of any person. Four different philosophies voting is signal — unanimity either way is worth noticing.</div>
                 </>
               )}
             </div>

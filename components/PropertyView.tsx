@@ -13,7 +13,11 @@ interface MarketStats { latest: { date: string; close: number }; qoqPct: number 
 interface Market { key: string; label: string; country: "SG" | "AU"; currency: string; unit: "index" | "price"; source: string; stats: MarketStats | null }
 interface Valuation { entryDate: string; asOfDate: string; value: number; deltaPct: number }
 interface Holding { id: string; label: string; market_key: string; purchase_price: number; purchase_date: string; valuation: Valuation | null }
-interface Outlook { read: string; drivers: string; confirm: string; kill: string; stance: StanceKey; stanceWhy?: string }
+interface Outlook {
+  read: string; confirm: string; kill: string; stance: StanceKey;
+  policy?: string; rates?: string; supply?: string; sentiment?: string; rental?: string;
+  scenarios?: string; verdict?: string; drivers?: string; stanceWhy?: string; // drivers = legacy shape
+}
 interface PropertyData { markets?: Market[]; portfolio?: Holding[]; outlooks?: Record<string, { body: Outlook; created_at: string }> }
 
 const money = (n: number, ccy: string) => `${ccy} ${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
@@ -76,20 +80,23 @@ export default function PropertyView() {
     if (outlookBusy) return;
     setOutlookBusy(key); setError(null);
     try {
-      let rafId = 0, last = "";
-      const flush = () => {
-        rafId = 0;
-        const sec = parseDebate(last);
-        if (sec.READ) setOutlooks((prev) => ({ ...prev, [key]: { read: sec.READ, drivers: sec.DRIVERS || "", confirm: sec.CONFIRM || "", kill: sec.KILL || "", stance: "mixed" } }));
+      const toOutlook = (raw: string): Outlook | null => {
+        const sec = parseDebate(raw);
+        if (!sec.READ) return null;
+        const head = (sec.VERDICT || "").trim().toLowerCase();
+        const stance: StanceKey = head.startsWith("buy") ? "constructive" : head.startsWith("avoid") || head.startsWith("sell") ? "cautious" : "mixed";
+        return {
+          read: sec.READ, policy: sec.POLICY, rates: sec.RATES, supply: sec.SUPPLY, sentiment: sec.SENTIMENT,
+          rental: sec.RENTAL, scenarios: sec.SCENARIOS, verdict: sec.VERDICT,
+          confirm: sec.CONFIRM || "", kill: sec.KILL || "", stance,
+        };
       };
+      let rafId = 0, last = "";
+      const flush = () => { rafId = 0; const o = toOutlook(last); if (o) setOutlooks((prev) => ({ ...prev, [key]: o })); };
       await readTextStream("/api/property/outlook", { market: key }, (acc) => { last = acc; if (!rafId) rafId = requestAnimationFrame(flush); });
       if (rafId) cancelAnimationFrame(rafId);
-      const sec = parseDebate(last);
-      if (sec.READ) {
-        const stanceHead = (sec.STANCE || "").split(/[—-]/)[0].toLowerCase();
-        const stance: StanceKey = stanceHead.includes("construct") ? "constructive" : stanceHead.includes("caut") ? "cautious" : "mixed";
-        setOutlooks((prev) => ({ ...prev, [key]: { read: sec.READ, drivers: sec.DRIVERS || "", confirm: sec.CONFIRM || "", kill: sec.KILL || "", stance, stanceWhy: (sec.STANCE || "").replace(/^[^—-]*[—-]\s*/, "").trim() } }));
-      }
+      const final = toOutlook(last);
+      if (final) setOutlooks((prev) => ({ ...prev, [key]: final }));
     } catch (err) { setError(err instanceof Error ? err.message : "Outlook failed"); }
     finally { setOutlookBusy(null); }
   };
@@ -152,8 +159,16 @@ export default function PropertyView() {
                 )}
                 {o && (
                   <div className="pr-prop-outlook">
-                    {st && <span className="pr-panel-stance" style={{ color: st.tone, borderColor: st.tone }}>{st.label}</span>}
+                    {o.verdict ? (() => {
+                      const head = o.verdict.trim().toLowerCase();
+                      const tone = head.startsWith("buy") ? "is-buy" : head.startsWith("avoid") || head.startsWith("sell") ? "is-sell" : "is-hold";
+                      return <div className={`pr-verdict-banner ${tone}`}><div className="pr-verdict-call">{o.verdict}</div></div>;
+                    })() : st && <span className="pr-panel-stance" style={{ color: st.tone, borderColor: st.tone }}>{st.label}</span>}
                     <p>{o.read}</p>
+                    {([["POLICY", o.policy], ["RATES", o.rates], ["SUPPLY", o.supply], ["SENTIMENT", o.sentiment], ["RENTAL", o.rental]] as const)
+                      .filter(([, v]) => v)
+                      .map(([k, v]) => <div key={k} className="pr-prop-dim"><span>{k}</span> {v}</div>)}
+                    {o.scenarios && <div className="pr-pick-now"><span>12-MO SCENARIOS (EST.) ▸</span> {o.scenarios}</div>}
                     {o.drivers && <div className="pr-prop-drivers">{o.drivers}</div>}
                     {o.confirm && <div className="pr-pick-check"><span>CONFIRM</span> {o.confirm}</div>}
                     {o.kill && <div className="pr-pick-check"><span>KILL</span> {o.kill}</div>}
@@ -161,7 +176,7 @@ export default function PropertyView() {
                 )}
                 <div className="pr-record-actions">
                   <button className="pr-btn-sm" onClick={() => runOutlook(m.key)} disabled={outlookBusy === m.key}>
-                    {outlookBusy === m.key ? <><Loader2 size={13} className="pr-spin" /> Reading the market…</> : <><Telescope size={13} /> {o ? "Refresh outlook" : "AI outlook"}</>}
+                    {outlookBusy === m.key ? <><Loader2 size={13} className="pr-spin" /> Policy, rates, supply, sentiment…</> : <><Telescope size={13} /> {o ? "Refresh deep view" : "Deep view"}</>}
                   </button>
                 </div>
               </div>

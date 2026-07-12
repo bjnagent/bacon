@@ -1086,3 +1086,32 @@ body { background: #EBE8E0; color: #1A1712; }
   /* six tabs now — tighten the labels so they fit comfortably */
   .pr-tabbtn{font-size:9.5px;padding:7px 1px 4px}
 }
+
+/* ============================================================
+   OPINIONATED BACON — verdict banners, per-idea calls, and the
+   property deep-view dimension rows.
+   ============================================================ */
+.pr-verdict-banner{border:1.5px solid var(--line2);border-radius:13px;padding:13px 16px;margin:14px 0;background:var(--card);box-shadow:3px 4px 0 var(--line2)}
+.pr-verdict-banner.is-buy{border-color:rgba(30,142,76,0.55);background:rgba(30,142,76,0.06)}
+.pr-verdict-banner.is-sell{border-color:rgba(207,59,44,0.55);background:rgba(207,59,44,0.06)}
+.pr-verdict-banner.is-hold{border-color:rgba(176,122,18,0.5);background:rgba(176,122,18,0.05)}
+.pr-verdict-call{font-family:var(--fd);font-weight:700;font-size:16px;color:var(--ink);line-height:1.4}
+.pr-verdict-banner.is-buy .pr-verdict-call{color:var(--good)}
+.pr-verdict-banner.is-sell .pr-verdict-call{color:var(--bad)}
+.pr-verdict-banner.is-hold .pr-verdict-call{color:var(--warn)}
+.pr-verdict-line{font-size:12.5px;color:var(--ink2);line-height:1.6;margin-top:4px}
+
+/* The call chip row on an opportunity / record item. */
+.pr-call{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;border-radius:9px;padding:8px 11px;margin-bottom:9px;border:1px solid var(--line2);background:var(--paper2)}
+.pr-call.is-buy{border-color:rgba(30,142,76,0.45);background:rgba(30,142,76,0.06)}
+.pr-call.is-sell{border-color:rgba(207,59,44,0.45);background:rgba(207,59,44,0.06)}
+.pr-call.is-hold{border-color:rgba(176,122,18,0.45);background:rgba(176,122,18,0.05)}
+.pr-call-action{font-family:var(--fm);font-weight:600;font-size:12px;color:var(--ink)}
+.pr-call.is-buy .pr-call-action{color:var(--good)}
+.pr-call.is-sell .pr-call-action{color:var(--bad)}
+.pr-call.is-hold .pr-call-action{color:var(--warn)}
+.pr-call-target{font-family:var(--fm);font-size:11px;color:var(--muted);letter-spacing:0.02em}
+
+/* Property deep-view dimensions (POLICY / RATES / SUPPLY / SENTIMENT / RENTAL). */
+.pr-prop-dim{font-size:12.5px;color:var(--ink2);line-height:1.6}
+.pr-prop-dim span{font-family:var(--fm);font-size:10px;color:var(--accent);letter-spacing:0.07em;font-weight:600;margin-right:6px}

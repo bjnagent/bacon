@@ -35,6 +35,7 @@ export interface LensSection {
 export interface Briefing {
   SUMMARY?: string;
   BOTTOMLINE?: string;
+  VERDICT?: string; // Buy/Hold/Sell call + scenario estimates (free text, first word is the call)
   lenses: Record<string, LensSection>;
 }
 
@@ -46,6 +47,7 @@ export function parseBriefing(text: string): Briefing {
     let body = (parts[i + 1] || "").trim();
     if (key === "SUMMARY") { out.SUMMARY = body; continue; }
     if (key === "BOTTOMLINE") { out.BOTTOMLINE = body; continue; }
+    if (key === "VERDICT") { out.VERDICT = body; continue; }
     let stance: string | null = null;
     const sm = body.match(/^\s*\[([^\]]+)\]/);
     if (sm) { stance = sm[1]; body = body.slice(sm[0].length).trim(); }
@@ -103,6 +105,8 @@ export interface OpportunityItem {
   horizon: string;
   thesis: string;
   signals: string;
+  action: string;  // Buy | Accumulate | Watch — why now
+  target: string;  // 12-mo estimate, labeled est.
   confirm: string;
   kill: string;
 }
@@ -122,8 +126,8 @@ export function parseOpportunities(text: string): OpportunityBrief {
   const blocks = text.split(/@@OPP@@/i).slice(1);
   const items = blocks.map((raw) => {
     const b = raw.split(/===\s*CAVEAT/i)[0];
-    const get = blockReader(b, ["name", "ticker", "class", "horizon", "thesis", "signals", "confirm", "kill"]);
-    return { name: get("name"), ticker: get("ticker"), cls: get("class"), horizon: get("horizon"), thesis: get("thesis"), signals: get("signals"), confirm: get("confirm"), kill: get("kill") };
+    const get = blockReader(b, ["name", "ticker", "class", "horizon", "thesis", "signals", "action", "target", "confirm", "kill"]);
+    return { name: get("name"), ticker: get("ticker"), cls: get("class"), horizon: get("horizon"), thesis: get("thesis"), signals: get("signals"), action: get("action"), target: get("target"), confirm: get("confirm"), kill: get("kill") };
   }).filter((o) => o.name || (o.ticker && o.ticker !== "—"));
   return { intro, items, caveat };
 }

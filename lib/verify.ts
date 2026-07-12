@@ -17,7 +17,8 @@ export interface FigureFlag {
 export interface FigureAudit {
   total: number;             // hard figures found
   cited: number;             // figures in a sentence that names a source
-  flagged: FigureFlag[];     // hard figures with no visible source
+  estimates: number;         // figures in a sentence that declares itself an estimate/scenario/target
+  flagged: FigureFlag[];     // hard figures with neither a source nor an estimate label
 }
 
 // A "hard figure" is the kind bacon bans inventing: a currency amount/target, a
@@ -30,6 +31,11 @@ const FIGURE_RE = /\$\s?\d[\d,]*(?:\.\d+)?\s?(?:trillion|billion|million|bn|tn|[
 // Deliberately excludes metric words like "earnings"/"margin": naming what a
 // number measures is not the same as sourcing it.
 const CITE_RE = /\b(via|per|according to|reported|reports|reporting|sources?|cited?|Reuters|Bloomberg|CNBC|WSJ|FT|SEC|EDGAR|FRED|Form ?4|10-?[KQ]|8-?K|filing|filings|consensus|analysts?|Street|press release|disclosed|disclosure|prospectus|as reported|as of)\b/i;
+
+// Bacon now makes forward calls: a figure whose sentence DECLARES itself an
+// estimate / scenario / target is an opinion, not a fact needing a source —
+// counted separately, never flagged.
+const ESTIMATE_RE = /\b(est\.?|estimates?|estimated|scenario|scenarios|target|targets|base case|bear case|bull case|bear|bull|12-mo|12-month|projected|projection|forecast|implies|implied|could reach|we think|my estimate|fair value|odds|probability|likely worth)\b/i;
 
 function splitSentences(text: string): string[] {
   return text
@@ -45,19 +51,21 @@ function splitSentences(text: string): string[] {
 export function auditFigures(text: string, grounding: string[] = []): FigureAudit {
   const groundSet = new Set(grounding.map((g) => g.replace(/\s+/g, "").toLowerCase()));
   const flagged: FigureFlag[] = [];
-  let total = 0, cited = 0;
+  let total = 0, cited = 0, estimates = 0;
   for (const sentence of splitSentences(text)) {
     const figs = sentence.match(FIGURE_RE);
     if (!figs) continue;
     const hasCite = CITE_RE.test(sentence);
+    const isEstimate = ESTIMATE_RE.test(sentence);
     for (const raw of figs) {
       const figure = raw.trim();
       total++;
       if (hasCite || groundSet.has(figure.replace(/\s+/g, "").toLowerCase())) { cited++; continue; }
+      if (isEstimate) { estimates++; continue; }
       flagged.push({ figure, snippet: sentence });
     }
   }
-  return { total, cited, flagged };
+  return { total, cited, estimates, flagged };
 }
 
 // Convenience: audit a parsed briefing (lens bodies + summary + bottom line).

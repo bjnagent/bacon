@@ -44,7 +44,7 @@ function StatusBar({ module }: { module: string }) {
       <div className="pr-status-right">
         <span className="pr-status-tag">CONN ●</span>
         <span className="pr-status-tag">DATA · LIVE WEB</span>
-        <span className="pr-status-tag is-warn">NOT ADVICE</span>
+        <span className="pr-status-tag is-warn">AI OPINION</span>
         <Clock />
       </div>
     </div>
