@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     : "no index data available right now — say so and rely only on attributed web_search findings";
 
   return textStreamResponse(
-    askStream(propertyOutlookPrompt(market.label, statsLine), [{ role: "user", content: `Write the current deep view for ${market.label} — policy, rates, supply, sentiment, rentals, scenarios, verdict.` }], true, 1500, 6),
+    askStream(propertyOutlookPrompt(market.label, statsLine), [{ role: "user", content: `Write the current deep view for ${market.label} — policy, rates, supply, sentiment, rentals, 12-mo scenarios, 5/10-yr long run, the rent-vs-mortgage carry math, and your verdict.` }], true, 1800, 6),
     async (full, ok) => {
       if (!ok) return; // don't persist a truncated outlook
       const sec = parseDebate(full); // generic ===SECTION=== splitter
@@ -38,6 +38,7 @@ export async function POST(req: Request) {
       const bodyJson = {
         read: sec.READ, policy: sec.POLICY || "", rates: sec.RATES || "", supply: sec.SUPPLY || "",
         sentiment: sec.SENTIMENT || "", rental: sec.RENTAL || "", scenarios: sec.SCENARIOS || "",
+        longrun: sec.LONGRUN || "", carry: sec.CARRY || "",
         verdict: sec.VERDICT || "", confirm: sec.CONFIRM || "", kill: sec.KILL || "",
         stance: normStance((sec.VERDICT || "").split(/[·—-]/)[0]), // buy→constructive, avoid→cautious via normStance synonyms? map below
       };

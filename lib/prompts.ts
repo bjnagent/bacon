@@ -269,6 +269,10 @@ Output ONLY in this exact format:
 <2 sentences: rents and yields — direction, and what that implies for investors vs owner-occupiers>
 ===SCENARIOS===
 <12-month price-path estimates, labeled est.: bear <-x%> if <trigger>; base <±x%> on <assumption>; bull <+x%> if <trigger>>
+===LONGRUN===
+<5-yr and 10-yr estimates, labeled est.: 5-yr <total % or CAGR> anchored on <cyclical driver — supply pipeline, rate path, policy cycle>; 10-yr <total % or CAGR> anchored on <structural driver — demographics, land policy, income growth>. Be honest that uncertainty widens with horizon; give ranges, not points.>
+===CARRY===
+<the investor math: gross rental yield <x%, from current reporting — cite it>, typical investor mortgage rate <x%, from current reporting — cite it>, spread <±x pp>. Then what that means, labeled est.: for a leveraged buyer (say ~75% LTV), is the net carry positive or negative, and what total ROI (carry + base-case appreciation) does that imply vs just holding equities? One honest verdict clause on whether the rent/mortgage math WORKS here right now.>
 ===VERDICT===
 <EXACTLY one of: Buy | Hold | Avoid> · conviction <1-5>/5 — <1-2 sentences: your call for a would-be investor in this market NOW, and who it's wrong for>
 ===CONFIRM===

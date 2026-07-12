@@ -16,7 +16,8 @@ interface Holding { id: string; label: string; market_key: string; purchase_pric
 interface Outlook {
   read: string; confirm: string; kill: string; stance: StanceKey;
   policy?: string; rates?: string; supply?: string; sentiment?: string; rental?: string;
-  scenarios?: string; verdict?: string; drivers?: string; stanceWhy?: string; // drivers = legacy shape
+  scenarios?: string; longrun?: string; carry?: string;
+  verdict?: string; drivers?: string; stanceWhy?: string; // drivers = legacy shape
 }
 interface PropertyData { markets?: Market[]; portfolio?: Holding[]; outlooks?: Record<string, { body: Outlook; created_at: string }> }
 
@@ -87,7 +88,7 @@ export default function PropertyView() {
         const stance: StanceKey = head.startsWith("buy") ? "constructive" : head.startsWith("avoid") || head.startsWith("sell") ? "cautious" : "mixed";
         return {
           read: sec.READ, policy: sec.POLICY, rates: sec.RATES, supply: sec.SUPPLY, sentiment: sec.SENTIMENT,
-          rental: sec.RENTAL, scenarios: sec.SCENARIOS, verdict: sec.VERDICT,
+          rental: sec.RENTAL, scenarios: sec.SCENARIOS, longrun: sec.LONGRUN, carry: sec.CARRY, verdict: sec.VERDICT,
           confirm: sec.CONFIRM || "", kill: sec.KILL || "", stance,
         };
       };
@@ -169,6 +170,8 @@ export default function PropertyView() {
                       .filter(([, v]) => v)
                       .map(([k, v]) => <div key={k} className="pr-prop-dim"><span>{k}</span> {v}</div>)}
                     {o.scenarios && <div className="pr-pick-now"><span>12-MO SCENARIOS (EST.) ▸</span> {o.scenarios}</div>}
+                    {o.longrun && <div className="pr-pick-now"><span>5 &amp; 10-YR (EST.) ▸</span> {o.longrun}</div>}
+                    {o.carry && <div className="pr-carry"><span>RENT vs MORTGAGE ▸</span> {o.carry}</div>}
                     {o.drivers && <div className="pr-prop-drivers">{o.drivers}</div>}
                     {o.confirm && <div className="pr-pick-check"><span>CONFIRM</span> {o.confirm}</div>}
                     {o.kill && <div className="pr-pick-check"><span>KILL</span> {o.kill}</div>}
