@@ -108,6 +108,19 @@ alter table market_snapshots enable row level security;
 drop policy if exists "read snapshots" on market_snapshots;
 create policy "read snapshots" on market_snapshots for select using (auth.role() = 'authenticated');
 
+-- shared price cache: one row per ticker with its full daily-close history, so a
+-- ticker is fetched at most once/UTC-day across all users (immutable history
+-- means past flag dates never need re-fetching). Read-only to clients; written
+-- by the service role. Lets ROI pricing stop depending on a provider's tier.
+create table if not exists ticker_series (
+  ticker text primary key,
+  bars jsonb not null default '[]'::jsonb,
+  fetched_at timestamptz default now()
+);
+alter table ticker_series enable row level security;
+drop policy if exists "read ticker_series" on ticker_series;
+create policy "read ticker_series" on ticker_series for select using (auth.role() = 'authenticated');
+
 -- discuss chat history
 create table if not exists chat_messages (
   id uuid primary key default gen_random_uuid(),
