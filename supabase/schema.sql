@@ -121,6 +121,42 @@ alter table ticker_series enable row level security;
 drop policy if exists "read ticker_series" on ticker_series;
 create policy "read ticker_series" on ticker_series for select using (auth.role() = 'authenticated');
 
+-- property tracker (SG + AU): shared index cache + per-user portfolio + outlooks
+create table if not exists property_series (
+  series_key text primary key,
+  bars jsonb not null default '[]'::jsonb,
+  fetched_at timestamptz default now()
+);
+alter table property_series enable row level security;
+drop policy if exists "read property_series" on property_series;
+create policy "read property_series" on property_series for select using (auth.role() = 'authenticated');
+
+create table if not exists properties (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  label text not null,
+  market_key text not null,
+  purchase_price numeric not null,
+  purchase_date date not null,
+  notes text default '',
+  created_at timestamptz default now()
+);
+alter table properties enable row level security;
+drop policy if exists "own properties" on properties;
+create policy "own properties" on properties for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create table if not exists property_outlooks (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  market_key text not null,
+  body jsonb not null default '{}'::jsonb,
+  created_at timestamptz default now(),
+  unique (user_id, market_key)
+);
+alter table property_outlooks enable row level security;
+drop policy if exists "own property_outlooks" on property_outlooks;
+create policy "own property_outlooks" on property_outlooks for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
 -- discuss chat history
 create table if not exists chat_messages (
   id uuid primary key default gen_random_uuid(),

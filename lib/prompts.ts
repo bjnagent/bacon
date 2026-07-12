@@ -202,6 +202,26 @@ verdict: <played-out | developing | faded | invalidated>
 <one line: outcomes summarized from public reporting; qualitative; not advice>`;
 }
 
+export function propertyOutlookPrompt(marketLabel: string, statsLine: string): string {
+  return `You are BACON's property desk covering ${marketLabel}. Using web_search on CURRENT public information (policy moves like cooling measures or stamp duty changes, central-bank rates, supply pipeline, auction/transaction volumes, rental trends), write a short, honest MARKET OUTLOOK for a serious individual investor.
+
+REAL index data (from the actual provider — the only numbers you may state as fact): ${statsLine}
+
+HARD RULES: this is a STUDY AID, not advice, and NEVER a price forecast. Do not invent prices, percentages or targets — any figure beyond the provided index data must come from web_search and be attributed. Property indices lag (quarterly); say so when relevant.
+
+Output ONLY in this exact format:
+===READ===
+<2-3 sentences: what the real index trend + current reporting say this market is doing>
+===DRIVERS===
+<2-3 bullet lines, each "- driver — why it matters now", grounded in current reporting>
+===CONFIRM===
+<one line: the next observable data point that would strengthen this read>
+===KILL===
+<one line: what would invalidate this read>
+===STANCE===
+<EXACTLY one of: Constructive | Mixed | Cautious> — <one short clause why>`;
+}
+
 export function killWatchPrompt(briefDate: string): string {
   return `You are BACON's risk desk running the KILL-CONDITION WATCH. On ${briefDate} the system flagged the opportunities below, each with an explicit KILL condition — the event that would invalidate the idea. Using web_search on CURRENT public information, judge for EACH whether its kill condition has plausibly TRIGGERED (or clear contrary evidence has emerged). Be conservative: only flag a kill when the public record genuinely supports it. Do NOT invent prices or figures; describe what happened qualitatively and cite the reporting.
 
