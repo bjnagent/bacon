@@ -30,13 +30,15 @@ export interface ScoutPickRow {
   why: string;
   now_catalyst: string;
   check_text: string;
+  action: string | null;  // Buy | Accumulate | Watch — why now
+  target: string | null;  // 12-mo estimate (est.)
   change_pct: string | null;
   data_source: string | null;
-  kind: string; // theme | mover
+  kind: string; // theme | mover | opportunity | brief-intro
   created_at: string;
 }
 
-export const SCOUT_PICK_COLUMNS = "id,name,symbol,asset_class,why,now_catalyst,check_text,change_pct,data_source,kind,created_at";
+export const SCOUT_PICK_COLUMNS = "id,name,symbol,asset_class,why,now_catalyst,check_text,action,target,change_pct,data_source,kind,created_at";
 
 export interface NewsItemRow {
   id: string;

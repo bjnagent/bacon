@@ -57,6 +57,9 @@ create table if not exists scout_picks (
 alter table scout_picks add column if not exists change_pct text;   -- real % move, via provider
 alter table scout_picks add column if not exists data_source text;  -- e.g. "Alpha Vantage"
 alter table scout_picks add column if not exists kind text default 'theme';  -- theme | mover
+-- opinionated bacon: explicit call per opportunity
+alter table scout_picks add column if not exists action text;  -- Buy | Accumulate | Watch — why
+alter table scout_picks add column if not exists target text;  -- 12-mo estimate (est.)
 
 -- cached news items
 create table if not exists news_items (
@@ -121,6 +124,42 @@ alter table ticker_series enable row level security;
 drop policy if exists "read ticker_series" on ticker_series;
 create policy "read ticker_series" on ticker_series for select using (auth.role() = 'authenticated');
 
+-- property tracker (SG + AU): shared index cache + per-user portfolio + outlooks
+create table if not exists property_series (
+  series_key text primary key,
+  bars jsonb not null default '[]'::jsonb,
+  fetched_at timestamptz default now()
+);
+alter table property_series enable row level security;
+drop policy if exists "read property_series" on property_series;
+create policy "read property_series" on property_series for select using (auth.role() = 'authenticated');
+
+create table if not exists properties (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  label text not null,
+  market_key text not null,
+  purchase_price numeric not null,
+  purchase_date date not null,
+  notes text default '',
+  created_at timestamptz default now()
+);
+alter table properties enable row level security;
+drop policy if exists "own properties" on properties;
+create policy "own properties" on properties for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create table if not exists property_outlooks (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  market_key text not null,
+  body jsonb not null default '{}'::jsonb,
+  created_at timestamptz default now(),
+  unique (user_id, market_key)
+);
+alter table property_outlooks enable row level security;
+drop policy if exists "own property_outlooks" on property_outlooks;
+create policy "own property_outlooks" on property_outlooks for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
 -- discuss chat history
 create table if not exists chat_messages (
   id uuid primary key default gen_random_uuid(),
@@ -181,3 +220,29 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
+
+-- calibration loop: every explicit call, stamped with context (incl. community
+-- crowding), graded later vs real prices + SPY; aggregates feed the prompts.
+create table if not exists calls (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  source text not null,
+  instrument text not null,
+  action text not null,
+  conviction int,
+  target_text text,
+  target_base numeric,
+  target_kind text,
+  horizon_date date not null,
+  crowded text,
+  created_at timestamptz default now(),
+  actual_pct numeric,
+  bench_pct numeric,
+  direction_hit boolean,
+  target_err_pct numeric,
+  graded_at timestamptz
+);
+create index if not exists calls_user_created on calls (user_id, created_at desc);
+alter table calls enable row level security;
+drop policy if exists "own calls" on calls;
+create policy "own calls" on calls for all using (auth.uid() = user_id) with check (auth.uid() = user_id);

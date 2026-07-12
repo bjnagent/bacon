@@ -12,7 +12,7 @@ import MacroBackdrop from "./MacroBackdrop";
 import BaconMark from "./BaconMark";
 import TVLink from "./TVLink";
 
-interface BriefItem { id: string; name: string; ticker: string; cls: string; horizon: string; thesis: string; signals: string; checks: string }
+interface BriefItem { id: string; name: string; ticker: string; cls: string; horizon: string; thesis: string; signals: string; checks: string; action?: string; target?: string }
 interface Brief { intro: string | null; caveat: string | null; generatedAt: string | null; items: BriefItem[] }
 
 // The cockpit: the system pieces together today's signals overnight and the
@@ -56,7 +56,7 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
         intro: b.intro, caveat: b.caveat, generatedAt: null,
         items: b.items.map((o, i) => ({
           id: `stream-${i}`, name: o.name, ticker: o.ticker, cls: o.cls, horizon: o.horizon,
-          thesis: o.thesis, signals: o.signals,
+          thesis: o.thesis, signals: o.signals, action: o.action, target: o.target,
           checks: [o.confirm && `Confirm: ${o.confirm}`, o.kill && `Kill: ${o.kill}`].filter(Boolean).join(" · "),
         })),
       };
@@ -167,6 +167,16 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
                         <span className="pr-pick-class">{o.cls}</span>
                       </div>
                       <div className="pr-pick-why">{o.thesis}</div>
+                      {(o.action || o.target) && (() => {
+                        const head = (o.action || "").split(/[—-]/)[0].trim().toLowerCase();
+                        const tone = head.startsWith("watch") ? "is-hold" : head.startsWith("sell") || head.startsWith("avoid") ? "is-sell" : "is-buy";
+                        return (
+                          <div className={`pr-call ${tone}`}>
+                            {o.action && <span className="pr-call-action">{o.action}</span>}
+                            {o.target && <span className="pr-call-target">◎ {o.target}</span>}
+                          </div>
+                        );
+                      })()}
                       {o.signals && <div className="pr-pick-now"><span>SIGNALS ▸</span> {o.signals}</div>}
                       {o.checks && <div className="pr-pick-check"><span>VERIFY</span> {o.checks}</div>}
                       <div className="pr-pick-actions">
@@ -190,13 +200,13 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
                   <div className="pr-datacheck-head">
                     <AlertTriangle size={13} />
                     <span className="pr-datacheck-title">Data check</span>
-                    <span className="pr-datacheck-sum">{check.total} hard figure{check.total === 1 ? "" : "s"} in today&apos;s ideas · {check.flagged.length} without a cited source</span>
+                    <span className="pr-datacheck-sum">{check.total} hard figure{check.total === 1 ? "" : "s"} in today&apos;s ideas · {check.estimates} labeled estimates · {check.flagged.length} stated as fact without a source</span>
                   </div>
                   <ul className="pr-datacheck-list">
                     {check.flagged.slice(0, 5).map((f, i) => <li key={i}><strong>{f.figure}</strong> — {f.snippet}</li>)}
                     {check.flagged.length > 5 && <li className="pr-datacheck-more">+{check.flagged.length - 5} more…</li>}
                   </ul>
-                  <div className="pr-datacheck-foot">Bacon grounds figures in real signals; these appear without an inline source — verify each before acting.</div>
+                  <div className="pr-datacheck-foot">Facts should carry a source; labeled estimates are Bacon&apos;s own calls. These figures are neither — verify before acting.</div>
                 </div>
               );
             })()}

@@ -23,6 +23,8 @@ export interface SignalBundle {
   voices?: string[];                // public commentators the investor follows
   commodities?: InstrumentQuote[];  // real commodity levels via FRED
   fx?: InstrumentQuote[];           // real FX rates via FRED
+  pulse?: string;                   // community pulse via Grok/X
+  calibration?: string;             // the system's own graded track record memo
 }
 
 // Split the comma-separated settings.voices column into clean labels.
@@ -43,6 +45,8 @@ export function buildSignalBundle(b: SignalBundle): string {
   if (b.macro.length) parts.push("MACRO BACKDROP (real data via FRED):\n" + b.macro.map((m) => `- ${m.label}: ${m.value}${m.unit}${m.change != null ? ` (${m.change >= 0 ? "+" : ""}${m.change.toFixed(2)} vs prior)` : ""}`).join("\n"));
   if (b.insiders?.length) parts.push("INSIDER FILING CLUSTERS (real, from SEC EDGAR Form 4 filings over the last few trading days — clustered open-market BUYING is the notable signal; sampled counts, not totals):\n" + b.insiders.map((i) => `- ${i.company} (${i.ticker}): ${i.filings} filings; sampled filings show ${i.buys} open-market buy${i.buys === 1 ? "" : "s"}, ${i.sells} sale${i.sells === 1 ? "" : "s"}`).join("\n"));
   if (b.voices?.length) parts.push("TRACKED VOICES (public commentators the investor follows): " + b.voices.join(", "));
+  if (b.pulse) parts.push("COMMUNITY PULSE (live X via Grok — noisy, contrarian at extremes; a HOT name is already crowded):\n" + b.pulse);
+  if (b.calibration) parts.push("YOUR CALIBRATION (measured from your own graded past calls — correct for these biases):\n" + b.calibration);
   if (b.themes.length) parts.push("INVESTOR THEMES: " + b.themes.join("; "));
   if (b.tracked.length) parts.push("ALREADY TRACKED (prefer NEW names over these): " + b.tracked.join(", "));
   parts.push("Piece these signals together into today's opportunity brief.");
@@ -59,13 +63,14 @@ export async function generateBrief(bundle: SignalBundle): Promise<OpportunityBr
 export interface StoredBriefItem {
   name: string; ticker: string; cls: string; horizon: string;
   thesis: string; signals: string; checks: string;
+  action?: string; target?: string;   // the call: Buy/Accumulate/Watch + 12-mo est.
   outcome?: string; verdict?: string; // played-out | developing | faded | invalidated
 }
 
 export function briefToDailyRow(userId: string, brief: OpportunityBrief) {
   const items: StoredBriefItem[] = brief.items.map((o) => ({
     name: o.name, ticker: o.ticker, cls: o.cls, horizon: o.horizon,
-    thesis: o.thesis, signals: o.signals,
+    thesis: o.thesis, signals: o.signals, action: o.action, target: o.target,
     checks: [o.confirm && `Confirm: ${o.confirm}`, o.kill && `Kill: ${o.kill}`].filter(Boolean).join(" · "),
   }));
   return { user_id: userId, intro: brief.intro ?? "", caveat: brief.caveat ?? "", items };
@@ -83,6 +88,8 @@ export function briefToRows(userId: string, brief: OpportunityBrief) {
     why: o.thesis,
     now_catalyst: o.signals,
     check_text: [o.confirm && `Confirm: ${o.confirm}`, o.kill && `Kill: ${o.kill}`].filter(Boolean).join(" · "),
+    action: o.action || null,
+    target: o.target || null,
     change_pct: null,
     data_source: o.horizon || null, // horizon rides the free-text source column
     kind: "opportunity",

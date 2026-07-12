@@ -2,11 +2,23 @@ import { describe, it, expect } from "vitest";
 import { auditFigures, auditBriefingText } from "./verify";
 
 describe("auditFigures", () => {
-  it("flags a bare price/target with no source", () => {
-    const a = auditFigures("Fair value sits near $450 with upside to $520.");
+  it("flags a bare figure stated as fact with no source", () => {
+    const a = auditFigures("The company carries $450 of net debt and pays $520 in annual interest.");
     expect(a.total).toBe(2);
     expect(a.cited).toBe(0);
     expect(a.flagged.map((f) => f.figure)).toEqual(["$450", "$520"]);
+  });
+
+  it("counts self-declared estimates/targets as opinions, not unsourced facts", () => {
+    const a = auditFigures("Base case est. $160 in 12 months, bull scenario $210.");
+    expect(a.total).toBe(2);
+    expect(a.estimates).toBe(2);
+    expect(a.flagged).toHaveLength(0);
+  });
+
+  it("still flags fact-shaped figures even when the app allows estimates", () => {
+    const a = auditFigures("Revenue was $4.2bn last quarter."); // fact claim, no source
+    expect(a.flagged).toHaveLength(1);
   });
 
   it("treats a figure as cited when the sentence names a source", () => {
@@ -47,9 +59,11 @@ describe("auditBriefingText", () => {
     const a = auditBriefingText({
       summary: "Momentum strong.",
       lensBodies: ["Margins near 35% look full.", "Guidance implies 20% growth, per the 10-K."],
-      bottomline: "Targets of $90 circulate.",
+      bottomline: "Our target of $90 is an est.",
     });
-    expect(a.total).toBe(3);          // 35%, 20%, $90
-    expect(a.flagged.map((f) => f.figure).sort()).toEqual(["$90", "35%"]); // 20% is cited (10-K)
+    expect(a.total).toBe(3);                                    // 35%, 20%, $90
+    expect(a.cited).toBe(1);                                    // 20% cites the 10-K
+    expect(a.estimates).toBe(1);                                // $90 self-declares as target/est.
+    expect(a.flagged.map((f) => f.figure)).toEqual(["35%"]);    // bare fact claim
   });
 });

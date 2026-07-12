@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { ask } from "@/lib/anthropic";
 import { killWatchPrompt } from "@/lib/prompts";
 import { parseKillWatch } from "@/lib/parsers";
+import { gradeCalls } from "@/lib/calls";
 import type { StoredBriefItem } from "@/lib/brief";
 import { sendKillAlertEmail, emailEnabled } from "@/lib/email";
 
@@ -21,8 +22,12 @@ export async function GET(req: Request) {
   }
   const admin = createAdminClient();
 
+  // Calibration grading rides the daily watch cron: deterministic math against
+  // real prices + SPY — no model grades its own homework.
+  const grading = await gradeCalls(admin).catch(() => ({ graded: 0, finalized: 0 }));
+
   const { data: users } = await admin.from("settings").select("user_id,brief_email_enabled").eq("watch_enabled", true);
-  if (!users?.length) return NextResponse.json({ ok: true, watched: 0, alerts: 0 });
+  if (!users?.length) return NextResponse.json({ ok: true, watched: 0, alerts: 0, ...grading });
 
   let watched = 0, alertCount = 0;
   for (const u of users) {
@@ -73,5 +78,5 @@ export async function GET(req: Request) {
       }
     } catch { /* per-user best-effort */ }
   }
-  return NextResponse.json({ ok: true, watched, alerts: alertCount });
+  return NextResponse.json({ ok: true, watched, alerts: alertCount, ...grading });
 }

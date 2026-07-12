@@ -100,9 +100,17 @@ export async function POST(req: Request) {
     value: priced.reduce((s, r) => s + r.value, 0),
     asOf: priced.reduce((d, r) => (r.asOfDate > d ? r.asOfDate : d), ""),
     roiPct: 0,
+    spyPct: null as number | null,
+    alphaPct: null as number | null,
   } : null;
   if (totals) {
     totals.roiPct = (totals.value / totals.invested - 1) * 100;
+    // Benchmark the same window against SPY — the honest question is alpha.
+    try {
+      const spySeries = await getCachedSeries(sb, "SPY", since);
+      const spy = spySeries && computeRoi(spySeries, since, INVESTED);
+      if (spy) { totals.spyPct = spy.roiPct; totals.alphaPct = totals.roiPct - spy.roiPct; }
+    } catch { /* benchmark optional */ }
     // Snapshot the day's totals so the all-time scoreboard aggregates without
     // re-pricing (and re-burning provider rate limits). Best-effort.
     try { await sb.from("daily_briefs").update({ roi: { ...totals, since, at: new Date().toISOString() } }).eq("id", id); } catch { /* additive */ }

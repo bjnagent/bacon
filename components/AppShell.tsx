@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Sunrise, Search, Command, History, Radar as RadarIcon, Newspaper } from "lucide-react";
+import { Sunrise, Search, Command, History, Radar as RadarIcon, Newspaper, Building2 } from "lucide-react";
 import { deriveContext, type ChatContext } from "@/lib/prompts";
 import { splitSymCls } from "@/lib/lenses";
 import { cachedJson } from "@/lib/clientCache";
@@ -44,7 +44,7 @@ function StatusBar({ module }: { module: string }) {
       <div className="pr-status-right">
         <span className="pr-status-tag">CONN ●</span>
         <span className="pr-status-tag">DATA · LIVE WEB</span>
-        <span className="pr-status-tag is-warn">NOT ADVICE</span>
+        <span className="pr-status-tag is-warn">AI OPINION</span>
         <Clock />
       </div>
     </div>
@@ -94,6 +94,7 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
     { id: "record", label: "Record", icon: <History size={19} />, active: place === "discover" && discoverTab === "record", go: () => goTab("discover", "record") },
     { id: "radar", label: "Radar", icon: <RadarIcon size={19} />, active: place === "discover" && discoverTab === "radar", go: () => goTab("discover", "radar") },
     { id: "news", label: "News", icon: <Newspaper size={19} />, active: place === "discover" && discoverTab === "news", go: () => goTab("discover", "news") },
+    { id: "property", label: "Property", icon: <Building2 size={19} />, active: place === "discover" && discoverTab === "property", go: () => goTab("discover", "property") },
     { id: "analyze", label: "Analyze", icon: <Search size={19} />, active: place === "analyze", go: () => setPlace("analyze") },
   ];
   const analyzeSym = useCallback((sym: string) => { const { sym: s, cls } = splitSymCls(sym); openAnalyze({ asset: s, cls }); }, [openAnalyze]);
@@ -126,6 +127,7 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
     { id: "record", label: "Track record — how past briefs aged", hint: "cockpit", run: () => { setPlace("discover"); setDiscoverTab("record"); } },
     { id: "radar", label: "Radar — tracking & fresh finds", hint: "cockpit", run: () => { setPlace("discover"); setDiscoverTab("radar"); } },
     { id: "news", label: "News — market headlines", hint: "cockpit", run: () => { setPlace("discover"); setDiscoverTab("news"); } },
+    { id: "property", label: "Property — SG & AU market tracker", hint: "cockpit", run: () => { setPlace("discover"); setDiscoverTab("property"); } },
     { id: "analyze", label: "Analyze — multi-lens cockpit", hint: "workspace", run: () => setPlace("analyze") },
     { id: "discuss", label: "Discuss", hint: "contextual chat", run: () => openChat() },
     { id: "account", label: "Account", hint: "password & sign out", run: () => setTool("account") },

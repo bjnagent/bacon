@@ -3,7 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { askStream } from "@/lib/anthropic";
 import { analysisPrompt } from "@/lib/prompts";
 import { getMacroSnapshot } from "@/lib/macro";
-import { getMovingAverages } from "@/lib/market";
+import { getMovingAverages, cleanTicker } from "@/lib/market";
+import { communityPulse } from "@/lib/grok";
+import { parseBriefing } from "@/lib/parsers";
+import { recordCalls, parseVerdictCall, getCalibrationMemo } from "@/lib/calls";
 import { textStreamResponse } from "@/lib/streamRoute";
 
 // Live web search can take 20–40s; stream the briefing so lens panels appear
@@ -30,22 +33,41 @@ export async function POST(req: Request) {
   } catch { /* macro optional */ }
 
   // Ground the GF-DMA Health lens with REAL moving averages (equities/ETFs only —
-  // the daily series is US-equity data). Real numbers; the model reads the trend.
-  let maCtx = "";
-  if (/equity|stock|etf|fund/i.test(assetClass) || !assetClass) {
-    try {
-      const ma = await getMovingAverages(asset);
-      if (ma) maCtx = `\n\nReal moving-average structure for the HEALTH (GF-DMA) lens (via market-data provider, as of ${ma.asOf}): last ${ma.price.toFixed(2)}; ${ma.smas.map((s) => `${s.period}D ${s.value.toFixed(2)} (${s.abovePct >= 0 ? "+" : ""}${s.abovePct.toFixed(1)}% vs price)`).join(", ")}. Mechanical read: ${ma.classification}. Use these real figures for the HEALTH lens.`;
-    } catch { /* MA optional — HEALTH lens degrades to Limited-data */ }
-  }
+  // the daily series is US-equity data), fetch the community pulse (Grok/X) and
+  // the calibration memo in parallel. A short deadline keeps first-byte fast.
+  const withDeadline = <T,>(p: Promise<T>, ms: number, fallback: T) =>
+    Promise.race([p, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);
+  const isEquity = /equity|stock|etf|fund/i.test(assetClass) || !assetClass;
+  const [ma, pulse, calibration] = await Promise.all([
+    isEquity ? getMovingAverages(asset).catch(() => null) : Promise.resolve(null),
+    withDeadline(communityPulse([asset], `the asset ${asset}`).catch(() => null), 12_000, null),
+    getCalibrationMemo(sb),
+  ]);
+  const maCtx = ma
+    ? `\n\nReal moving-average structure for the HEALTH (GF-DMA) lens (via market-data provider, as of ${ma.asOf}): last ${ma.price.toFixed(2)}; ${ma.smas.map((s) => `${s.period}D ${s.value.toFixed(2)} (${s.abovePct >= 0 ? "+" : ""}${s.abovePct.toFixed(1)}% vs price)`).join(", ")}. Mechanical read: ${ma.classification}. Use these real figures for the HEALTH lens.`
+    : "";
+  const pulseCtx = pulse ? `\n\nCOMMUNITY PULSE (live X via Grok — noisy, contrarian at extremes; weigh crowding in the SIGNALS lens and the VERDICT):\n${pulse.text}` : "";
+  const calCtx = calibration ? `\n\nYOUR CALIBRATION (measured from your graded past calls — correct for these biases in the VERDICT):\n${calibration}` : "";
 
   return textStreamResponse(
     askStream(
       analysisPrompt(),
-      [{ role: "user", content: `Asset: ${asset}\nAsset class: ${assetClass}${macroCtx}${maCtx}\n\nProduce the full multi-lens BACON briefing using current public information.` }],
+      [{ role: "user", content: `Asset: ${asset}\nAsset class: ${assetClass}${macroCtx}${maCtx}${pulseCtx}${calCtx}\n\nProduce the full multi-lens BACON briefing using current public information.` }],
       true,
       1700,
       6
-    )
+    ),
+    async (full, ok) => {
+      if (!ok) return;
+      // Calibration: file the verdict as a graded call (12-mo horizon).
+      const v = parseVerdictCall(parseBriefing(full).VERDICT);
+      if (!v) return;
+      const key = cleanTicker(asset) ?? asset.toUpperCase();
+      await recordCalls(sb, user.id, [{
+        source: "analyze", instrument: asset, action: v.action, conviction: v.conviction,
+        targetText: v.targetText, horizonDays: 365,
+        crowded: pulse?.crowding.get(key) ?? null,
+      }]);
+    }
   );
 }

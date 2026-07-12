@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Sunrise, Radar as RadarIcon, Newspaper, History } from "lucide-react";
+import { Sunrise, Radar as RadarIcon, Newspaper, History, Building2 } from "lucide-react";
 import TodayView from "./TodayView";
 import TrackRecordView from "./TrackRecordView";
 import RadarView from "./RadarView";
 import NewsView from "./NewsView";
+import PropertyView from "./PropertyView";
 import type { ChatContext } from "@/lib/prompts";
 
-export type DiscoverTab = "today" | "record" | "radar" | "news";
+export type DiscoverTab = "today" | "record" | "radar" | "news" | "property";
 
 // The cockpit home. Tabs are lazy-mounted on first visit and then KEPT ALIVE
 // (display:none) — switching back is instant, state and scroll survive, and
@@ -37,11 +38,13 @@ export default function DiscoverView({ tab, setTab, onAnalyze, onDiscuss }: {
         <button role="tab" aria-selected={tab === "record"} className={`pr-seg-btn ${tab === "record" ? "is-on" : ""}`} onClick={() => setTab("record")}><History size={14} /> Record</button>
         <button role="tab" aria-selected={tab === "radar"} className={`pr-seg-btn ${tab === "radar" ? "is-on" : ""}`} onClick={() => setTab("radar")}><RadarIcon size={14} /> Radar</button>
         <button role="tab" aria-selected={tab === "news"} className={`pr-seg-btn ${tab === "news" ? "is-on" : ""}`} onClick={() => setTab("news")}><Newspaper size={14} /> News</button>
+        <button role="tab" aria-selected={tab === "property"} className={`pr-seg-btn ${tab === "property" ? "is-on" : ""}`} onClick={() => setTab("property")}><Building2 size={14} /> Property</button>
       </div>
       {pane("today", <TodayView onAnalyze={onAnalyze} onDiscuss={onDiscuss} />)}
       {pane("record", <TrackRecordView />)}
       {pane("radar", <RadarView onAnalyze={onAnalyze} />)}
       {pane("news", <NewsView onAnalyze={onAnalyze} onDiscuss={onDiscuss} />)}
+      {pane("property", <PropertyView />)}
     </div>
   );
 }
