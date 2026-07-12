@@ -41,6 +41,7 @@ export default function TrackRecordView() {
   const [error, setError] = useState<string | null>(null);
   const [roi, setRoi] = useState<Record<string, RoiData>>({});
   const [pricing, setPricing] = useState<string | null>(null);
+  const [calib, setCalib] = useState<{ total: number; graded: number; memo: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,6 +63,10 @@ export default function TrackRecordView() {
         if (data.migrationNeeded) setMigrationNeeded(true);
       } catch { /* empty state */ }
       finally { if (!cancelled) setLoaded(true); }
+      try {
+        const c = await cachedJson<{ total: number; graded: number; memo: string }>("/api/calibration", 300_000);
+        if (!cancelled && c && typeof c.total === "number") setCalib(c);
+      } catch { /* calibration strip is optional */ }
     })();
     return () => { cancelled = true; };
   }, []);
@@ -116,10 +121,20 @@ export default function TrackRecordView() {
               <div className="pr-score-cell"><span className="pr-score-lbl">Worth today</span><span className={`pr-score-val ${score.roiPct >= 0 ? "is-up" : "is-down"}`}>{usd(score.value)}</span></div>
               <div className="pr-score-cell"><span className="pr-score-lbl">Return</span><span className={`pr-score-val ${score.roiPct >= 0 ? "is-up" : "is-down"}`}>{score.roiPct >= 0 ? "▲" : "▼"} {pct(score.roiPct)}</span></div>
             </>}
+            {score.alphaPct != null && (
+              <div className="pr-score-cell"><span className="pr-score-lbl">vs SPY (alpha)</span><span className={`pr-score-val ${score.alphaPct >= 0 ? "is-up" : "is-down"}`}>{score.alphaPct >= 0 ? "▲" : "▼"} {pct(score.alphaPct)}</span></div>
+            )}
             {score.hitRatePct != null && (
               <div className="pr-score-cell"><span className="pr-score-lbl">Hit rate</span><span className="pr-score-val">{Math.round(score.hitRatePct)}% <em>({score.wins}/{score.graded})</em></span></div>
             )}
-            <div className="pr-score-note">Across {score.pricedDays > 0 ? `${score.pricedDays} priced day${score.pricedDays === 1 ? "" : "s"}` : "graded calls"} — hypothetical $10K per idea, real prices, excludes fees. Not advice.</div>
+            <div className="pr-score-note">Across {score.pricedDays > 0 ? `${score.pricedDays} priced day${score.pricedDays === 1 ? "" : "s"}` : "graded calls"} — hypothetical $10K per idea vs the same money in SPY, real prices, excludes fees.</div>
+          </div>
+        )}
+
+        {calib && calib.total > 0 && (
+          <div className="pr-calib">
+            <span className="pr-calib-lbl">Calibration</span>
+            <span className="pr-calib-body">{calib.memo || `${calib.total} calls filed, ${calib.graded} graded so far — the memo kicks in once cohorts reach statistical size, then feeds back into every future call.`}</span>
           </div>
         )}
 

@@ -10,6 +10,7 @@ import { getMarketSignals, getSectorPerformance, type MarketSignals, type Mover 
 import { getMacroSnapshot, type MacroIndicator } from "./macro";
 import { getCommodityFxSignals, type InstrumentQuote } from "./commodities";
 import { getInsiderClusters, type InsiderCluster } from "./insider";
+import { communityPulse, grokEnabled } from "./grok";
 
 export interface MarketWide {
   movers: Mover[]; losers: Mover[]; mostActive: Mover[];
@@ -17,6 +18,9 @@ export interface MarketWide {
   macro: MacroIndicator[];
   commodities: InstrumentQuote[]; fx: InstrumentQuote[];
   insiders: InsiderCluster[];
+  // Community pulse via Grok/X (null when XAI_API_KEY unset): prompt-grounding
+  // text + per-ticker crowding used to stamp calls for the calibration loop.
+  pulse?: { text: string; crowding: Record<string, string> } | null;
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -46,9 +50,17 @@ export async function fetchMarketWide(insiderDeadlineMs = 8000): Promise<MarketW
     getCommodityFxSignals().catch(() => ({ commodities: [] as InstrumentQuote[], fx: [] as InstrumentQuote[] })),
     withDeadline(getInsiderClusters().catch(() => [] as InsiderCluster[]), insiderDeadlineMs, [] as InsiderCluster[]),
   ]);
+  // Community pulse rides on the day's most visible tickers (needs the movers,
+  // so it runs after the parallel fan-out). One Grok call per day, shared.
+  let pulse: MarketWide["pulse"] = null;
+  if (grokEnabled()) {
+    const tickers = [...signals.gainers, ...signals.mostActive].map((m) => m.ticker).filter(Boolean).slice(0, 10);
+    const p = await communityPulse(tickers, "US markets today").catch(() => null);
+    if (p) pulse = { text: p.text, crowding: Object.fromEntries(p.crowding) };
+  }
   return {
     movers: signals.gainers, losers: signals.losers, mostActive: signals.mostActive,
-    sectors, macro, commodities: commodityFx.commodities, fx: commodityFx.fx, insiders,
+    sectors, macro, commodities: commodityFx.commodities, fx: commodityFx.fx, insiders, pulse,
   };
 }
 

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { readMarketWide, fetchMarketWide } from "@/lib/snapshot";
 import { buildSignalBundle, briefToRows, briefToDailyRow, splitVoices } from "@/lib/brief";
+import { recordCalls, horizonToDays, getCalibrationMemo } from "@/lib/calls";
+import { cleanTicker } from "@/lib/market";
 import { parseOpportunities } from "@/lib/parsers";
 import { opportunityBriefPrompt } from "@/lib/prompts";
 import { askStream } from "@/lib/anthropic";
@@ -49,8 +51,9 @@ export async function POST() {
   // cron) so Sweep-now doesn't refetch every external provider on a cold
   // instance. On a miss, fetch live with a short insider deadline so the stream's
   // first byte isn't held up. The user-specific parts below stay live and cheap.
-  const [marketWide, themesRes, trackedRes, newsRes, settingsRes] = await Promise.all([
+  const [marketWide, calibration, themesRes, trackedRes, newsRes, settingsRes] = await Promise.all([
     readMarketWide(sb).then((cached) => cached ?? fetchMarketWide(2500)),
+    getCalibrationMemo(sb),
     sb.from("themes").select("label"),
     sb.from("watchlist").select("symbol"),
     sb.from("news_items").select("headline,source,why").order("created_at", { ascending: false }).limit(10),
@@ -69,6 +72,8 @@ export async function POST() {
     voices: splitVoices((settingsRes.data as { voices?: string } | null)?.voices),
     commodities: marketWide.commodities,
     fx: marketWide.fx,
+    pulse: marketWide.pulse?.text,
+    calibration,
   });
 
   return textStreamResponse(
@@ -81,6 +86,16 @@ export async function POST() {
       const rows = briefToRows(user.id, brief);
       await sb.from("scout_picks").delete().in("kind", ["opportunity", "brief-intro"]);
       await sb.from("scout_picks").insert(rows);
+      // Calibration: file every actionable call, stamped with community
+      // crowding at call time so the loop can grade hot vs quiet entries.
+      const crowding = marketWide.pulse?.crowding ?? {};
+      await recordCalls(sb, user.id, brief.items.filter((o) => o.action).map((o) => ({
+        source: "brief" as const,
+        instrument: (o.ticker && o.ticker !== "—" ? o.ticker : o.name),
+        action: o.action, targetText: o.target,
+        horizonDays: horizonToDays(o.horizon),
+        crowded: crowding[cleanTicker(o.ticker) ?? ""] ?? null,
+      })));
     }
   );
 }

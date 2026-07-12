@@ -220,3 +220,29 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
+
+-- calibration loop: every explicit call, stamped with context (incl. community
+-- crowding), graded later vs real prices + SPY; aggregates feed the prompts.
+create table if not exists calls (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  source text not null,
+  instrument text not null,
+  action text not null,
+  conviction int,
+  target_text text,
+  target_base numeric,
+  target_kind text,
+  horizon_date date not null,
+  crowded text,
+  created_at timestamptz default now(),
+  actual_pct numeric,
+  bench_pct numeric,
+  direction_hit boolean,
+  target_err_pct numeric,
+  graded_at timestamptz
+);
+create index if not exists calls_user_created on calls (user_id, created_at desc);
+alter table calls enable row level security;
+drop policy if exists "own calls" on calls;
+create policy "own calls" on calls for all using (auth.uid() = user_id) with check (auth.uid() = user_id);

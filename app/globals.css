@@ -1119,3 +1119,8 @@ body { background: #EBE8E0; color: #1A1712; }
 /* Rent-vs-mortgage carry callout — the "does the math work" row. */
 .pr-carry{font-size:12px;color:var(--ink);background:rgba(30,142,76,0.05);border:1px solid var(--line);border-left:3px solid var(--good);border-radius:5px;padding:9px 11px;line-height:1.55;margin-bottom:9px}
 .pr-carry span{font-family:var(--fm);color:var(--good);font-size:10.5px;letter-spacing:0.06em;margin-right:5px;font-weight:600}
+
+/* Calibration strip — the system's own graded report card on Record. */
+.pr-calib{display:flex;gap:10px;align-items:flex-start;background:var(--card);border:1.5px solid var(--line2);border-radius:13px;padding:12px 15px;margin-bottom:14px;box-shadow:3px 4px 0 var(--line2)}
+.pr-calib-lbl{font-family:var(--fm);font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--accent);font-weight:600;padding-top:2px;flex-shrink:0}
+.pr-calib-body{font-size:12.5px;color:var(--ink2);line-height:1.55}
