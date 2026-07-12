@@ -263,6 +263,8 @@ Output ONLY in this exact format:
 <2 sentences: the rate environment (SORA / RBA cash rate, mortgage rates) and what it's doing to affordability and demand right now>
 ===SUPPLY===
 <2 sentences: pipeline and inventory — launches, completions, vacancy — tightening or loosening?>
+===DEVELOPMENT===
+<2-3 sentences: district development and major projects being built or planned that change this market — transport lines (MRT/metro/rail), new towns and business hubs, master-plan rezonings (URA Master Plan / state infrastructure pipelines), major private projects. Name the specific projects and rough timelines from current reporting, and say which districts/corridors they lift (or burden with supply).>
 ===SENTIMENT===
 <2 sentences: what transaction volumes, auction clearance rates, developer behaviour and press tone say about mood — cite the reporting>
 ===RENTAL===

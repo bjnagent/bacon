@@ -15,7 +15,7 @@ interface Valuation { entryDate: string; asOfDate: string; value: number; deltaP
 interface Holding { id: string; label: string; market_key: string; purchase_price: number; purchase_date: string; valuation: Valuation | null }
 interface Outlook {
   read: string; confirm: string; kill: string; stance: StanceKey;
-  policy?: string; rates?: string; supply?: string; sentiment?: string; rental?: string;
+  policy?: string; rates?: string; supply?: string; development?: string; sentiment?: string; rental?: string;
   scenarios?: string; longrun?: string; carry?: string;
   verdict?: string; drivers?: string; stanceWhy?: string; // drivers = legacy shape
 }
@@ -89,6 +89,7 @@ export default function PropertyView() {
         return {
           read: sec.READ, policy: sec.POLICY, rates: sec.RATES, supply: sec.SUPPLY, sentiment: sec.SENTIMENT,
           rental: sec.RENTAL, scenarios: sec.SCENARIOS, longrun: sec.LONGRUN, carry: sec.CARRY, verdict: sec.VERDICT,
+          development: sec.DEVELOPMENT,
           confirm: sec.CONFIRM || "", kill: sec.KILL || "", stance,
         };
       };
@@ -166,7 +167,7 @@ export default function PropertyView() {
                       return <div className={`pr-verdict-banner ${tone}`}><div className="pr-verdict-call">{o.verdict}</div></div>;
                     })() : st && <span className="pr-panel-stance" style={{ color: st.tone, borderColor: st.tone }}>{st.label}</span>}
                     <p>{o.read}</p>
-                    {([["POLICY", o.policy], ["RATES", o.rates], ["SUPPLY", o.supply], ["SENTIMENT", o.sentiment], ["RENTAL", o.rental]] as const)
+                    {([["POLICY", o.policy], ["RATES", o.rates], ["SUPPLY", o.supply], ["DEVELOPMENT", o.development], ["SENTIMENT", o.sentiment], ["RENTAL", o.rental]] as const)
                       .filter(([, v]) => v)
                       .map(([k, v]) => <div key={k} className="pr-prop-dim"><span>{k}</span> {v}</div>)}
                     {o.scenarios && <div className="pr-pick-now"><span>12-MO SCENARIOS (EST.) ▸</span> {o.scenarios}</div>}
