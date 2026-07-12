@@ -82,34 +82,77 @@ export function cleanTicker(raw: string | null | undefined): string | null {
 const seriesCache = new Map<string, { at: number; data: DailySeries }>();
 const SERIES_TTL_MS = 30 * 60 * 1000;
 
-async function fetchDailyBars(ticker: string, full: boolean): Promise<DailyBar[]> {
+const UA = "Mozilla/5.0 (compatible; BaconResearch/1.0)";
+const clean = (bars: DailyBar[]) =>
+  bars.filter((b) => /^\d{4}-\d{2}-\d{2}$/.test(b.date) && Number.isFinite(b.close) && b.close > 0)
+      .sort((a, b) => (a.date < b.date ? 1 : -1)); // newest-first
+
+// --- Source 1: Stooq (keyless, no daily cap) — one CSV = full daily history. ---
+async function fetchStooq(ticker: string): Promise<DailyBar[]> {
+  const sym = ticker.toLowerCase().replace(/\./g, "-"); // BRK.B → brk-b
+  const res = await fetch(`https://stooq.com/q/d/l/?s=${encodeURIComponent(sym)}.us&i=d`, { cache: "no-store", headers: { "User-Agent": UA } });
+  if (!res.ok) return [];
+  const text = await res.text();
+  if (!/^Date,/i.test(text)) return []; // "N/A" / error page
+  return clean(text.trim().split("\n").slice(1).map((line) => {
+    const c = line.split(",");
+    return { date: c[0], close: parseFloat(c[4]) }; // Date,Open,High,Low,Close,Volume
+  }));
+}
+
+// --- Source 2: Yahoo chart v8 (keyless) — history + current in one JSON. ---
+async function fetchYahoo(ticker: string): Promise<DailyBar[]> {
+  const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=2y&interval=1d`, { cache: "no-store", headers: { "User-Agent": UA } });
+  if (!res.ok) return [];
+  const data = await res.json();
+  const r = data?.chart?.result?.[0];
+  const ts: number[] = r?.timestamp, closes: (number | null)[] = r?.indicators?.quote?.[0]?.close;
+  if (!Array.isArray(ts) || !Array.isArray(closes)) return [];
+  // Number(null) → 0 and Number(undefined) → NaN, both dropped by clean().
+  return clean(ts.map((t, i) => ({ date: new Date(t * 1000).toISOString().slice(0, 10), close: Number(closes[i]) })));
+}
+
+// --- Source 3: Alpha Vantage (needs a key, 25/day) — last-resort fallback. ---
+async function fetchAlphaVantage(ticker: string, full: boolean): Promise<DailyBar[]> {
+  if (!KEY || PROVIDER !== "alphavantage") return [];
   const size = full ? "full" : "compact"; // compact = last 100 trading days
   const res = await fetch(`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodeURIComponent(ticker)}&outputsize=${size}&apikey=${KEY}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`market data request failed (${res.status})`);
   const data = await res.json();
   if (data?.Information) throw new Error(`market data: ${String(data.Information).slice(0, 120)}`);
-  const ts = data?.["Time Series (Daily)"];
-  if (!ts || typeof ts !== "object") return [];
-  return Object.entries(ts as Record<string, Record<string, string>>)
-    .map(([date, bar]) => ({ date, close: parseFloat(bar?.["4. close"]) }))
-    .filter((b) => Number.isFinite(b.close))
-    .sort((a, b) => (a.date < b.date ? 1 : -1)); // newest-first
+  const tsd = data?.["Time Series (Daily)"];
+  if (!tsd || typeof tsd !== "object") return [];
+  return clean(Object.entries(tsd as Record<string, Record<string, string>>).map(([date, bar]) => ({ date, close: parseFloat(bar?.["4. close"]) })));
 }
 
-// Daily close series for one ticker. `since` (YYYY-MM-DD) is the flag date we
-// must reach back to: the compact window covers ~100 trading days; if `since`
-// predates that, we fetch the full history once so the entry price still exists.
+// Daily close series for one ticker, tried across sources KEYLESS-FIRST so we
+// don't lean on any metered tier: Stooq → Yahoo → Alpha Vantage. First source
+// whose history reaches `since` (the flag date) wins; otherwise the longest
+// partial. Every source is validated (finite, positive, real dates) — a bad or
+// blocked source silently yields to the next, never a fabricated number.
 export async function getDailySeries(rawTicker: string, since?: string): Promise<DailySeries | null> {
-  if (!KEY || PROVIDER !== "alphavantage") return null;
   const ticker = cleanTicker(rawTicker);
   if (!ticker) return null;
   const reaches = (bars: DailyBar[]) => bars.length > 0 && (!since || bars[bars.length - 1].date <= since);
   const cached = seriesCache.get(ticker);
   if (cached && Date.now() - cached.at < SERIES_TTL_MS && reaches(cached.data.bars)) return cached.data;
-  let bars = await fetchDailyBars(ticker, false);
-  if (bars.length && !reaches(bars)) bars = await fetchDailyBars(ticker, true);
-  if (!bars.length) return null;
-  const out: DailySeries = { ticker, bars };
+
+  const sources: Array<() => Promise<DailyBar[]>> = [
+    () => fetchStooq(ticker),
+    () => fetchYahoo(ticker),
+    async () => { let b = await fetchAlphaVantage(ticker, false); if (b.length && !reaches(b)) b = await fetchAlphaVantage(ticker, true); return b; },
+  ];
+  let best: DailyBar[] = [];
+  let lastErr: unknown = null;
+  for (const src of sources) {
+    try {
+      const bars = await src();
+      if (reaches(bars)) { best = bars; break; }
+      if (bars.length > best.length) best = bars;
+    } catch (err) { lastErr = err; }
+  }
+  if (!best.length) { if (lastErr) throw lastErr; return null; }
+  const out: DailySeries = { ticker, bars: best };
   seriesCache.set(ticker, { at: Date.now(), data: out });
   return out;
 }

@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getDailySeries, computeRoi, cleanTicker, marketDataEnabled, type RoiPoint } from "@/lib/market";
-import { resolveInstrument, priceInstrumentRoi, formatLevel, commoditiesEnabled, type Instrument } from "@/lib/commodities";
+import { getDailySeries, computeRoi, cleanTicker, type RoiPoint } from "@/lib/market";
+import { resolveInstrument, priceInstrumentRoi, formatLevel, type Instrument } from "@/lib/commodities";
 import type { StoredBriefItem } from "@/lib/brief";
 
 export const maxDuration = 60;
 
 // The hypothetical: $10,000 placed at each opportunity's flag-day level, valued
 // at today's. Live (not stored) — "today" moves — and grounded entirely in real
-// prices: US equities via Alpha Vantage, commodities/FX via FRED. Skips items
-// with no resolvable instrument.
+// prices: US equities via keyless sources (Stooq/Yahoo, Alpha Vantage fallback),
+// commodities/FX via FRED. Skips items with no resolvable instrument.
 const INVESTED = 10_000;
 
 // Commodity/FX rows carry preformatted level strings (e.g. "78.20 $/bbl") so the
@@ -21,7 +21,6 @@ export async function POST(req: Request) {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  if (!marketDataEnabled() && !commoditiesEnabled()) return NextResponse.json({ unavailable: true, error: "Price data isn't configured — add MARKET_DATA_API_KEY (equities) and/or FRED_API_KEY (commodities & FX) to price this." });
 
   let body: { id?: string };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Bad request" }, { status: 400 }); }
@@ -44,7 +43,6 @@ export async function POST(req: Request) {
     if (ins) return ins.investable ? { kind: "fred", ins } : { kind: "skip", ticker: ins.label, reason: "FX pair — tracked as a signal; direction-ambiguous to price" };
     const ticker = cleanTicker(o.ticker);
     if (!ticker) return { kind: "skip", ticker: o.ticker || "—", reason: "no ticker" };
-    if (!marketDataEnabled()) return { kind: "skip", ticker, reason: "equity pricing needs MARKET_DATA_API_KEY" };
     return { kind: "equity", ticker };
   });
 

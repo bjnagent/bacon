@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { cleanTicker, closeOnOrBefore, computeRoi, movingAveragesFrom, type DailySeries, type DailyBar } from "./market";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { cleanTicker, closeOnOrBefore, computeRoi, movingAveragesFrom, getDailySeries, type DailySeries, type DailyBar } from "./market";
 
 describe("cleanTicker", () => {
   it("pulls a plausible symbol out of the stored ticker field", () => {
@@ -76,5 +76,44 @@ describe("movingAveragesFrom", () => {
   it("uses only the MA windows it has data for", () => {
     const ma = movingAveragesFrom(maBars(60, (i) => 100 - i * 0.1))!;
     expect(ma.smas.map((s) => s.period)).toEqual([20, 50]);
+  });
+});
+
+// Route fetch by URL fragment; anything unmatched 404s (empty).
+function mockFetch(handlers: [string, () => { ok: boolean; text?: () => Promise<string>; json?: () => Promise<unknown> }][]) {
+  return vi.fn(async (url: string) => {
+    for (const [frag, resp] of handlers) if (String(url).includes(frag)) return resp();
+    return { ok: false, status: 404, text: async () => "", json: async () => ({}) };
+  });
+}
+const unix = (d: string) => Math.floor(new Date(d + "T00:00:00Z").getTime() / 1000);
+
+describe("getDailySeries (keyless-first, multi-source)", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("parses Stooq CSV (keyless) and prices from it — no API key needed", async () => {
+    vi.stubGlobal("fetch", mockFetch([["stooq", () => ({ ok: true, text: async () => "Date,Open,High,Low,Close,Volume\n2026-07-01,1,1,1,100,1\n2026-07-08,1,1,1,110,1\n2026-07-09,1,1,1,120,1" })]]));
+    const s = await getDailySeries("STQTST", "2026-07-01");
+    expect(s?.bars[0].close).toBe(120); // newest-first
+    expect(computeRoi(s!, "2026-07-01", 10_000)?.value).toBeCloseTo(12_000, 6);
+  });
+
+  it("falls back to Yahoo when Stooq yields nothing", async () => {
+    vi.stubGlobal("fetch", mockFetch([
+      ["stooq", () => ({ ok: true, text: async () => "N/A" })],
+      ["query1.finance.yahoo", () => ({ ok: true, json: async () => ({ chart: { result: [{ timestamp: [unix("2026-07-01"), unix("2026-07-08"), unix("2026-07-09")], indicators: { quote: [{ close: [100, 110, 132] }] } }] } }) })],
+    ]));
+    const s = await getDailySeries("YHOTST", "2026-07-01");
+    expect(s?.bars[0].close).toBe(132);
+    expect(computeRoi(s!, "2026-07-01", 10_000)?.roiPct).toBeCloseTo(32, 6);
+  });
+
+  it("drops null/zero closes from Yahoo rather than fabricating them", async () => {
+    vi.stubGlobal("fetch", mockFetch([
+      ["stooq", () => ({ ok: true, text: async () => "N/A" })],
+      ["query1.finance.yahoo", () => ({ ok: true, json: async () => ({ chart: { result: [{ timestamp: [unix("2026-07-01"), unix("2026-07-08"), unix("2026-07-09")], indicators: { quote: [{ close: [100, null, 120] }] } }] } }) })],
+    ]));
+    const s = await getDailySeries("YHONULL", "2026-07-01");
+    expect(s?.bars.map((b) => b.close)).toEqual([120, 100]); // the null bar is gone
   });
 });
