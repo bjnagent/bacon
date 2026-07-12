@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getDailySeries, computeRoi, cleanTicker, type RoiPoint } from "@/lib/market";
+import { computeRoi, cleanTicker, type RoiPoint } from "@/lib/market";
+import { getCachedSeries } from "@/lib/priceCache";
 import { resolveInstrument, priceInstrumentRoi, formatLevel, type Instrument } from "@/lib/commodities";
 import type { StoredBriefItem } from "@/lib/brief";
 
@@ -82,7 +83,7 @@ export async function POST(req: Request) {
     const o = items[i];
     if (rateLimited) { results[i] = { name: o.name, ticker: plan.ticker, skipped: RATE_LIMIT }; continue; }
     try {
-      const series = await getDailySeries(plan.ticker, since);
+      const series = await getCachedSeries(sb, plan.ticker, since);
       const roi = series && computeRoi(series, since, INVESTED);
       results[i] = roi ? { name: o.name, ...roi } : { name: o.name, ticker: plan.ticker, skipped: "no price history" };
     } catch (err) {
