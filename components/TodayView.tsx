@@ -154,7 +154,8 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
         {hasBrief && (
           <>
             {brief!.intro && <div className="pr-summary">{brief!.intro}</div>}
-            <div className="pr-opp-list">
+            {/* Announce opportunities to assistive tech as they stream in. */}
+            <div className="pr-opp-list" aria-live="polite" aria-busy={generating}>
               {brief!.items.map((o, i) => {
                 const sym = (o.ticker && o.ticker !== "—") ? o.ticker : o.name;
                 const isTracked = tracked[sym.toUpperCase()];

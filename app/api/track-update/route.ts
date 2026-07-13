@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ask } from "@/lib/anthropic";
 import { trackingUpdatePrompt } from "@/lib/prompts";
 import { parseTrackingUpdate } from "@/lib/parsers";
+import { withinQuota, QUOTA_MESSAGE } from "@/lib/quota";
 
 export const maxDuration = 300;
 
@@ -19,6 +20,7 @@ export async function POST(req: Request) {
   const symbol = String(body.symbol || "").trim().slice(0, 120);
   const assetClass = String(body.assetClass || "").trim().slice(0, 60);
   if (!id || !symbol) return NextResponse.json({ error: "Missing id or symbol" }, { status: 400 });
+  if (!(await withinQuota(sb))) return NextResponse.json({ error: QUOTA_MESSAGE }, { status: 429 });
 
   try {
     const text = await ask(

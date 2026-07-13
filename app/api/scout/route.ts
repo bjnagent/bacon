@@ -4,6 +4,7 @@ import { ask } from "@/lib/anthropic";
 import { scoutPrompt } from "@/lib/prompts";
 import { parseScout } from "@/lib/parsers";
 import { SCOUT_PICK_COLUMNS } from "@/lib/types";
+import { withinQuota, QUOTA_MESSAGE } from "@/lib/quota";
 
 export const maxDuration = 300;
 
@@ -28,6 +29,7 @@ export async function POST(req: Request) {
   let body: { themes?: string[] };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Bad request" }, { status: 400 }); }
   const themes = Array.isArray(body.themes) ? body.themes.map((t) => String(t).slice(0, 80)).filter(Boolean).slice(0, 20) : [];
+  if (!(await withinQuota(sb))) return NextResponse.json({ error: QUOTA_MESSAGE }, { status: 429 });
 
   try {
     const text = await ask(

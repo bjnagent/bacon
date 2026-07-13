@@ -8,6 +8,7 @@ import { marketByKey, getPropertySeries, computeMarketStats } from "@/lib/proper
 import { communityPulse } from "@/lib/grok";
 import { recordCalls, getCalibrationMemo } from "@/lib/calls";
 import { textStreamResponse } from "@/lib/streamRoute";
+import { withinQuota, QUOTA_MESSAGE } from "@/lib/quota";
 
 export const maxDuration = 300;
 
@@ -23,6 +24,7 @@ export async function POST(req: Request) {
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Bad request" }, { status: 400 }); }
   const market = marketByKey(String(body.market || ""));
   if (!market) return NextResponse.json({ error: "Unknown market" }, { status: 400 });
+  if (!(await withinQuota(sb))) return NextResponse.json({ error: QUOTA_MESSAGE }, { status: 429 });
 
   const withDeadline = <T,>(p: Promise<T>, ms: number, fallback: T) =>
     Promise.race([p, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);

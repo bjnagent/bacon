@@ -1,12 +1,28 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { ask } from "@/lib/anthropic";
+import { createClient } from "@/lib/supabase/server";
 
-// Health + configuration diagnostic. Reports which providers are wired (presence
-// only — never the keys) and pings Anthropic. Handy for verifying env vars on a
-// fresh deploy without exposing secrets.
+// Health + configuration diagnostic. The DETAILED body — which providers are
+// wired (presence only, never the keys) plus an Anthropic probe — is GATED: it's
+// returned only to a CRON_SECRET bearer or a signed-in user. Unauthenticated
+// callers get a bare liveness `{ ok: true }`. That stops the open web from
+// enumerating the stack (which providers are on) and from burning Anthropic
+// quota by hammering this route.
 export const maxDuration = 30;
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = req.headers.get("authorization");
+  let authorized = !!process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`;
+  if (!authorized) {
+    try {
+      const sb = await createClient();
+      const { data: { user } } = await sb.auth.getUser();
+      authorized = !!user;
+    } catch { /* treat as unauthenticated */ }
+  }
+  // Public liveness ping only — no infra details, no upstream call.
+  if (!authorized) return NextResponse.json({ ok: true });
+
   const providers = {
     anthropic: !!process.env.ANTHROPIC_API_KEY,
     gemini: !!process.env.GEMINI_API_KEY,

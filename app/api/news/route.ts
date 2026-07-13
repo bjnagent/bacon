@@ -4,6 +4,7 @@ import { askCheap } from "@/lib/ai";
 import { newsPrompt } from "@/lib/prompts";
 import { parseNews } from "@/lib/parsers";
 import { NEWS_COLUMNS } from "@/lib/types";
+import { withinQuota, QUOTA_MESSAGE } from "@/lib/quota";
 
 export const maxDuration = 300;
 
@@ -28,6 +29,7 @@ export async function POST(req: Request) {
   try { body = await req.json(); } catch { body = {}; }
   const source = String(body.source || "All").slice(0, 60);
   const focus = String(body.focus || "").trim().slice(0, 200);
+  if (!(await withinQuota(sb))) return NextResponse.json({ error: QUOTA_MESSAGE }, { status: 429 });
 
   try {
     const text = await askCheap(

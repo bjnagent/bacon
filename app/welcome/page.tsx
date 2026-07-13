@@ -46,7 +46,7 @@ export default async function WelcomePage() {
               <div className="pr-w-card-title">Multi-lens analysis</div>
               <div className="pr-w-card-body">
                 Any name gets the full latticework — business, valuation, momentum, trend
-                health, macro, sentiment, risk — with live web research and charts.
+                health, factor, macro, sentiment, risk — with live web research and charts.
               </div>
             </div>
             <div className="pr-w-card">

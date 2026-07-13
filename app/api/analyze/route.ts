@@ -8,6 +8,7 @@ import { communityPulse } from "@/lib/grok";
 import { parseBriefing } from "@/lib/parsers";
 import { recordCalls, parseVerdictCall, getCalibrationMemo } from "@/lib/calls";
 import { textStreamResponse } from "@/lib/streamRoute";
+import { withinQuota, QUOTA_MESSAGE } from "@/lib/quota";
 
 // Live web search can take 20–40s; stream the briefing so lens panels appear
 // as they're written instead of after the whole generation.
@@ -23,6 +24,7 @@ export async function POST(req: Request) {
   const asset = String(body.asset || "").trim().slice(0, 120);
   const assetClass = String(body.assetClass || "").trim().slice(0, 60);
   if (!asset) return NextResponse.json({ error: "Missing asset" }, { status: 400 });
+  if (!(await withinQuota(sb))) return NextResponse.json({ error: QUOTA_MESSAGE }, { status: 429 });
 
   // Ground the Macro lens with the real FRED backdrop (cached). It's context for
   // reasoning, not the asset's own figures — the prompt still web-searches facts.

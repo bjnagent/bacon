@@ -109,7 +109,7 @@ create table if not exists market_snapshots (
 );
 alter table market_snapshots enable row level security;
 drop policy if exists "read snapshots" on market_snapshots;
-create policy "read snapshots" on market_snapshots for select using (auth.role() = 'authenticated');
+create policy "read snapshots" on market_snapshots for select using ((select auth.role()) = 'authenticated');
 
 -- shared price cache: one row per ticker with its full daily-close history, so a
 -- ticker is fetched at most once/UTC-day across all users (immutable history
@@ -122,7 +122,7 @@ create table if not exists ticker_series (
 );
 alter table ticker_series enable row level security;
 drop policy if exists "read ticker_series" on ticker_series;
-create policy "read ticker_series" on ticker_series for select using (auth.role() = 'authenticated');
+create policy "read ticker_series" on ticker_series for select using ((select auth.role()) = 'authenticated');
 
 -- property tracker (SG + AU): shared index cache + per-user portfolio + outlooks
 create table if not exists property_series (
@@ -132,7 +132,7 @@ create table if not exists property_series (
 );
 alter table property_series enable row level security;
 drop policy if exists "read property_series" on property_series;
-create policy "read property_series" on property_series for select using (auth.role() = 'authenticated');
+create policy "read property_series" on property_series for select using ((select auth.role()) = 'authenticated');
 
 create table if not exists properties (
   id uuid primary key default gen_random_uuid(),
@@ -146,7 +146,7 @@ create table if not exists properties (
 );
 alter table properties enable row level security;
 drop policy if exists "own properties" on properties;
-create policy "own properties" on properties for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "own properties" on properties for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
 create table if not exists property_outlooks (
   id uuid primary key default gen_random_uuid(),
@@ -158,7 +158,7 @@ create table if not exists property_outlooks (
 );
 alter table property_outlooks enable row level security;
 drop policy if exists "own property_outlooks" on property_outlooks;
-create policy "own property_outlooks" on property_outlooks for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "own property_outlooks" on property_outlooks for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
 -- discuss chat history
 create table if not exists chat_messages (
@@ -193,14 +193,28 @@ drop policy if exists "own news"     on news_items;
 drop policy if exists "own chat"     on chat_messages;
 drop policy if exists "own briefs"   on daily_briefs;
 
-create policy "own profile"   on profiles      for all using (auth.uid() = id)       with check (auth.uid() = id);
-create policy "own settings"  on settings      for all using (auth.uid() = user_id)  with check (auth.uid() = user_id);
-create policy "own watch"     on watchlist     for all using (auth.uid() = user_id)  with check (auth.uid() = user_id);
-create policy "own themes"    on themes        for all using (auth.uid() = user_id)  with check (auth.uid() = user_id);
-create policy "own picks"     on scout_picks   for all using (auth.uid() = user_id)  with check (auth.uid() = user_id);
-create policy "own news"      on news_items    for all using (auth.uid() = user_id)  with check (auth.uid() = user_id);
-create policy "own chat"      on chat_messages for all using (auth.uid() = user_id)  with check (auth.uid() = user_id);
-create policy "own briefs"    on daily_briefs   for all using (auth.uid() = user_id)  with check (auth.uid() = user_id);
+-- auth.uid() is wrapped in a scalar subselect so Postgres evaluates it ONCE per
+-- statement instead of once per row (the auth_rls_initplan lint) — a real win on
+-- any multi-row scan. Semantics are identical.
+create policy "own profile"   on profiles      for all using ((select auth.uid()) = id)       with check ((select auth.uid()) = id);
+create policy "own settings"  on settings      for all using ((select auth.uid()) = user_id)  with check ((select auth.uid()) = user_id);
+create policy "own watch"     on watchlist     for all using ((select auth.uid()) = user_id)  with check ((select auth.uid()) = user_id);
+create policy "own themes"    on themes        for all using ((select auth.uid()) = user_id)  with check ((select auth.uid()) = user_id);
+create policy "own picks"     on scout_picks   for all using ((select auth.uid()) = user_id)  with check ((select auth.uid()) = user_id);
+create policy "own news"      on news_items    for all using ((select auth.uid()) = user_id)  with check ((select auth.uid()) = user_id);
+create policy "own chat"      on chat_messages for all using ((select auth.uid()) = user_id)  with check ((select auth.uid()) = user_id);
+create policy "own briefs"    on daily_briefs   for all using ((select auth.uid()) = user_id)  with check ((select auth.uid()) = user_id);
+
+-- Covering indexes for the per-user foreign keys. Every RLS-filtered query
+-- carries a `user_id = auth.uid()` predicate, so without these each read is a
+-- sequential scan. Composite where the list query also orders/filters.
+create index if not exists watchlist_user          on watchlist(user_id);
+create index if not exists themes_user             on themes(user_id);
+create index if not exists scout_picks_user_kind   on scout_picks(user_id, kind);
+create index if not exists news_items_user_created  on news_items(user_id, created_at desc);
+create index if not exists chat_messages_conv       on chat_messages(conversation_id, created_at);
+create index if not exists chat_messages_user_created on chat_messages(user_id, created_at desc);
+create index if not exists properties_user          on properties(user_id);
 
 -- auto-create profile + settings on signup.
 -- security definer hardening: pinned search_path (schema-shadowing) and no
@@ -243,6 +257,43 @@ create table if not exists calls (
   graded_at timestamptz
 );
 create index if not exists calls_user_created on calls (user_id, created_at desc);
+-- Idempotency for repeat sweeps: a natural key so re-recording the same call on
+-- the same UTC day upserts instead of piling up duplicate rows (which would
+-- inflate the calibration cohorts). Backfilled from created_at for existing rows.
+alter table calls add column if not exists call_date date;
+update calls set call_date = (created_at at time zone 'utc')::date where call_date is null;
+alter table calls alter column call_date set default (now() at time zone 'utc')::date;
+create unique index if not exists calls_dedup on calls (user_id, source, instrument, call_date);
 alter table calls enable row level security;
 drop policy if exists "own calls" on calls;
-create policy "own calls" on calls for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "own calls" on calls for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+
+-- ---------------------------------------------------------------------------
+-- Per-user daily AI usage meter — backs the rate-limit gate (lib/quota.ts) that
+-- caps expensive web-search AI calls so one account can't run up an unbounded
+-- Anthropic/search bill. Written via bump_ai_usage(); the app fails OPEN if this
+-- object is missing, so shipping the code before this migration is safe.
+create table if not exists ai_usage (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  day date not null default (now() at time zone 'utc')::date,
+  calls int not null default 0,
+  primary key (user_id, day)
+);
+alter table ai_usage enable row level security;
+drop policy if exists "own usage" on ai_usage;
+create policy "own usage" on ai_usage for select using ((select auth.uid()) = user_id);
+
+-- Atomic increment + limit check. SECURITY DEFINER with a pinned empty
+-- search_path (schema-shadowing safe); only signed-in callers may execute it.
+create or replace function public.bump_ai_usage(p_limit int)
+returns boolean language plpgsql security definer set search_path = '' as $$
+declare n int;
+begin
+  insert into public.ai_usage (user_id, calls) values (auth.uid(), 1)
+    on conflict (user_id, day) do update set calls = public.ai_usage.calls + 1
+    returning calls into n;
+  return n <= p_limit;
+end;
+$$;
+revoke execute on function public.bump_ai_usage(int) from public, anon;
+grant  execute on function public.bump_ai_usage(int) to authenticated;

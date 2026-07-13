@@ -1,8 +1,8 @@
 # Bacon — Investment Research Tool
 
-> **Status:** an automated opportunity cockpit. The nightly sweep pieces together the day's market signals — real movers, sector rotation, macro, news, SEC insider-buy clusters, tracked voices — into a ranked morning brief, with Analyze (six-lens deep dives), a self-grading track record, Radar, News, and a context-aware Discuss chat on top of the self-hosting layer (server routes, Supabase auth, daily background sweep, embedded live charts). Extras: persona lenses, password/account auth, PWA install, error pages, a health diagnostic, and a Vitest suite with CI.
+> **Status:** an automated opportunity cockpit. The nightly sweep pieces together the day's market signals — real movers, sector rotation, macro, news, SEC insider-buy clusters, tracked voices — into a ranked morning brief, with Analyze (eight-lens deep dives), a self-grading track record, Radar, News, and a context-aware Discuss chat on top of the self-hosting layer (server routes, Supabase auth, daily background sweep, embedded live charts). Extras: persona lenses, password/account auth, PWA install, error pages, a health diagnostic, and a Vitest suite with CI.
 
-An **automated opportunity cockpit**: every day the system pieces together real market signals — movers, headlines, the macro backdrop, your themes — and surfaces under-the-radar, coming-up-on-the-horizon opportunities on its own. You open it to *see what it found*, not to search. Deep-dives run through six independent professional lenses (Fundamental, Technical, Factor, Macro/Regulatory, Smart Money/Signals, Risk); conviction comes from **convergence** across independent signals, never a single indicator.
+An **automated opportunity cockpit**: every day the system pieces together real market signals — movers, headlines, the macro backdrop, your themes — and surfaces under-the-radar, coming-up-on-the-horizon opportunities on its own. You open it to *see what it found*, not to search. Deep-dives run through eight independent professional lenses (Fundamental, Valuation, Technical, Trend-health, Factor, Macro/Regulatory, Smart Money/Signals, Risk); conviction comes from **convergence** across independent signals, never a single indicator.
 
 **Visual identity:** "Daylight Instrument" — warm bone/graph-paper canvas, near-black ink, safety-orange accent, six lens hues as channel colours.
 
@@ -24,9 +24,9 @@ An **automated opportunity cockpit**: every day the system pieces together real 
 ## What works today
 
 - **Auth:** Supabase **email + password** (sign in / create account) with **magic-link** as a fallback → session → protected app shell. Session refresh + route protection in `proxy.ts` (Next 16's renamed middleware). Password sign-up is instant when "Confirm email" is off in Supabase. An **Account** tab (`/api/account/password`) lets the user change their password — handy for setting one after a magic-link-only signup.
-- **Shell:** the full "Bacon look" — left rail nav, status bar, six-lens spectrum, bacon-rasher logo.
+- **Shell:** the full "Bacon look" — left rail nav, status bar, eight-lens spectrum, bacon-rasher logo.
 - **Radar (Phase 2 slice, home view):** a Scout + Tracking dashboard. **Tracking** lists your names with qualitative monitoring updates (`/api/track-update`) and editable thesis / conviction / note — all persisted to `watchlist`. **Scout** runs `/api/scout` on your saved `themes` to surface timely candidates; track a pick or jump straight into its lenses.
-- **Analyze (Phase 2 slice):** run any asset through the six-lens cockpit. Calls `/api/analyze` → live web search → parsed briefing with per-lens stances, a convergence gauge, summary + bottom line. **Bull vs Bear** runs `/api/debate`. **Save to radar** persists to `watchlist`.
+- **Analyze (Phase 2 slice):** run any asset through the eight-lens cockpit. Calls `/api/analyze` → live web search → parsed briefing with per-lens stances, a convergence gauge, summary + bottom line. **Bull vs Bear** runs `/api/debate`. **Save to radar** persists to `watchlist`.
 - **Background Sweep (auto-scout):** a daily Vercel Cron (`/api/cron/sweep`) that, per user who's enabled it, surfaces a **"fresh finds"** feed — **today's real top movers** (via a market-data provider, the one place real numbers are allowed) enriched with a qualitative "why it's moving / verify" read, plus theme-scout matches — and refreshes tracked names. Toggle it on the Radar; new finds are waiting when you return. No fabricated prices: the % move is attributed to the provider, the rest is grounded by web search.
 - **Today's brief (the cockpit centerpiece):** the nightly sweep now ends with a **synthesis pass** — one AI read across all of the day's signals (real movers, headlines, macro, themes, your tracked names) hunting second-order beneficiaries and convergent setups, each with horizon, converged signals, confirm/kill lines, and one-tap Track / Run lenses. `GET/POST /api/brief`; on-demand "Sweep now" from the Today tab. Stored in `scout_picks` (`kind='opportunity'`/`'brief-intro'`) — zero migration.
 - **Navigation:** an object + command-driven shell — **⌘K / "/" command palette** (type a ticker → analyze, or run a command), **Discover** (Radar + News) and **Analyze** as the two destinations, and **Account** in a user menu. Boot animation plays once per session.
@@ -106,7 +106,7 @@ app/
 ├─ globals.css           ← design system (verbatim port) + base reset + login styles
 └─ api/
    ├─ health/route.ts        ← Anthropic probe
-   ├─ analyze/route.ts       ← six-lens briefing  (auth → prompt → ask → parse)
+   ├─ analyze/route.ts       ← eight-lens briefing  (auth → prompt → ask → parse)
    ├─ debate/route.ts        ← bull-vs-bear debate
    ├─ scout/route.ts         ← theme-based idea scout
    ├─ track-update/route.ts  ← per-name monitoring update (persists to watchlist)
@@ -118,7 +118,7 @@ app/
 components/
 ├─ AppShell.tsx          ← rail nav + status bar + view switching (client)
 ├─ RadarView.tsx         ← Scout + Tracking dashboard (client)
-├─ AnalyzeView.tsx       ← six-lens cockpit + Bull/Bear (client)
+├─ AnalyzeView.tsx       ← eight-lens cockpit + Bull/Bear (client)
 ├─ ConvictionRadar.tsx   ← SVG convergence gauge
 ├─ BaconMark.tsx · Spectrum.tsx · TVLink.tsx
 
@@ -152,7 +152,7 @@ vercel.json              ← cron schedule (route lands in a later slice)
 Feature port from [`reference/bacon-artifact.jsx`](reference/bacon-artifact.jsx) (now committed). Suggested order:
 
 - [x] `lib/lenses.ts`, `lib/prompts.ts`, `lib/parsers.ts` — constants + prompt builders + parsers, ported verbatim
-- [x] **Analyze** — six-lens cockpit + convergence gauge + Bull/Bear (`/api/analyze`, `/api/debate`, `AnalyzeView`) + save-to-watchlist
+- [x] **Analyze** — eight-lens cockpit + convergence gauge + Bull/Bear (`/api/analyze`, `/api/debate`, `AnalyzeView`) + save-to-watchlist
 - [x] **Radar** — watchlist CRUD + per-name tracking updates + Scout with persisted themes (`/api/watchlist`, `/api/track-update`, `/api/scout`, `/api/themes`, `RadarView`).
 - [x] **Background sweeps** — daily `/api/cron/sweep` (service-role): real top movers (`lib/market.ts`) + theme scout → `scout_picks` "fresh finds" feed, plus tracked-name refresh; per-user opt-in via `settings`. Auto-sweep toggle on the Radar.
 - [x] **News** — paraphrase + attribute (`/api/news`, `news_items`, `NewsView`)
