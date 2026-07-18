@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ask } from "@/lib/anthropic";
 import { personasPrompt } from "@/lib/prompts";
 import { parseDebate } from "@/lib/parsers"; // generic ===SECTION=== splitter
+import { withinQuota, QUOTA_MESSAGE } from "@/lib/quota";
 
 export const maxDuration = 300;
 
@@ -17,6 +18,7 @@ export async function POST(req: Request) {
   const asset = String(body.asset || "").trim().slice(0, 120);
   const assetClass = String(body.assetClass || "").trim().slice(0, 60);
   if (!asset) return NextResponse.json({ error: "Missing asset" }, { status: 400 });
+  if (!(await withinQuota(sb))) return NextResponse.json({ error: QUOTA_MESSAGE }, { status: 429 });
 
   try {
     const text = await ask(

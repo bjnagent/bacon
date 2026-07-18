@@ -9,6 +9,7 @@ import { opportunityBriefPrompt } from "@/lib/prompts";
 import { askStream } from "@/lib/anthropic";
 import { textStreamResponse } from "@/lib/streamRoute";
 import { SCOUT_PICK_COLUMNS, type ScoutPickRow } from "@/lib/types";
+import { withinQuota, QUOTA_MESSAGE } from "@/lib/quota";
 
 export const maxDuration = 300;
 
@@ -46,6 +47,7 @@ export async function POST() {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  if (!(await withinQuota(sb))) return NextResponse.json({ error: QUOTA_MESSAGE }, { status: 429 });
 
   // Market-wide signals: reuse today's cached snapshot (warmed by the nightly
   // cron) so Sweep-now doesn't refetch every external provider on a cold

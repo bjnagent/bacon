@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { askStream } from "@/lib/anthropic";
 import { chatSystemPrompt, type ChatContext } from "@/lib/prompts";
+import { withinQuota, QUOTA_MESSAGE } from "@/lib/quota";
 
 export const maxDuration = 300;
 
@@ -36,6 +37,7 @@ export async function POST(req: Request) {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return new Response("Not authenticated", { status: 401 });
+  if (!(await withinQuota(sb))) return Response.json({ error: QUOTA_MESSAGE }, { status: 429 });
 
   let body: { messages?: { role: "user" | "assistant"; content: string }[]; context?: ChatContext | null; conversationId?: string };
   try { body = await req.json(); } catch { return new Response("Bad request", { status: 400 }); }

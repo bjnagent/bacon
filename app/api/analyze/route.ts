@@ -4,10 +4,12 @@ import { askStream } from "@/lib/anthropic";
 import { analysisPrompt } from "@/lib/prompts";
 import { getMacroSnapshot } from "@/lib/macro";
 import { getMovingAverages, cleanTicker } from "@/lib/market";
+import { getFundamentals, deriveValuation, formatFundamentals } from "@/lib/fundamentals";
 import { communityPulse } from "@/lib/grok";
 import { parseBriefing } from "@/lib/parsers";
 import { recordCalls, parseVerdictCall, getCalibrationMemo } from "@/lib/calls";
 import { textStreamResponse } from "@/lib/streamRoute";
+import { withinQuota, QUOTA_MESSAGE } from "@/lib/quota";
 
 // Live web search can take 20–40s; stream the briefing so lens panels appear
 // as they're written instead of after the whole generation.
@@ -23,6 +25,7 @@ export async function POST(req: Request) {
   const asset = String(body.asset || "").trim().slice(0, 120);
   const assetClass = String(body.assetClass || "").trim().slice(0, 60);
   if (!asset) return NextResponse.json({ error: "Missing asset" }, { status: 400 });
+  if (!(await withinQuota(sb))) return NextResponse.json({ error: QUOTA_MESSAGE }, { status: 429 });
 
   // Ground the Macro lens with the real FRED backdrop (cached). It's context for
   // reasoning, not the asset's own figures — the prompt still web-searches facts.
@@ -38,11 +41,22 @@ export async function POST(req: Request) {
   const withDeadline = <T,>(p: Promise<T>, ms: number, fallback: T) =>
     Promise.race([p, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);
   const isEquity = /equity|stock|etf|fund/i.test(assetClass) || !assetClass;
-  const [ma, pulse, calibration] = await Promise.all([
+  // Fundamentals are company filings — only meaningful for individual stocks
+  // (not ETFs/funds/FX/commodities). Deadline-bounded so a slow SEC fetch never
+  // holds up first-byte; on miss/timeout the lens degrades to web search.
+  const isStock = /equity|stock/i.test(assetClass) || !assetClass;
+  const [ma, fundamentals, pulse, calibration] = await Promise.all([
     isEquity ? getMovingAverages(asset).catch(() => null) : Promise.resolve(null),
+    isStock ? withDeadline(getFundamentals(cleanTicker(asset) ?? asset).catch(() => null), 8000, null) : Promise.resolve(null),
     withDeadline(communityPulse([asset], `the asset ${asset}`).catch(() => null), 12_000, null),
     getCalibrationMemo(sb),
   ]);
+  // Real SEC-filed fundamentals ground the FUNDAMENTAL & VALUATION lenses; the
+  // live close (from the MA fetch) turns filed EPS/shares into a real P/E, market
+  // cap and PEG instead of searched guesses.
+  const fundCtx = fundamentals
+    ? formatFundamentals(fundamentals, ma?.price ? deriveValuation(fundamentals, ma.price) : null)
+    : "";
   const maCtx = ma
     ? `\n\nReal moving-average structure for the HEALTH (GF-DMA) lens (via market-data provider, as of ${ma.asOf}): last ${ma.price.toFixed(2)}; ${ma.smas.map((s) => `${s.period}D ${s.value.toFixed(2)} (${s.abovePct >= 0 ? "+" : ""}${s.abovePct.toFixed(1)}% vs price)`).join(", ")}. Mechanical read: ${ma.classification}. Use these real figures for the HEALTH lens.`
     : "";
@@ -52,7 +66,7 @@ export async function POST(req: Request) {
   return textStreamResponse(
     askStream(
       analysisPrompt(),
-      [{ role: "user", content: `Asset: ${asset}\nAsset class: ${assetClass}${macroCtx}${maCtx}${pulseCtx}${calCtx}\n\nProduce the full multi-lens BACON briefing using current public information.` }],
+      [{ role: "user", content: `Asset: ${asset}\nAsset class: ${assetClass}${macroCtx}${maCtx}${fundCtx}${pulseCtx}${calCtx}\n\nProduce the full multi-lens BACON briefing using current public information.` }],
       true,
       1700,
       6

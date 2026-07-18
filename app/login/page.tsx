@@ -35,7 +35,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     "use server";
     const email = String(formData.get("email") || "").trim();
     const password = String(formData.get("password") || "");
-    if (!email || password.length < 6) redirect("/login?error=signup&reason=Use%20a%20password%20of%20at%20least%206%20characters");
+    if (!email || password.length < 8) redirect("/login?error=signup&reason=Use%20a%20password%20of%20at%20least%208%20characters");
     const sb = await createClient();
     const { data, error } = await sb.auth.signUp({
       email,

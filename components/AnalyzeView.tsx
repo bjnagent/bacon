@@ -245,7 +245,7 @@ export default function AnalyzeView({ target, onDiscuss, quickSyms = [] }: { tar
                   <div className="pr-cluster-note">Where each lens leans in BACON&apos;s reading. The gauge shape shows convergence — not a score, rating, or forecast.</div>
                 </div>
               </div>
-              <div className="pr-grid">
+              <div className="pr-grid" aria-live="polite" aria-busy={loading}>
                 {LENSES.map((l, i) => { const sec = briefing.lenses[l.key]; const st = STANCES[sec?.stance || "mixed"]; return (
                   <div key={l.key} className="pr-panel" style={{ "--h": l.hue } as React.CSSProperties}>
                     <div className="pr-panel-top">

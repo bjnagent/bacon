@@ -3,7 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { askCheap } from "@/lib/ai";
 import { scoutPrompt, moversScoutPrompt, trackingUpdatePrompt, newsPrompt } from "@/lib/prompts";
 import { parseScout, parseTrackingUpdate, parseNews, type ScoutResult, type NewsResult } from "@/lib/parsers";
-import { MARKET_SOURCE } from "@/lib/market";
+import { MARKET_SOURCE, cleanTicker } from "@/lib/market";
+import { recordCalls, horizonToDays } from "@/lib/calls";
 import { readMarketWide, fetchMarketWide, cacheMarketWide, type MarketWide } from "@/lib/snapshot";
 import { generateBrief, briefToRows, briefToDailyRow, splitVoices } from "@/lib/brief";
 import { sendBriefEmail, emailEnabled } from "@/lib/email";
@@ -104,6 +105,20 @@ async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: st
   try {
     if (!brief) throw new Error("brief failed");
     briefRows = briefToRows(userId, brief);
+    // Calibration: file each actionable call, stamped with the community crowding
+    // captured at call time — the same accounting the interactive /api/brief POST
+    // does. Without this the nightly sweep (the primary path) fed the calibration
+    // loop NOTHING, so it never engaged. Additive + idempotent (dedup key).
+    try {
+      const crowding = mw.pulse?.crowding ?? {};
+      await recordCalls(admin, userId, brief.items.filter((o) => o.action).map((o) => ({
+        source: "brief" as const,
+        instrument: o.ticker && o.ticker !== "—" ? o.ticker : o.name,
+        action: o.action, targetText: o.target,
+        horizonDays: horizonToDays(o.horizon),
+        crowded: crowding[cleanTicker(o.ticker) ?? ""] ?? null,
+      })));
+    } catch { /* calibration is additive */ }
     // Track record: upsert today's brief (best-effort — table ships in schema.sql).
     try {
       await admin.from("daily_briefs").upsert({ ...briefToDailyRow(userId, brief), brief_date: new Date().toISOString().slice(0, 10) }, { onConflict: "user_id,brief_date" });

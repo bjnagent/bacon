@@ -78,6 +78,7 @@ export function horizonToDays(h: string | undefined, fallback = 180): number {
 // ---------- recording ----------
 
 export async function recordCalls(sb: SupabaseClient, userId: string, calls: NewCall[]): Promise<void> {
+  const callDate = new Date().toISOString().slice(0, 10); // UTC day — the dedup key
   const rows = calls
     .filter((c) => c.instrument && actionHead(c.action))
     .map((c) => {
@@ -88,10 +89,15 @@ export async function recordCalls(sb: SupabaseClient, userId: string, calls: New
         target_text: (c.targetText || "").slice(0, 300), target_base: t?.base ?? null, target_kind: t?.kind ?? null,
         horizon_date: new Date(Date.now() + c.horizonDays * 86_400_000).toISOString().slice(0, 10),
         crowded: c.crowded ?? null,
+        call_date: callDate,
       };
     });
   if (!rows.length) return;
-  try { await sb.from("calls").insert(rows); } catch { /* calibration is additive, never blocking */ }
+  // Upsert on the (user_id, source, instrument, call_date) dedup key so a repeat
+  // sweep the same day overwrites instead of piling up duplicate rows (which
+  // would inflate the calibration cohorts). Additive: never blocks the caller.
+  try { await sb.from("calls").upsert(rows, { onConflict: "user_id,source,instrument,call_date", ignoreDuplicates: true }); }
+  catch { /* calibration is additive, never blocking */ }
 }
 
 // ---------- grading (deterministic; runs in the daily cron) ----------
