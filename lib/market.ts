@@ -6,6 +6,11 @@
 const PROVIDER = process.env.MARKET_DATA_PROVIDER ?? "alphavantage";
 const KEY = process.env.MARKET_DATA_API_KEY;
 
+// Hard per-request timeout on every external fetch so a hung/slow-loris provider
+// (accepts the socket, never responds) degrades to empty instead of stalling a
+// brief or an analyze to the platform function ceiling.
+const FETCH_TIMEOUT_MS = 6000;
+
 export const MARKET_SOURCE = PROVIDER === "alphavantage" ? "Alpha Vantage" : PROVIDER;
 
 export interface Mover {
@@ -43,7 +48,7 @@ export async function getMarketSignals(limit = 8): Promise<MarketSignals> {
   const empty: MarketSignals = { gainers: [], losers: [], mostActive: [] };
   if (!KEY || PROVIDER !== "alphavantage") return empty;
   if (signalsCache && signalsCache.limit === limit && Date.now() - signalsCache.at < TTL_MS) return signalsCache.data;
-  const res = await fetch(`https://www.alphavantage.co/query?function=TOP_GAINERS_LOSERS&apikey=${KEY}`, { cache: "no-store" });
+  const res = await fetch(`https://www.alphavantage.co/query?function=TOP_GAINERS_LOSERS&apikey=${KEY}`, { cache: "no-store", signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
   if (!res.ok) throw new Error(`market data request failed (${res.status})`);
   const data = await res.json();
   if (!data?.top_gainers?.length && data?.Information) throw new Error(`market data: ${String(data.Information).slice(0, 120)}`);
@@ -90,7 +95,7 @@ const clean = (bars: DailyBar[]) =>
 // --- Source 1: Stooq (keyless, no daily cap) — one CSV = full daily history. ---
 async function fetchStooq(ticker: string): Promise<DailyBar[]> {
   const sym = ticker.toLowerCase().replace(/\./g, "-"); // BRK.B → brk-b
-  const res = await fetch(`https://stooq.com/q/d/l/?s=${encodeURIComponent(sym)}.us&i=d`, { cache: "no-store", headers: { "User-Agent": UA } });
+  const res = await fetch(`https://stooq.com/q/d/l/?s=${encodeURIComponent(sym)}.us&i=d`, { cache: "no-store", headers: { "User-Agent": UA }, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
   if (!res.ok) return [];
   const text = await res.text();
   if (!/^Date,/i.test(text)) return []; // "N/A" / error page
@@ -102,7 +107,7 @@ async function fetchStooq(ticker: string): Promise<DailyBar[]> {
 
 // --- Source 2: Yahoo chart v8 (keyless) — history + current in one JSON. ---
 async function fetchYahoo(ticker: string): Promise<DailyBar[]> {
-  const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=2y&interval=1d`, { cache: "no-store", headers: { "User-Agent": UA } });
+  const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=2y&interval=1d`, { cache: "no-store", headers: { "User-Agent": UA }, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
   if (!res.ok) return [];
   const data = await res.json();
   const r = data?.chart?.result?.[0];
@@ -116,7 +121,7 @@ async function fetchYahoo(ticker: string): Promise<DailyBar[]> {
 async function fetchAlphaVantage(ticker: string, full: boolean): Promise<DailyBar[]> {
   if (!KEY || PROVIDER !== "alphavantage") return [];
   const size = full ? "full" : "compact"; // compact = last 100 trading days
-  const res = await fetch(`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodeURIComponent(ticker)}&outputsize=${size}&apikey=${KEY}`, { cache: "no-store" });
+  const res = await fetch(`https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${encodeURIComponent(ticker)}&outputsize=${size}&apikey=${KEY}`, { cache: "no-store", signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
   if (!res.ok) throw new Error(`market data request failed (${res.status})`);
   const data = await res.json();
   if (data?.Information) throw new Error(`market data: ${String(data.Information).slice(0, 120)}`);
@@ -135,7 +140,11 @@ export async function getDailySeries(rawTicker: string, since?: string): Promise
   if (!ticker) return null;
   const reaches = (bars: DailyBar[]) => bars.length > 0 && (!since || bars[bars.length - 1].date <= since);
   const cached = seriesCache.get(ticker);
-  if (cached && Date.now() - cached.at < SERIES_TTL_MS && reaches(cached.data.bars)) return cached.data;
+  // Serve a fresh cache even when it doesn't reach `since`: the sources return
+  // full available history, so within the TTL the cached series IS the best
+  // available (a recently-IPO'd ticker simply has less history than `since`).
+  // Without this, such tickers re-fanned out to every source on EVERY call.
+  if (cached && Date.now() - cached.at < SERIES_TTL_MS) return cached.data;
 
   const sources: Array<() => Promise<DailyBar[]>> = [
     () => fetchStooq(ticker),
@@ -242,7 +251,7 @@ export async function getMovingAverages(rawTicker: string): Promise<MovingAverag
 export async function getSectorPerformance(): Promise<{ sector: string; changePct: string }[]> {
   if (!KEY || PROVIDER !== "alphavantage") return [];
   if (sectorCache && Date.now() - sectorCache.at < TTL_MS) return sectorCache.data;
-  const res = await fetch(`https://www.alphavantage.co/query?function=SECTOR&apikey=${KEY}`, { cache: "no-store" });
+  const res = await fetch(`https://www.alphavantage.co/query?function=SECTOR&apikey=${KEY}`, { cache: "no-store", signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
   if (!res.ok) return [];
   const data = await res.json();
   const rt = data?.["Rank A: Real-Time Performance"];

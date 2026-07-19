@@ -86,8 +86,9 @@ export async function POST() {
       if (!brief.items.length) return;
       await sb.from("daily_briefs").upsert({ ...briefToDailyRow(user.id, brief), brief_date: new Date().toISOString().slice(0, 10) }, { onConflict: "user_id,brief_date" });
       const rows = briefToRows(user.id, brief);
-      await sb.from("scout_picks").delete().in("kind", ["opportunity", "brief-intro"]);
-      await sb.from("scout_picks").insert(rows);
+      // Atomic replace so a failed insert can't leave the feed wiped (RLS scopes
+      // the RPC to the caller's own rows).
+      await sb.rpc("replace_scout_picks", { p_user: user.id, p_kinds: ["opportunity", "brief-intro"], p_rows: rows });
       // Calibration: file every actionable call, stamped with community
       // crowding at call time so the loop can grade hot vs quiet entries.
       const crowding = marketWide.pulse?.crowding ?? {};

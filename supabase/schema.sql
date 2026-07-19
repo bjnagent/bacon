@@ -297,3 +297,66 @@ end;
 $$;
 revoke execute on function public.bump_ai_usage(int) from public, anon;
 grant  execute on function public.bump_ai_usage(int) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Optimization-audit follow-ups (speed / accuracy / reliability).
+
+-- A8: prevent duplicate tracked names / themes from a check-then-insert race.
+-- Dedupe any existing dups first (keep the earliest) so the unique index builds.
+delete from watchlist w using watchlist w2
+  where w.user_id = w2.user_id and w.symbol = w2.symbol and w.created_at > w2.created_at;
+create unique index if not exists watchlist_user_symbol on watchlist (user_id, symbol);
+delete from themes t using themes t2
+  where t.user_id = t2.user_id and lower(t.label) = lower(t2.label) and t.created_at > t2.created_at;
+create unique index if not exists themes_user_label on themes (user_id, lower(label));
+
+-- S6: a single-column index so the warm-prices global "recent briefs" scan can
+-- order by brief_date without a full sort (the composite unique can't serve it).
+create index if not exists daily_briefs_date on daily_briefs (brief_date desc);
+
+-- S3: shared, DB-backed fundamentals cache (mirrors ticker_series) so a ticker's
+-- SEC facts are fetched at most once/TTL across all instances instead of every
+-- cold serverless instance re-downloading the CIK map + 9 concept calls.
+create table if not exists ticker_fundamentals (
+  ticker text primary key,
+  facts jsonb,
+  fetched_at timestamptz default now()
+);
+alter table ticker_fundamentals enable row level security;
+drop policy if exists "read ticker_fundamentals" on ticker_fundamentals;
+create policy "read ticker_fundamentals" on ticker_fundamentals for select using ((select auth.role()) = 'authenticated');
+
+-- R1: atomic feed replacement. delete-then-insert as two round-trips can wipe a
+-- user's feed if the insert fails after the delete commits. These do both in one
+-- transaction. SECURITY DEFINER + pinned search_path; a caller may only replace
+-- their OWN rows (p_user = auth.uid()) unless it's the service role (the cron).
+create or replace function public.replace_scout_picks(p_user uuid, p_kinds text[], p_rows jsonb)
+returns void language plpgsql security definer set search_path = '' as $$
+begin
+  if p_user is distinct from auth.uid() and coalesce(auth.role(), '') <> 'service_role' then
+    raise exception 'forbidden';
+  end if;
+  delete from public.scout_picks where user_id = p_user and kind = any(p_kinds);
+  insert into public.scout_picks (user_id, name, symbol, asset_class, why, now_catalyst, check_text, action, target, change_pct, data_source, kind)
+  select p_user, x.name, x.symbol, x.asset_class, x.why, x.now_catalyst, x.check_text, x.action, x.target, x.change_pct, x.data_source, x.kind
+  from jsonb_to_recordset(coalesce(p_rows, '[]'::jsonb)) as x(
+    name text, symbol text, asset_class text, why text, now_catalyst text, check_text text,
+    action text, target text, change_pct text, data_source text, kind text);
+end $$;
+revoke execute on function public.replace_scout_picks(uuid, text[], jsonb) from public, anon;
+grant  execute on function public.replace_scout_picks(uuid, text[], jsonb) to authenticated, service_role;
+
+create or replace function public.replace_news(p_user uuid, p_rows jsonb)
+returns void language plpgsql security definer set search_path = '' as $$
+begin
+  if p_user is distinct from auth.uid() and coalesce(auth.role(), '') <> 'service_role' then
+    raise exception 'forbidden';
+  end if;
+  delete from public.news_items where user_id = p_user;
+  insert into public.news_items (user_id, headline, source, why, symbol, asset_class, signal, recency)
+  select p_user, x.headline, x.source, x.why, x.symbol, x.asset_class, x.signal, x.recency
+  from jsonb_to_recordset(coalesce(p_rows, '[]'::jsonb)) as x(
+    headline text, source text, why text, symbol text, asset_class text, signal text, recency text);
+end $$;
+revoke execute on function public.replace_news(uuid, jsonb) from public, anon;
+grant  execute on function public.replace_news(uuid, jsonb) to authenticated, service_role;

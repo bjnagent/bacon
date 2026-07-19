@@ -10,6 +10,9 @@
 // fetch failure returns null, and the lens degrades to web-search exactly as
 // before — so this only ever ADDS accuracy, never breaks a read.
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { createAdminClient } from "./supabase/admin";
+
 export const FUNDAMENTALS_SOURCE = "SEC EDGAR (XBRL company facts)";
 
 const SEC_HEADERS = {
@@ -90,7 +93,7 @@ export function annualSeries(points: XbrlPoint[] | undefined): { fy: number; end
     .sort((a, b) => (a.end < b.end ? 1 : -1));
 }
 
-// Latest point-in-time value of an INSTANT concept (assets, shares…).
+// Latest point-in-time value of an INSTANT concept (assets, equity…).
 export function latestInstant(points: XbrlPoint[] | undefined): { end: string; val: number } | null {
   if (!Array.isArray(points)) return null;
   const instants = points
@@ -99,8 +102,29 @@ export function latestInstant(points: XbrlPoint[] | undefined): { end: string; v
   return instants.length ? { end: instants[0].end, val: instants[0].val } : null;
 }
 
+// SUM of an instant concept across all rows sharing the latest `end`. Needed for
+// dei:EntityCommonStockSharesOutstanding: a dual/multi-class filer (GOOGL, BRK)
+// reports one share count PER CLASS at the same date, so taking a single instant
+// undercounts total shares and halves market cap. We sum the classes at the
+// latest date. (Restatements of the SAME class at the same end are rare on the
+// cover-page count; the risk of a modest over-count is preferable to the ~2x
+// under-count of dropping a class, and the value is labelled an estimate.)
+export function sumLatestInstant(points: XbrlPoint[] | undefined): { end: string; val: number } | null {
+  if (!Array.isArray(points)) return null;
+  const instants = points.filter((p) => Number.isFinite(p.val) && !p.start);
+  if (!instants.length) return null;
+  const latestEnd = instants.reduce((m, p) => (p.end > m ? p.end : m), instants[0].end);
+  const val = instants.filter((p) => p.end === latestEnd).reduce((s, p) => s + p.val, 0);
+  return val > 0 ? { end: latestEnd, val } : null;
+}
+
+// Growth is only meaningful off a POSITIVE base. A prior-year loss (prior<=0)
+// makes YoY% undefined, not a huge positive — the old Math.abs(prior) turned a
+// loss→profit swing into fake triple-digit growth and, via PEG, a deceptively
+// "undervalued" ratio fed to the model as ground truth. Return null instead so
+// PEG falls back to revenue growth or is omitted.
 const growthPct = (latest: number | null, prior: number | null): number | null =>
-  latest != null && prior != null && prior !== 0 ? ((latest - prior) / Math.abs(prior)) * 100 : null;
+  latest != null && prior != null && prior > 0 ? ((latest - prior) / prior) * 100 : null;
 
 const marginPct = (part: number | null, whole: number | null): number | null =>
   part != null && whole != null && whole !== 0 ? (part / whole) * 100 : null;
@@ -135,7 +159,7 @@ export function assembleFundamentals(
   const gp = annualSeries(concepts.grossProfit);
   const oi = annualSeries(concepts.operatingIncome);
   const eps = annualSeries(concepts.eps);
-  const shares = latestInstant(concepts.shares);
+  const shares = sumLatestInstant(concepts.shares); // sum share classes (dual-class fix)
   const assets = latestInstant(concepts.assets);
   const liabilities = latestInstant(concepts.liabilities);
   const equity = latestInstant(concepts.equity);
@@ -206,9 +230,16 @@ export function formatFundamentals(f: Fundamentals, v: Valuation | null): string
 // ---------- fetching ----------
 
 const UA_TIMEOUT_MS = 5000;
-async function secJson<T>(url: string): Promise<T | null> {
+// Combine an optional caller signal with the per-request timeout so a deadline
+// upstream (analyze's fundamentals race) actually CANCELS the SEC fetch instead
+// of leaving it running and billing function-seconds for a discarded result.
+function secSignal(signal?: AbortSignal): AbortSignal {
+  const timeout = AbortSignal.timeout(UA_TIMEOUT_MS);
+  return signal ? AbortSignal.any([signal, timeout]) : timeout;
+}
+async function secJson<T>(url: string, signal?: AbortSignal): Promise<T | null> {
   try {
-    const res = await fetch(url, { headers: SEC_HEADERS, cache: "no-store", signal: AbortSignal.timeout(UA_TIMEOUT_MS) });
+    const res = await fetch(url, { headers: SEC_HEADERS, cache: "no-store", signal: secSignal(signal) });
     if (!res.ok) return null;
     return (await res.json()) as T;
   } catch { return null; }
@@ -218,11 +249,11 @@ async function secJson<T>(url: string): Promise<T | null> {
 let tickerMap: { at: number; map: Map<string, string> } | null = null;
 const MAP_TTL_MS = 24 * 60 * 60 * 1000;
 
-export async function cikForTicker(rawTicker: string): Promise<string | null> {
+export async function cikForTicker(rawTicker: string, signal?: AbortSignal): Promise<string | null> {
   const t = rawTicker.trim().toUpperCase();
   if (!t) return null;
   if (!tickerMap || Date.now() - tickerMap.at > MAP_TTL_MS) {
-    const data = await secJson<Record<string, { cik_str: number; ticker: string }>>("https://www.sec.gov/files/company_tickers.json");
+    const data = await secJson<Record<string, { cik_str: number; ticker: string }>>("https://www.sec.gov/files/company_tickers.json", signal);
     if (!data) return tickerMap?.map.get(t) ?? tickerMap?.map.get(t.replace(/\./g, "-")) ?? null;
     const map = new Map<string, string>();
     for (const row of Object.values(data)) {
@@ -235,9 +266,9 @@ export async function cikForTicker(rawTicker: string): Promise<string | null> {
 
 // Pull one us-gaap (or dei) concept's observations, trying tag fallbacks in order.
 interface ConceptResponse { units?: Record<string, XbrlPoint[]> }
-async function concept(cik: string, tags: string[], unit: string, taxonomy = "us-gaap"): Promise<XbrlPoint[] | undefined> {
+async function concept(cik: string, tags: string[], unit: string, signal?: AbortSignal, taxonomy = "us-gaap"): Promise<XbrlPoint[] | undefined> {
   for (const tag of tags) {
-    const data = await secJson<ConceptResponse>(`https://data.sec.gov/api/xbrl/companyconcept/CIK${cik}/${taxonomy}/${tag}.json`);
+    const data = await secJson<ConceptResponse>(`https://data.sec.gov/api/xbrl/companyconcept/CIK${cik}/${taxonomy}/${tag}.json`, signal);
     const points = data?.units?.[unit];
     if (Array.isArray(points) && points.length) return points;
   }
@@ -246,31 +277,53 @@ async function concept(cik: string, tags: string[], unit: string, taxonomy = "us
 
 const fundCache = new Map<string, { at: number; data: Fundamentals | null }>();
 const FUND_TTL_MS = 12 * 60 * 60 * 1000; // fundamentals change quarterly
+const fresh = (at: number) => Date.now() - at < FUND_TTL_MS;
 
 // Real fundamentals for a US-listed ticker, or null (non-US / unmatched / failure
-// → the lens falls back to web search). Concept fetches run in parallel.
-export async function getFundamentals(rawTicker: string): Promise<Fundamentals | null> {
+// → the lens falls back to web search). Two cache layers: an in-process L1 and,
+// when a `read` client is passed, a shared DB L2 (ticker_fundamentals) so a
+// ticker's SEC facts are fetched at most once/TTL across ALL serverless
+// instances instead of every cold instance re-downloading the ~1MB CIK map + 9
+// concept calls. `signal` lets a caller's deadline cancel the SEC fetch.
+export async function getFundamentals(rawTicker: string, read?: SupabaseClient, signal?: AbortSignal): Promise<Fundamentals | null> {
   const ticker = rawTicker.trim().toUpperCase();
   if (!ticker) return null;
   const cached = fundCache.get(ticker);
-  if (cached && Date.now() - cached.at < FUND_TTL_MS) return cached.data;
+  if (cached && fresh(cached.at)) return cached.data;
 
-  const cik = await cikForTicker(ticker);
+  // L2: shared DB cache. Read via the caller's client; write-through via admin
+  // (RLS makes ticker_fundamentals read-only to normal clients).
+  if (read) {
+    try {
+      const { data } = await read.from("ticker_fundamentals").select("facts,fetched_at").eq("ticker", ticker).maybeSingle();
+      if (data && fresh(new Date(String(data.fetched_at)).getTime())) {
+        const facts = (data.facts ?? null) as Fundamentals | null;
+        fundCache.set(ticker, { at: Date.now(), data: facts });
+        return facts;
+      }
+    } catch { /* table missing / unreadable → fetch live */ }
+  }
+
+  const cik = await cikForTicker(ticker, signal);
   if (!cik) { fundCache.set(ticker, { at: Date.now(), data: null }); return null; }
 
   const [revenue, netIncome, grossProfit, operatingIncome, eps, shares, assets, liabilities, equity] = await Promise.all([
-    concept(cik, ["RevenueFromContractWithCustomerExcludingAssessedTax", "Revenues", "SalesRevenueNet"], "USD"),
-    concept(cik, ["NetIncomeLoss"], "USD"),
-    concept(cik, ["GrossProfit"], "USD"),
-    concept(cik, ["OperatingIncomeLoss"], "USD"),
-    concept(cik, ["EarningsPerShareDiluted"], "USD/shares"),
-    concept(cik, ["EntityCommonStockSharesOutstanding"], "shares", "dei"),
-    concept(cik, ["Assets"], "USD"),
-    concept(cik, ["Liabilities"], "USD"),
-    concept(cik, ["StockholdersEquity", "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"], "USD"),
+    concept(cik, ["RevenueFromContractWithCustomerExcludingAssessedTax", "Revenues", "SalesRevenueNet"], "USD", signal),
+    concept(cik, ["NetIncomeLoss"], "USD", signal),
+    concept(cik, ["GrossProfit"], "USD", signal),
+    concept(cik, ["OperatingIncomeLoss"], "USD", signal),
+    concept(cik, ["EarningsPerShareDiluted"], "USD/shares", signal),
+    concept(cik, ["EntityCommonStockSharesOutstanding"], "shares", signal, "dei"),
+    concept(cik, ["Assets"], "USD", signal),
+    concept(cik, ["Liabilities"], "USD", signal),
+    concept(cik, ["StockholdersEquity", "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"], "USD", signal),
   ]);
 
   const data = assembleFundamentals(ticker, cik, { revenue, netIncome, grossProfit, operatingIncome, eps, shares, assets, liabilities, equity });
   fundCache.set(ticker, { at: Date.now(), data });
+  if (read) {
+    try { await createAdminClient().from("ticker_fundamentals").upsert({ ticker, facts: data, fetched_at: new Date().toISOString() }); }
+    catch { /* cache write is best-effort */ }
+  }
   return data;
 }

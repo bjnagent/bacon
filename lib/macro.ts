@@ -46,7 +46,8 @@ async function fetchSeries(cfg: SeriesCfg): Promise<MacroIndicator | null> {
   u.searchParams.set("sort_order", "desc");
   u.searchParams.set("limit", "8");
   if (cfg.units) u.searchParams.set("units", cfg.units);
-  const res = await fetch(u, { cache: "no-store" });
+  // Bounded so a slow/hung FRED degrades to empty instead of stalling the caller.
+  const res = await fetch(u, { cache: "no-store", signal: AbortSignal.timeout(5000) });
   if (!res.ok) return null;
   const data = await res.json();
   const obs: Array<{ date: string; value: string }> = (data.observations ?? []).filter((o: { value: string }) => o.value !== "." && o.value !== "");

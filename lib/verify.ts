@@ -35,7 +35,10 @@ const CITE_RE = /\b(via|per|according to|reported|reports|reporting|sources?|cit
 // Bacon now makes forward calls: a figure whose sentence DECLARES itself an
 // estimate / scenario / target is an opinion, not a fact needing a source —
 // counted separately, never flagged.
-const ESTIMATE_RE = /\b(est\.?|estimates?|estimated|scenario|scenarios|target|targets|base case|bear case|bull case|bear|bull|12-mo|12-month|projected|projection|forecast|implies|implied|could reach|we think|my estimate|fair value|odds|probability|likely worth)\b/i;
+// NB: match "bear case"/"bull case" only — bare "bear"/"bull" also match "bear
+// market"/"bull market", which would let an uncited hard figure in such a
+// sentence escape the fabrication flag.
+const ESTIMATE_RE = /\b(est\.?|estimates?|estimated|scenario|scenarios|target|targets|base case|bear case|bull case|12-mo|12-month|projected|projection|forecast|implies|implied|could reach|we think|my estimate|fair value|odds|probability|likely worth)\b/i;
 
 function splitSentences(text: string): string[] {
   return text

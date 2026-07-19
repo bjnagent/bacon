@@ -31,7 +31,10 @@ export async function readMarketWide(read: SupabaseClient): Promise<MarketWide |
   try {
     const { data } = await read.from("market_snapshots").select("bundle").eq("snap_date", today()).maybeSingle();
     const b = data?.bundle as MarketWide | undefined;
-    if (b && Array.isArray(b.movers) && Array.isArray(b.macro)) return b;
+    // Require real content: an ALL-empty bundle (providers were down / rate-limited
+    // when it was written) must be treated as absent, or it poisons every reader's
+    // brief for the rest of the UTC day even after providers recover.
+    if (b && Array.isArray(b.movers) && Array.isArray(b.macro) && (b.movers.length > 0 || b.macro.length > 0)) return b;
   } catch { /* table missing or unreadable → treat as cold */ }
   return null;
 }
@@ -68,6 +71,9 @@ export async function fetchMarketWide(insiderDeadlineMs = 8000): Promise<MarketW
 // read-only to normal clients). Best-effort: a failed write just means the next
 // reader fetches live again.
 export async function cacheMarketWide(admin: SupabaseClient, bundle: MarketWide): Promise<void> {
+  // Don't persist an all-empty bundle — caching a "providers were down" result
+  // would serve emptiness to everyone until tomorrow. Let the next reader retry.
+  if (!bundle.movers.length && !bundle.macro.length && !bundle.commodities.length && !bundle.insiders.length) return;
   try { await admin.from("market_snapshots").upsert({ snap_date: today(), bundle, updated_at: new Date().toISOString() }); }
   catch { /* cache is an optimization, never a requirement */ }
 }

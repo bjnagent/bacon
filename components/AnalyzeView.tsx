@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Loader2, ArrowRight, ArrowUpRight, AlertTriangle, Scale, LayoutGrid, Bookmark, MessageCircle, Users, ShieldAlert, Network } from "lucide-react";
 import { LENSES, STANCES, ASSET_CLASSES, PERSONAS, overallLean, type LensKey, type StanceKey } from "@/lib/lenses";
 import { toPoints, parseBriefing, type Briefing, type Debate } from "@/lib/parsers";
 import { auditBriefingText } from "@/lib/verify";
 import { readTextStream } from "@/lib/readStream";
+import { invalidate } from "@/lib/clientCache";
 import type { ChatContext } from "@/lib/prompts";
 import Spectrum from "./Spectrum";
 import BaconMark from "./BaconMark";
@@ -120,7 +121,7 @@ export default function AnalyzeView({ target, onDiscuss, quickSyms = [] }: { tar
     if (saved) return;
     try {
       const res = await fetch("/api/watchlist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: analyzed, asset_class: assetClass }) });
-      if (res.ok) setSaved(true);
+      if (res.ok) { setSaved(true); invalidate("/api/watchlist"); } // refresh the shared cache so the save shows app-wide
     } catch { /* leave unsaved; user can retry */ }
   };
 
@@ -136,16 +137,18 @@ export default function AnalyzeView({ target, onDiscuss, quickSyms = [] }: { tar
   }, [target?.token]);
 
   const hasBriefing = !!briefing;
-  const stances: Partial<Record<LensKey, StanceKey>> = {};
-  if (hasBriefing) LENSES.forEach((l) => { stances[l.key] = briefing!.lenses[l.key]?.stance || "mixed"; });
-  const lean = hasBriefing ? overallLean(stances) : null;
-  const analysisNotes = hasBriefing && briefing
-    ? [briefing.SUMMARY && `Summary: ${briefing.SUMMARY}`, `Lens leans — ${LENSES.map((l) => `${l.name}: ${briefing.lenses[l.key]?.stance || "mixed"}`).join("; ")}`, briefing.BOTTOMLINE && `Bottom line: ${briefing.BOTTOMLINE}`].filter(Boolean).join("\n")
-    : undefined;
-  // Verification gate: audit the read for hard figures that don't cite a source.
-  const dataCheck = hasBriefing && briefing
-    ? auditBriefingText({ summary: briefing.SUMMARY, bottomline: briefing.BOTTOMLINE, lensBodies: LENSES.map((l) => briefing!.lenses[l.key]?.body || "") })
-    : null;
+  // Memoized on `briefing` so the streamed re-render (one setBriefing per frame)
+  // doesn't re-run the lens loop + the four-regex figure audit over all 8 lenses
+  // on every chunk — that was hundreds of full audits across a 20-40s stream.
+  const { stances, lean, analysisNotes, dataCheck } = useMemo(() => {
+    const stances: Partial<Record<LensKey, StanceKey>> = {};
+    if (!briefing) return { stances, lean: null as ReturnType<typeof overallLean> | null, analysisNotes: undefined as string | undefined, dataCheck: null as ReturnType<typeof auditBriefingText> | null };
+    LENSES.forEach((l) => { stances[l.key] = briefing.lenses[l.key]?.stance || "mixed"; });
+    const lean = overallLean(stances);
+    const analysisNotes = [briefing.SUMMARY && `Summary: ${briefing.SUMMARY}`, `Lens leans — ${LENSES.map((l) => `${l.name}: ${briefing.lenses[l.key]?.stance || "mixed"}`).join("; ")}`, briefing.BOTTOMLINE && `Bottom line: ${briefing.BOTTOMLINE}`].filter(Boolean).join("\n");
+    const dataCheck = auditBriefingText({ summary: briefing.SUMMARY, bottomline: briefing.BOTTOMLINE, lensBodies: LENSES.map((l) => briefing.lenses[l.key]?.body || "") });
+    return { stances, lean, analysisNotes, dataCheck };
+  }, [briefing]);
 
   return (
     <div className="pr-view">

@@ -29,13 +29,21 @@ export function actionHead(action: string): string {
 }
 
 const BULLISH = new Set(["buy", "accumulate", "proceed"]);
-const BEARISH = new Set(["sell", "avoid", "stay"]);
+const BEARISH = new Set(["sell", "avoid"]);
 
 // Direction expectation for grading; null = not a directional call (watch/hold).
 export function expectedDirection(action: string): 1 | -1 | null {
   const head = actionHead(action);
   if (BULLISH.has(head)) return 1;
   if (BEARISH.has(head)) return -1;
+  // "stay" is ambiguous on the head alone: "stay away/out" is bearish, but
+  // "stay long / invested / the course" is BULLISH — grading it as bearish
+  // inverted the result. Disambiguate on the full phrase; ambiguous → null.
+  if (head === "stay") {
+    const a = (action || "").toLowerCase();
+    if (/\bstay\s+(away|out|clear)\b/.test(a)) return -1;
+    if (/\bstay\s+(long|invested|the\s+course|in)\b/.test(a)) return 1;
+  }
   return null;
 }
 
@@ -46,10 +54,21 @@ export function expectedDirection(action: string): 1 | -1 | null {
 export function parseTargets(text: string | undefined): { base: number; kind: "price" | "pct" } | null {
   if (!text) return null;
   const scan = (s: string): { base: number; kind: "price" | "pct" } | null => {
+    // Prefer an explicit $ PRICE over an incidental %: "base $160 (+12%)" is a
+    // $160 price target, not a 12% target. Scale a magnitude suffix attached to
+    // the number ($1.2M → 1_200_000) so it isn't read as 1.2.
+    const price = s.match(/\$\s?(\d[\d,]*(?:\.\d+)?)([a-z]*)/i);
+    if (price) {
+      const v = Number(price[1].replace(/,/g, ""));
+      const suf = price[2].toLowerCase();
+      const mult = /^(t|tn|trillion)$/.test(suf) ? 1e12
+        : /^(b|bn|billion)$/.test(suf) ? 1e9
+        : /^(m|mm|million)$/.test(suf) ? 1e6
+        : /^k$/.test(suf) ? 1e3 : 1;
+      if (Number.isFinite(v)) return { base: v * mult, kind: "price" };
+    }
     const pct = s.match(/([+-]?\d+(?:\.\d+)?)\s*%/);
     if (pct) return { base: Number(pct[1]), kind: "pct" };
-    const price = s.match(/\$\s?(\d[\d,]*(?:\.\d+)?)/);
-    if (price) return { base: Number(price[1].replace(/,/g, "")), kind: "price" };
     return null;
   };
   const clause = text.match(/base[\s\S]*?(?=bear|bull|;|$)/i)?.[0];
@@ -93,10 +112,12 @@ export async function recordCalls(sb: SupabaseClient, userId: string, calls: New
       };
     });
   if (!rows.length) return;
-  // Upsert on the (user_id, source, instrument, call_date) dedup key so a repeat
-  // sweep the same day overwrites instead of piling up duplicate rows (which
-  // would inflate the calibration cohorts). Additive: never blocks the caller.
-  try { await sb.from("calls").upsert(rows, { onConflict: "user_id,source,instrument,call_date", ignoreDuplicates: true }); }
+  // Upsert on the (user_id, source, instrument, call_date) dedup key. Default
+  // merge (NOT ignoreDuplicates) so a same-day RE-record — the user refines the
+  // call from "watch" to "buy, base $200" — UPDATES the row instead of being
+  // dropped; the later, better-informed call is the one the loop should grade.
+  // Additive: never blocks the caller.
+  try { await sb.from("calls").upsert(rows, { onConflict: "user_id,source,instrument,call_date" }); }
   catch { /* calibration is additive, never blocking */ }
 }
 
@@ -123,23 +144,34 @@ async function actualPct(admin: SupabaseClient, row: CallRow): Promise<{ pct: nu
 }
 
 // Grade every call ≥30 days old: interim direction/actual each run, final
-// (target error + graded_at) once the horizon lapses. SPY benches the window.
+// (target error + graded_at) once the horizon lapses. Ordered by horizon so the
+// closest-to-final calls are prioritized (with only a bounded batch per run, an
+// unordered scan could starve the backlog and never finalize some calls). SPY
+// benches equity/commodity windows; property calls are left un-benched (S&P 500
+// vs a housing index is meaningless). Rows are priced with bounded concurrency.
 export async function gradeCalls(admin: SupabaseClient): Promise<{ graded: number; finalized: number }> {
   const cutoff = new Date(Date.now() - 30 * 86_400_000).toISOString();
   const { data } = await admin.from("calls")
     .select("id,source,instrument,action,target_base,target_kind,horizon_date,created_at")
-    .is("graded_at", null).lte("created_at", cutoff).limit(60);
+    .is("graded_at", null).lte("created_at", cutoff)
+    .order("horizon_date", { ascending: true }).order("created_at", { ascending: true })
+    .limit(120);
   const rows = (data ?? []) as CallRow[];
   if (!rows.length) return { graded: 0, finalized: 0 };
 
   const today = new Date().toISOString().slice(0, 10);
+  // Resolve the SPY benchmark series ONCE (covering the oldest call) and price
+  // each window off it, instead of a getCachedSeries('SPY') round-trip per row.
+  const earliest = rows.reduce((m, r) => (String(r.created_at) < m ? String(r.created_at) : m), String(rows[0].created_at)).slice(0, 10);
+  const spySeries = await getCachedSeries(admin, "SPY", earliest).catch(() => null);
+
   let graded = 0, finalized = 0;
-  for (const row of rows) {
+  const gradeOne = async (row: CallRow) => {
     try {
       const actual = await actualPct(admin, row);
-      if (!actual) continue;
-      const spySince = String(row.created_at).slice(0, 10);
-      const spy = await getCachedSeries(admin, "SPY", spySince).then((s) => s && computeRoi(s, spySince, 1)).catch(() => null);
+      if (!actual) return;
+      const since = String(row.created_at).slice(0, 10);
+      const spy = row.source === "property" || !spySeries ? null : computeRoi(spySeries, since, 1);
       const dir = expectedDirection(row.action);
       const patch: Record<string, unknown> = {
         actual_pct: actual.pct,
@@ -158,6 +190,10 @@ export async function gradeCalls(admin: SupabaseClient): Promise<{ graded: numbe
       await admin.from("calls").update(patch).eq("id", row.id);
       graded++;
     } catch { /* per-call best-effort */ }
+  };
+  const POOL = 6;
+  for (let i = 0; i < rows.length; i += POOL) {
+    await Promise.all(rows.slice(i, i + POOL).map(gradeOne));
   }
   return { graded, finalized };
 }

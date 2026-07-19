@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  annualSeries, latestInstant, assembleFundamentals, deriveValuation, formatFundamentals,
+  annualSeries, latestInstant, sumLatestInstant, assembleFundamentals, deriveValuation, formatFundamentals,
   type XbrlPoint,
 } from "./fundamentals";
 
@@ -48,6 +48,41 @@ describe("latestInstant", () => {
   it("takes the newest point and ignores duration rows", () => {
     expect(latestInstant(ASSETS)).toEqual({ end: "2024-12-31", val: 200_000 });
     expect(latestInstant(REVENUE)).toBeNull(); // all have `start` → not instant
+  });
+});
+
+describe("sumLatestInstant (dual-class shares)", () => {
+  it("SUMS every share class reported at the latest date (not just one)", () => {
+    // A dual-class filer (e.g. GOOGL A+C) reports one row per class at the same
+    // end date; taking a single instant would ~halve the share count / market cap.
+    const shares: XbrlPoint[] = [
+      { end: "2025-01-15", val: 5_900 }, // class C
+      { end: "2025-01-15", val: 6_100 }, // class A
+      { end: "2024-01-15", val: 11_000 }, // older cover page — ignored
+    ];
+    expect(sumLatestInstant(shares)).toEqual({ end: "2025-01-15", val: 12_000 });
+  });
+  it("returns null when there are no instant rows", () => {
+    expect(sumLatestInstant([])).toBeNull();
+    expect(sumLatestInstant(REVENUE)).toBeNull(); // all duration
+  });
+});
+
+describe("negative prior-year earnings → no fake PEG", () => {
+  const NI_TURNAROUND: XbrlPoint[] = [
+    { start: "2023-01-01", end: "2023-12-31", val: -500, fy: 2023, fp: "FY", form: "10-K" }, // loss
+    { start: "2024-01-01", end: "2024-12-31", val: 1_000, fy: 2024, fp: "FY", form: "10-K" }, // profit
+  ];
+  const f = assembleFundamentals("T", "1", { revenue: REVENUE, netIncome: NI_TURNAROUND, eps: EPS, shares: SHARES })!;
+
+  it("earnings growth is null off a loss base (not a huge Math.abs figure)", () => {
+    expect(f.earningsGrowthPct).toBeNull();
+  });
+  it("PEG falls back to REVENUE growth, not a turnaround artifact", () => {
+    const v = deriveValuation(f, 50)!; // P/E = 50/2 = 25
+    expect(f.revenueGrowthPct).toBeCloseTo(25, 5);
+    expect(v.pegBasis).toBe("revenue");
+    expect(v.pegRatio).toBeCloseTo(1.0, 3); // 25 / 25%, not 25 / 300% ≈ 0.08
   });
 });
 
