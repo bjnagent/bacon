@@ -29,7 +29,10 @@ export async function GET(req: Request) {
     }
   } catch { /* briefs optional */ }
   try {
-    const { data: wl } = await admin.from("watchlist").select("symbol,asset_class");
+    // Bounded: we only warm up to 60 tickers, so cap the scan (a full-table read
+    // of every user's watchlist just to dedupe to 60 grows with the user base).
+    // Bias to recently-touched names, which are the ones users will re-price.
+    const { data: wl } = await admin.from("watchlist").select("symbol,asset_class").order("last_scan_at", { ascending: false, nullsFirst: false }).limit(500);
     for (const w of wl ?? []) {
       if (resolveInstrument(w.symbol, "", w.asset_class)) continue;
       const t = cleanTicker(w.symbol);

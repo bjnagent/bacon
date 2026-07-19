@@ -13,6 +13,13 @@ describe("actionHead / expectedDirection", () => {
     expect(expectedDirection("Watch until breakout")).toBeNull();
     expect(expectedDirection("Hold")).toBeNull();
   });
+  it("disambiguates 'stay': away/out is bearish, long/invested is bullish", () => {
+    expect(expectedDirection("Stay away — value trap")).toBe(-1);
+    expect(expectedDirection("Stay out until the print")).toBe(-1);
+    expect(expectedDirection("Stay long — hold through earnings")).toBe(1);
+    expect(expectedDirection("Stay invested")).toBe(1);
+    expect(expectedDirection("Stay")).toBeNull(); // ambiguous alone → not graded
+  });
 });
 
 describe("parseTargets", () => {
@@ -22,6 +29,14 @@ describe("parseTargets", () => {
   });
   it("supports percent targets", () => {
     expect(parseTargets("base +12% on rate cuts, bull +25%")).toEqual({ base: 12, kind: "pct" });
+  });
+  it("prefers an explicit $ price over an incidental % in the same clause", () => {
+    // "$160 (+12% upside)" is a $160 price target, not a 12% target.
+    expect(parseTargets("base $160 — about +12% upside")).toEqual({ base: 160, kind: "price" });
+  });
+  it("scales a magnitude suffix so $1.5M isn't read as 1.5", () => {
+    expect(parseTargets("base $1.5M")).toEqual({ base: 1_500_000, kind: "price" });
+    expect(parseTargets("base $450B target")).toEqual({ base: 450_000_000_000, kind: "price" });
   });
   it("returns null when no number exists", () => {
     expect(parseTargets("no view")).toBeNull();

@@ -26,11 +26,16 @@ export async function POST(req: Request) {
   if (!market) return NextResponse.json({ error: "Unknown market" }, { status: 400 });
   if (!(await withinQuota(sb))) return NextResponse.json({ error: QUOTA_MESSAGE }, { status: 429 });
 
-  const withDeadline = <T,>(p: Promise<T>, ms: number, fallback: T) =>
-    Promise.race([p, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);
+  // raceAbort cancels the Grok call when its 12s deadline loses, instead of
+  // leaving a 45s X-search running and billed for a discarded result.
+  const raceAbort = <T,>(make: (signal: AbortSignal) => Promise<T>, ms: number, fallback: T): Promise<T> => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ms);
+    return make(ctrl.signal).catch(() => fallback).finally(() => clearTimeout(timer));
+  };
   const [series, pulse, calibration] = await Promise.all([
     getPropertySeries(sb, market.key).catch(() => null),
-    withDeadline(communityPulse([market.label], `${market.country === "SG" ? "Singapore" : "Australia"} property market`).catch(() => null), 12_000, null),
+    raceAbort((signal) => communityPulse([market.label], `${market.country === "SG" ? "Singapore" : "Australia"} property market`, signal), 12_000, null),
     getCalibrationMemo(sb),
   ]);
   const stats = series ? computeMarketStats(series.bars) : null;

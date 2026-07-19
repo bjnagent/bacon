@@ -29,7 +29,11 @@ export async function GET(req: Request) {
   // Users who opted into auto-sweep and are due (interval honored even on a daily cron).
   const { data: users } = await admin.from("settings").select("*").gt("scout_interval_minutes", 0);
   const now = Date.now();
-  const due = (users ?? []).filter((u) => !u.last_sweep_at || now - new Date(u.last_sweep_at).getTime() >= u.scout_interval_minutes * 60000);
+  const due = (users ?? [])
+    .filter((u) => !u.last_sweep_at || now - new Date(u.last_sweep_at).getTime() >= u.scout_interval_minutes * 60000)
+    // Oldest-served first, so a mid-run timeout doesn't drop the SAME tail every
+    // night — the users waiting longest get processed first each run.
+    .sort((a, b) => (String(a.last_sweep_at ?? "") < String(b.last_sweep_at ?? "") ? -1 : 1));
   if (!due.length) return NextResponse.json({ ok: true, swept: 0 });
 
   // Market-wide signals → build the day's snapshot ONCE (and cache it so
@@ -48,15 +52,28 @@ export async function GET(req: Request) {
     }
   } catch { /* market data unavailable → degrade to theme scout only */ }
 
-  let swept = 0;
-  for (const u of due) {
-    await sweepUser(admin, u.user_id, moverPicks, u.news_source, u.news_focus, mw, !!u.brief_email_enabled, splitVoices(u.voices));
-    swept++;
+  // Bounded concurrency + per-user isolation: one user's throw (or slow run) no
+  // longer aborts the whole sweep or serializes the rest to the 300s ceiling.
+  let swept = 0, failed = 0;
+  const POOL = 3;
+  for (let i = 0; i < due.length; i += POOL) {
+    const batch = due.slice(i, i + POOL);
+    const results = await Promise.all(batch.map((u) =>
+      sweepUser(admin, u.user_id, moverPicks, u.news_source, u.news_focus, mw, !!u.brief_email_enabled, splitVoices(u.voices))
+        .then(() => true)
+        .catch((e) => { console.error("sweepUser failed", u.user_id, e); return false; })
+    ));
+    for (const ok of results) { if (ok) swept++; else failed++; }
   }
-  return NextResponse.json({ ok: true, swept });
+  return NextResponse.json({ ok: true, swept, failed });
 }
 
 async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: string, moverPicks: MoverPick[], newsSource: string | null, newsFocus: string | null, mw: MarketWide, emailOptIn: boolean, voices: string[]) {
+  // Claim the user up-front (before the slow AI work) so if this invocation
+  // times out mid-run, the user isn't left perpetually "due" and dropped again
+  // next run — better to skip a day than loop the same tail forever.
+  await admin.from("settings").update({ last_sweep_at: new Date().toISOString() }).eq("user_id", userId);
+
   const [{ data: themes }, { data: items }, { data: cachedNews }] = await Promise.all([
     admin.from("themes").select("label").eq("user_id", userId),
     admin.from("watchlist").select("id,symbol,asset_class").eq("user_id", userId).order("last_scan_at", { ascending: true, nullsFirst: true }).limit(6),
@@ -138,17 +155,17 @@ async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: st
   for (const p of moverPicks) picks.push({ user_id: userId, name: p.name, symbol: p.ticker, asset_class: "Equity / Stock", why: p.why, now_catalyst: p.now, check_text: p.check, change_pct: p.change_pct, data_source: MARKET_SOURCE, kind: "mover" });
   if (themeRes) for (const p of themeRes.picks) picks.push({ user_id: userId, name: p.name, symbol: p.ticker, asset_class: mapClass(p.cls), why: p.why, now_catalyst: p.now, check_text: p.check, change_pct: null, data_source: null, kind: "theme" });
   if (picks.length || briefRows.length) {
-    await admin.from("scout_picks").delete().eq("user_id", userId);
-    await admin.from("scout_picks").insert([...briefRows, ...picks]);
+    // Atomic replace (delete+insert in one transaction) so a failed insert can't
+    // leave the user's fresh-finds feed wiped with nothing to replace it.
+    await admin.rpc("replace_scout_picks", { p_user: userId, p_kinds: ["opportunity", "brief-intro", "mover", "theme"], p_rows: [...briefRows, ...picks] });
   }
 
-  // Refresh the news feed (paraphrased + attributed in the prompt).
+  // Refresh the news feed (paraphrased + attributed in the prompt) — atomically.
   if (newsRes && newsRes.items.length) {
-    await admin.from("news_items").delete().eq("user_id", userId);
-    await admin.from("news_items").insert(newsRes.items.map((n) => ({
-      user_id: userId, headline: n.head, source: n.source, why: n.why,
+    await admin.rpc("replace_news", { p_user: userId, p_rows: newsRes.items.map((n) => ({
+      headline: n.head, source: n.source, why: n.why,
       symbol: n.ticker, asset_class: n.cls, signal: n.signal, recency: n.when,
-    })));
+    })) });
   }
 
   // Persist tracking refreshes.
@@ -157,6 +174,5 @@ async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: st
       ? admin.from("watchlist").update({ update_text: upd.update, watch_text: upd.watch, lean: upd.lean, lean_reason: upd.leanReason, status: "ok", last_scan_at: new Date().toISOString() }).eq("id", it.id)
       : admin.from("watchlist").update({ status: "error" }).eq("id", it.id)
   ));
-
-  await admin.from("settings").update({ last_sweep_at: new Date().toISOString() }).eq("user_id", userId);
+  // last_sweep_at was claimed at the top of sweepUser (timeout-safe).
 }

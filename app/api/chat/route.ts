@@ -37,7 +37,6 @@ export async function POST(req: Request) {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return new Response("Not authenticated", { status: 401 });
-  if (!(await withinQuota(sb))) return Response.json({ error: QUOTA_MESSAGE }, { status: 429 });
 
   let body: { messages?: { role: "user" | "assistant"; content: string }[]; context?: ChatContext | null; conversationId?: string };
   try { body = await req.json(); } catch { return new Response("Bad request", { status: 400 }); }
@@ -48,11 +47,14 @@ export async function POST(req: Request) {
   const context = body.context ?? null;
   const conversationId = body.conversationId || crypto.randomUUID();
   if (!messages.length) return new Response("No messages", { status: 400 });
+  // Meter AFTER validation, so an empty/malformed request doesn't burn a daily unit.
+  if (!(await withinQuota(sb))) return Response.json({ error: QUOTA_MESSAGE }, { status: 429 });
 
   const system = chatSystemPrompt(context);
   const lastUser = messages[messages.length - 1];
   const encoder = new TextEncoder();
   let full = "";
+  let ok = true; // set false if the stream errors mid-flight
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -62,12 +64,15 @@ export async function POST(req: Request) {
           controller.enqueue(encoder.encode(chunk));
         }
       } catch (err) {
+        ok = false;
         controller.enqueue(encoder.encode(`\n\n[error: ${err instanceof Error ? err.message : "stream failed"}]`));
       } finally {
         try {
           const rows: Array<Record<string, unknown>> = [];
           if (lastUser?.role === "user") rows.push({ user_id: user.id, conversation_id: conversationId, role: "user", content: String(lastUser.content), context });
-          if (full) rows.push({ user_id: user.id, conversation_id: conversationId, role: "assistant", content: full, context });
+          // Only persist the assistant turn if the stream COMPLETED — a truncated
+          // answer must not be saved (and later resumed) as if it were finished.
+          if (ok && full) rows.push({ user_id: user.id, conversation_id: conversationId, role: "assistant", content: full, context });
           if (rows.length) await sb.from("chat_messages").insert(rows);
         } catch { /* persistence best-effort */ }
         controller.close();

@@ -41,9 +41,9 @@ export async function POST(req: Request) {
     );
     const result = parseNews(text);
     if (result.items.length) {
-      await sb.from("news_items").delete().eq("user_id", user.id);
-      await sb.from("news_items").insert(result.items.map((n) => ({
-        user_id: user.id,
+      // Atomic replace (delete+insert in one tx) so a failed insert can't leave
+      // the user's cached headlines wiped with nothing to replace them.
+      await sb.rpc("replace_news", { p_user: user.id, p_rows: result.items.map((n) => ({
         headline: n.head,
         source: n.source,
         why: n.why,
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
         asset_class: n.cls,
         signal: n.signal,
         recency: n.when,
-      })));
+      })) });
     }
     return NextResponse.json({ result });
   } catch (err) {

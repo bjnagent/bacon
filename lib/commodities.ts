@@ -54,7 +54,8 @@ async function fredSeries(id: string, limit: number): Promise<Obs[]> {
   u.searchParams.set("file_type", "json");
   u.searchParams.set("sort_order", "desc");
   u.searchParams.set("limit", String(limit));
-  const res = await fetch(u, { cache: "no-store" });
+  // Bounded so a slow/hung FRED degrades to empty instead of stalling the caller.
+  const res = await fetch(u, { cache: "no-store", signal: AbortSignal.timeout(5000) });
   if (!res.ok) return [];
   const data = await res.json();
   return ((data.observations ?? []) as { date: string; value: string }[])

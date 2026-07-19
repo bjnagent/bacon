@@ -27,30 +27,34 @@ export async function POST(req: Request) {
   if (!asset) return NextResponse.json({ error: "Missing asset" }, { status: 400 });
   if (!(await withinQuota(sb))) return NextResponse.json({ error: QUOTA_MESSAGE }, { status: 429 });
 
-  // Ground the Macro lens with the real FRED backdrop (cached). It's context for
-  // reasoning, not the asset's own figures — the prompt still web-searches facts.
-  let macroCtx = "";
-  try {
-    const macro = await getMacroSnapshot();
-    if (macro.length) macroCtx = `\n\nCurrent macro backdrop (real data via FRED — context for the Macro lens, not this asset's own figures): ${macro.map((m) => `${m.label} ${m.value}${m.unit}`).join(", ")}.`;
-  } catch { /* macro optional */ }
-
-  // Ground the GF-DMA Health lens with REAL moving averages (equities/ETFs only —
-  // the daily series is US-equity data), fetch the community pulse (Grok/X) and
-  // the calibration memo in parallel. A short deadline keeps first-byte fast.
+  // All grounding fetches run in ONE deadline-bounded parallel fan-out so none of
+  // them (macro included — previously a serial, un-timed await) can hold up the
+  // stream's first byte. raceAbort actually CANCELS the upstream call when its
+  // deadline loses, instead of leaving it running and billing for a discarded
+  // result (Grok's X search, the SEC fan-out).
   const withDeadline = <T,>(p: Promise<T>, ms: number, fallback: T) =>
     Promise.race([p, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);
+  const raceAbort = <T,>(make: (signal: AbortSignal) => Promise<T>, ms: number, fallback: T): Promise<T> => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ms);
+    return make(ctrl.signal).catch(() => fallback).finally(() => clearTimeout(timer));
+  };
   const isEquity = /equity|stock|etf|fund/i.test(assetClass) || !assetClass;
   // Fundamentals are company filings — only meaningful for individual stocks
-  // (not ETFs/funds/FX/commodities). Deadline-bounded so a slow SEC fetch never
-  // holds up first-byte; on miss/timeout the lens degrades to web search.
+  // (not ETFs/funds/FX/commodities). `sb` gives the shared DB cache; the signal
+  // lets the 8s deadline cancel a slow SEC fetch.
   const isStock = /equity|stock/i.test(assetClass) || !assetClass;
-  const [ma, fundamentals, pulse, calibration] = await Promise.all([
+  const [macro, ma, fundamentals, pulse, calibration] = await Promise.all([
+    withDeadline(getMacroSnapshot().catch(() => []), 4000, [] as Awaited<ReturnType<typeof getMacroSnapshot>>),
     isEquity ? getMovingAverages(asset).catch(() => null) : Promise.resolve(null),
-    isStock ? withDeadline(getFundamentals(cleanTicker(asset) ?? asset).catch(() => null), 8000, null) : Promise.resolve(null),
-    withDeadline(communityPulse([asset], `the asset ${asset}`).catch(() => null), 12_000, null),
+    isStock ? raceAbort((signal) => getFundamentals(cleanTicker(asset) ?? asset, sb, signal), 8000, null) : Promise.resolve(null),
+    raceAbort((signal) => communityPulse([asset], `the asset ${asset}`, signal), 12_000, null),
     getCalibrationMemo(sb),
   ]);
+  // Real FRED backdrop — context for the Macro lens, not the asset's own figures.
+  const macroCtx = macro.length
+    ? `\n\nCurrent macro backdrop (real data via FRED — context for the Macro lens, not this asset's own figures): ${macro.map((m) => `${m.label} ${m.value}${m.unit}`).join(", ")}.`
+    : "";
   // Real SEC-filed fundamentals ground the FUNDAMENTAL & VALUATION lenses; the
   // live close (from the MA fetch) turns filed EPS/shares into a real P/E, market
   // cap and PEG instead of searched guesses.

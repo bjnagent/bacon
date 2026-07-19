@@ -29,8 +29,11 @@ export async function GET(req: Request) {
   const { data: users } = await admin.from("settings").select("user_id,brief_email_enabled").eq("watch_enabled", true);
   if (!users?.length) return NextResponse.json({ ok: true, watched: 0, alerts: 0, ...grading });
 
-  let watched = 0, alertCount = 0;
-  for (const u of users) {
+  // Per-user kill-condition check. Isolated + returns counts so it can run with
+  // bounded concurrency instead of serializing every user's web-search ask()
+  // under the 300s ceiling (which dropped the tail's checks — the whole point of
+  // the watcher is that a triggered kill comes and finds you).
+  const watchUser = async (u: { user_id: string; brief_email_enabled: boolean | null }): Promise<{ watched: number; alerts: number }> => {
     try {
       const { data: brief } = await admin
         .from("daily_briefs")
@@ -39,12 +42,11 @@ export async function GET(req: Request) {
         .order("brief_date", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (!brief) continue;
+      if (!brief) return { watched: 0, alerts: 0 };
       const items = (brief.items ?? []) as StoredBriefItem[];
       // Only watch ideas that carry a kill condition and aren't already closed out.
       const openIdeas = items.filter((o) => o.checks && /kill:/i.test(o.checks) && o.verdict !== "invalidated" && o.verdict !== "played-out");
-      if (!openIdeas.length) continue;
-      watched++;
+      if (!openIdeas.length) return { watched: 0, alerts: 0 };
 
       const listing = openIdeas.map((o, i) => `${i + 1}. ${o.name} (${o.ticker || "—"}) — thesis: ${o.thesis} — ${o.checks}`).join("\n");
       const text = await ask(
@@ -66,17 +68,22 @@ export async function GET(req: Request) {
       const kill_alert = enriched.length ? { at: new Date().toISOString(), note, items: enriched } : null;
       await admin.from("daily_briefs").update({ kill_alert }).eq("id", brief.id);
 
-      if (enriched.length) {
-        alertCount += enriched.length;
-        if (u.brief_email_enabled && emailEnabled()) {
-          try {
-            const { data: au } = await admin.auth.admin.getUserById(u.user_id);
-            const to = au?.user?.email;
-            if (to) await sendKillAlertEmail(to, enriched, new Date().toUTCString().slice(0, 16));
-          } catch { /* email is best-effort */ }
-        }
+      if (enriched.length && u.brief_email_enabled && emailEnabled()) {
+        try {
+          const { data: au } = await admin.auth.admin.getUserById(u.user_id);
+          const to = au?.user?.email;
+          if (to) await sendKillAlertEmail(to, enriched, new Date().toUTCString().slice(0, 16));
+        } catch { /* email is best-effort */ }
       }
-    } catch { /* per-user best-effort */ }
+      return { watched: 1, alerts: enriched.length };
+    } catch { return { watched: 0, alerts: 0 }; }
+  };
+
+  let watched = 0, alertCount = 0;
+  const POOL = 3;
+  for (let i = 0; i < users.length; i += POOL) {
+    const res = await Promise.all(users.slice(i, i + POOL).map(watchUser));
+    for (const r of res) { watched += r.watched; alertCount += r.alerts; }
   }
   return NextResponse.json({ ok: true, watched, alerts: alertCount, ...grading });
 }

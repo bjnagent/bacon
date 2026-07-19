@@ -195,9 +195,17 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
         <main className="pr-main">
           <div className="pr-head"><StatusBar module={moduleLabel} /></div>
           <div className="pr-canvas">
-            {place === "discover"
-              ? <DiscoverView tab={discoverTab} setTab={setDiscoverTab} onAnalyze={openAnalyze} onDiscuss={openChat} />
-              : <AnalyzeView target={analyzeTarget} onDiscuss={openChat} quickSyms={watchlistSyms} />}
+            {/* Keep BOTH destinations mounted, toggling visibility (the same
+                keep-alive pattern DiscoverView uses for its tabs). A hard ternary
+                unmounted the other view — discarding a finished, already-paid-for
+                analysis and, via a stale target token, auto-re-firing a billed
+                /api/analyze web-search stream on the way back. */}
+            <div style={{ display: place === "discover" ? "block" : "none" }}>
+              <DiscoverView tab={discoverTab} setTab={setDiscoverTab} onAnalyze={openAnalyze} onDiscuss={openChat} />
+            </div>
+            <div style={{ display: place === "analyze" ? "block" : "none" }}>
+              <AnalyzeView target={analyzeTarget} onDiscuss={openChat} quickSyms={watchlistSyms} />
+            </div>
           </div>
         </main>
       </div>

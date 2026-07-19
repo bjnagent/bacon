@@ -7,7 +7,7 @@ export async function GET() {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  const { data, error } = await sb.from("themes").select("id,label,created_at").order("created_at", { ascending: true });
+  const { data, error } = await sb.from("themes").select("id,label,created_at").order("created_at", { ascending: true }).limit(500);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ themes: data });
 }

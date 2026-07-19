@@ -16,7 +16,7 @@ export function grokEnabled(): boolean {
   return !!KEY;
 }
 
-async function askGrok(system: string, user: string, maxTokens = 700): Promise<string | null> {
+async function askGrok(system: string, user: string, maxTokens = 700, signal?: AbortSignal): Promise<string | null> {
   if (!KEY) return null;
   const body = {
     model: MODEL,
@@ -25,11 +25,15 @@ async function askGrok(system: string, user: string, maxTokens = 700): Promise<s
     // Live Search over X — the whole point of using Grok here.
     search_parameters: { mode: "auto", sources: [{ type: "x" }], max_search_results: 15 },
   };
+  // Combine the caller's deadline signal with the hard 45s cap, so when the
+  // caller's shorter race loses, this call is actually ABORTED (not left running
+  // to 45s while its X Live-Search is billed for a discarded result).
+  const timeout = () => (signal ? AbortSignal.any([signal, AbortSignal.timeout(45_000)]) : AbortSignal.timeout(45_000));
   const call = async (payload: object) => fetch("https://api.x.ai/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(45_000),
+    signal: timeout(),
   });
   try {
     let res = await call(body);
@@ -54,7 +58,7 @@ export interface CommunityPulse {
 
 // One pulse call covering a set of tickers/topics. The CROWDING block is
 // machine-parsed (feeds the calibration loop); the rest is prompt grounding.
-export async function communityPulse(topics: string[], context = "US markets"): Promise<CommunityPulse | null> {
+export async function communityPulse(topics: string[], context = "US markets", signal?: AbortSignal): Promise<CommunityPulse | null> {
   const list = topics.filter(Boolean).slice(0, 12);
   if (!list.length || !KEY) return null;
   const text = await askGrok(
@@ -66,6 +70,8 @@ export async function communityPulse(topics: string[], context = "US markets"): 
 ===CONTRARIAN===
 <1-2 sentences: where the crowd looks MOST wrong — euphoric tops or fear-driven bottoms>`,
     `Context: ${context}\nNames: ${list.join(", ")}\n\nWhat is the community saying right now?`,
+    700,
+    signal,
   );
   if (!text) return null;
   const crowding = new Map<string, string>();
