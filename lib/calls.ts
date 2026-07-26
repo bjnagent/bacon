@@ -248,3 +248,78 @@ export async function getCalibrationMemo(sb: SupabaseClient): Promise<string> {
     return buildCalibrationMemo((data ?? []) as GradedCall[]);
   } catch { return ""; }
 }
+
+// ---------- per-name reflection memory (episodic; unit-tested) ----------
+//
+// The aggregate memo above is STATISTICAL — it needs a cohort (MIN_N) before it
+// says anything. This one is EPISODIC: what did we say about THIS exact name
+// before, and what actually happened? Even a single prior call is useful, for
+// two reasons an advisor cannot ignore:
+//   1. Accountability — the model sees its own realized result on this name.
+//   2. Consistency — it must not silently flip a recent call without saying
+//      what changed. Flip-flopping with no stated cause is how a "desk" loses
+//      credibility, and it's invisible without this memory.
+// Deliberately NOT gated on a minimum sample: one prior call is the signal.
+
+export interface PastCall {
+  action: string;
+  conviction: number | null;
+  actual_pct: number | null;
+  bench_pct: number | null;
+  direction_hit: boolean | null;
+  target_err_pct: number | null;
+  target_text: string | null;
+  created_at: string;
+}
+
+const MAX_RECALLED = 5;
+const signed = (n: number, dp = 1) => `${n >= 0 ? "+" : ""}${n.toFixed(dp)}%`;
+
+export function buildInstrumentMemo(instrument: string, calls: PastCall[]): string {
+  if (!calls.length) return "";
+  const lines: string[] = [];
+  for (const c of calls.slice(0, MAX_RECALLED)) {
+    const date = String(c.created_at).slice(0, 10);
+    const action = (c.action || "?").toLowerCase();
+    const conv = c.conviction != null ? ` (conviction ${c.conviction}/5)` : "";
+    const target = c.target_text ? ` [${String(c.target_text).slice(0, 60)}]` : "";
+    if (c.actual_pct == null) {
+      lines.push(`- ${date}: you called ${action}${conv}${target} — still open, too early to grade.`);
+      continue;
+    }
+    const move = signed(c.actual_pct);
+    const vs = c.bench_pct != null ? ` vs SPY ${signed(c.bench_pct)}` : "";
+    const hit = c.direction_hit == null ? "" : c.direction_hit ? " — direction RIGHT" : " — direction WRONG";
+    const err = c.target_err_pct != null ? `; the actual landed ${signed(c.target_err_pct)} vs your base case` : "";
+    lines.push(`- ${date}: you called ${action}${conv}${target} → ${move}${vs}${hit}${err}.`);
+  }
+
+  // A one-line lesson, only where there is something real to conclude.
+  const rated = calls.filter((c) => c.direction_hit != null);
+  if (rated.length >= 2) {
+    const wins = rated.filter((c) => c.direction_hit).length;
+    lines.push(`On this name you are ${wins}/${rated.length} on direction — weigh that against your instinct here.`);
+  }
+
+  return `\n\nYOUR OWN TRACK RECORD ON ${instrument.toUpperCase()} (your prior calls on THIS name, graded against real prices). Treat it as accountability, not a script: if your view here CONTRADICTS a recent call above, say explicitly what changed to justify the flip; if it repeats a call that already went wrong, explain why it is different this time:\n${lines.join("\n")}`;
+}
+
+// Strip anything that could break the PostgREST or() filter, then match the
+// stored instrument case-insensitively (analyze stores the raw asset string,
+// the brief stores a ticker — so try both the raw text and the cleaned ticker).
+const sanitizeInstrument = (s: string) => s.replace(/[^A-Za-z0-9./\- ]/g, "").trim().slice(0, 60);
+
+export async function getInstrumentMemo(sb: SupabaseClient, rawInstrument: string): Promise<string> {
+  try {
+    const raw = sanitizeInstrument(rawInstrument || "");
+    if (!raw) return "";
+    const tick = cleanTicker(raw);
+    const candidates = [...new Set([raw.toUpperCase(), (tick ?? "").toUpperCase()].filter(Boolean))];
+    const { data } = await sb.from("calls")
+      .select("action,conviction,actual_pct,bench_pct,direction_hit,target_err_pct,target_text,created_at")
+      .or(candidates.map((c) => `instrument.ilike.${c}`).join(","))
+      .order("created_at", { ascending: false })
+      .limit(MAX_RECALLED + 3);
+    return buildInstrumentMemo(candidates[0], (data ?? []) as PastCall[]);
+  } catch { return ""; }
+}

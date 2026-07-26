@@ -6,7 +6,7 @@ import { parseDebate } from "@/lib/parsers";
 import { normStance } from "@/lib/lenses";
 import { marketByKey, getPropertySeries, computeMarketStats } from "@/lib/property";
 import { communityPulse } from "@/lib/grok";
-import { recordCalls, getCalibrationMemo } from "@/lib/calls";
+import { recordCalls, getCalibrationMemo, getInstrumentMemo } from "@/lib/calls";
 import { textStreamResponse } from "@/lib/streamRoute";
 import { withinQuota, QUOTA_MESSAGE } from "@/lib/quota";
 
@@ -33,10 +33,12 @@ export async function POST(req: Request) {
     const timer = setTimeout(() => ctrl.abort(), ms);
     return make(ctrl.signal).catch(() => fallback).finally(() => clearTimeout(timer));
   };
-  const [series, pulse, calibration] = await Promise.all([
+  const [series, pulse, calibration, instrumentMemo] = await Promise.all([
     getPropertySeries(sb, market.key).catch(() => null),
     raceAbort((signal) => communityPulse([market.label], `${market.country === "SG" ? "Singapore" : "Australia"} property market`, signal), 12_000, null),
     getCalibrationMemo(sb),
+    // Episodic memory: prior calls on THIS market and how they aged.
+    getInstrumentMemo(sb, market.key),
   ]);
   const stats = series ? computeMarketStats(series.bars) : null;
   const fmt = (n: number) => market.unit === "price" ? `${market.currency} ${Math.round(n).toLocaleString("en-US")}` : n.toFixed(1);
@@ -47,7 +49,7 @@ export async function POST(req: Request) {
   const pulseCtx = pulse ? `\n\nCOMMUNITY PULSE (live X via Grok — weigh in SENTIMENT; noisy, contrarian at extremes):\n${pulse.text}` : "";
   const calCtx = calibration ? `\n\nYOUR CALIBRATION (from your graded past calls — correct for these biases in the VERDICT):\n${calibration}` : "";
   return textStreamResponse(
-    askStream(propertyOutlookPrompt(market.label, statsLine), [{ role: "user", content: `Write the current deep view for ${market.label} — policy, rates, supply, district development & major projects, sentiment, rentals, 12-mo scenarios, 5/10-yr long run, the rent-vs-mortgage carry math, and your verdict.${pulseCtx}${calCtx}` }], true, 1800, 6),
+    askStream(propertyOutlookPrompt(market.label, statsLine), [{ role: "user", content: `Write the current deep view for ${market.label} — policy, rates, supply, district development & major projects, sentiment, rentals, 12-mo scenarios, 5/10-yr long run, the rent-vs-mortgage carry math, and your verdict.${pulseCtx}${calCtx}${instrumentMemo}` }], true, 1800, 6),
     async (full, ok) => {
       if (!ok) return; // don't persist a truncated outlook
       const sec = parseDebate(full); // generic ===SECTION=== splitter
