@@ -7,7 +7,7 @@ import { getMovingAverages, cleanTicker } from "@/lib/market";
 import { getFundamentals, deriveValuation, formatFundamentals } from "@/lib/fundamentals";
 import { communityPulse } from "@/lib/grok";
 import { parseBriefing } from "@/lib/parsers";
-import { recordCalls, parseVerdictCall, getCalibrationMemo } from "@/lib/calls";
+import { recordCalls, parseVerdictCall, getCalibrationMemo, getInstrumentMemo } from "@/lib/calls";
 import { textStreamResponse } from "@/lib/streamRoute";
 import { withinQuota, QUOTA_MESSAGE } from "@/lib/quota";
 
@@ -44,12 +44,14 @@ export async function POST(req: Request) {
   // (not ETFs/funds/FX/commodities). `sb` gives the shared DB cache; the signal
   // lets the 8s deadline cancel a slow SEC fetch.
   const isStock = /equity|stock/i.test(assetClass) || !assetClass;
-  const [macro, ma, fundamentals, pulse, calibration] = await Promise.all([
+  const [macro, ma, fundamentals, pulse, calibration, instrumentMemo] = await Promise.all([
     withDeadline(getMacroSnapshot().catch(() => []), 4000, [] as Awaited<ReturnType<typeof getMacroSnapshot>>),
     isEquity ? getMovingAverages(asset).catch(() => null) : Promise.resolve(null),
     isStock ? raceAbort((signal) => getFundamentals(cleanTicker(asset) ?? asset, sb, signal), 8000, null) : Promise.resolve(null),
     raceAbort((signal) => communityPulse([asset], `the asset ${asset}`, signal), 12_000, null),
     getCalibrationMemo(sb),
+    // Episodic memory: what we called on THIS name before, and how it aged.
+    getInstrumentMemo(sb, asset),
   ]);
   // Real FRED backdrop — context for the Macro lens, not the asset's own figures.
   const macroCtx = macro.length
@@ -70,7 +72,7 @@ export async function POST(req: Request) {
   return textStreamResponse(
     askStream(
       analysisPrompt(),
-      [{ role: "user", content: `Asset: ${asset}\nAsset class: ${assetClass}${macroCtx}${maCtx}${fundCtx}${pulseCtx}${calCtx}\n\nProduce the full multi-lens BACON briefing using current public information.` }],
+      [{ role: "user", content: `Asset: ${asset}\nAsset class: ${assetClass}${macroCtx}${maCtx}${fundCtx}${pulseCtx}${calCtx}${instrumentMemo}\n\nProduce the full multi-lens BACON briefing using current public information.` }],
       true,
       1700,
       6

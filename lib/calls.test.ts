@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { actionHead, expectedDirection, parseTargets, parseVerdictCall, horizonToDays, buildCalibrationMemo, type GradedCall } from "./calls";
+import { actionHead, expectedDirection, parseTargets, parseVerdictCall, horizonToDays, buildCalibrationMemo, buildInstrumentMemo, type GradedCall, type PastCall } from "./calls";
 
 describe("actionHead / expectedDirection", () => {
   it("normalizes the action word out of free text", () => {
@@ -90,5 +90,54 @@ describe("buildCalibrationMemo", () => {
     const memo = buildCalibrationMemo(calls);
     expect(memo).toContain("-8.0%");
     expect(memo).toContain("optimistic");
+  });
+});
+
+describe("buildInstrumentMemo (per-name reflection)", () => {
+  const graded: PastCall = {
+    action: "buy", conviction: 4, actual_pct: 12.3, bench_pct: 4.1,
+    direction_hit: true, target_err_pct: -8, target_text: "base $160",
+    created_at: "2026-01-15T00:00:00Z",
+  };
+  const open: PastCall = {
+    action: "watch", conviction: null, actual_pct: null, bench_pct: null,
+    direction_hit: null, target_err_pct: null, target_text: null,
+    created_at: "2026-07-01T00:00:00Z",
+  };
+
+  it("returns empty when there is no history on the name", () => {
+    expect(buildInstrumentMemo("NVDA", [])).toBe("");
+  });
+
+  it("recalls a graded call with its realized move, benchmark and verdict", () => {
+    const memo = buildInstrumentMemo("nvda", [graded]);
+    expect(memo).toContain("NVDA");            // header uppercases the name
+    expect(memo).toContain("2026-01-15");
+    expect(memo).toContain("+12.3%");
+    expect(memo).toContain("SPY +4.1%");
+    expect(memo).toContain("direction RIGHT");
+    expect(memo).toContain("base $160");
+  });
+
+  it("marks an ungraded call as still open rather than inventing an outcome", () => {
+    const memo = buildInstrumentMemo("NVDA", [open]);
+    expect(memo).toContain("too early to grade");
+    expect(memo).not.toContain("direction");
+  });
+
+  it("instructs the model to justify a flip — the anti-flip-flop guard", () => {
+    expect(buildInstrumentMemo("NVDA", [graded])).toContain("what changed");
+  });
+
+  it("adds a hit-rate lesson once two or more calls are graded", () => {
+    const miss: PastCall = { ...graded, created_at: "2026-03-02T00:00:00Z", direction_hit: false, actual_pct: -5 };
+    const memo = buildInstrumentMemo("NVDA", [graded, miss]);
+    expect(memo).toContain("1/2 on direction");
+  });
+
+  it("caps how many prior calls it recalls", () => {
+    const many = Array.from({ length: 9 }, (_, i) => ({ ...graded, created_at: `2026-0${(i % 9) + 1}-01T00:00:00Z` }));
+    const lines = buildInstrumentMemo("NVDA", many).split("\n").filter((l) => l.startsWith("- "));
+    expect(lines).toHaveLength(5);
   });
 });
