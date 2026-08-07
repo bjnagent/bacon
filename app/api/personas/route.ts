@@ -26,7 +26,8 @@ export async function POST(req: Request) {
       [{ role: "user", content: `Asset: ${asset}\nAsset class: ${assetClass}\n\nGive the four stylized investor takes using current public information.` }],
       true,
       1100,
-      6
+      6,
+      { route: "personas", userId: user.id }
     );
     return NextResponse.json({ personas: parseDebate(text) });
   } catch (err) {

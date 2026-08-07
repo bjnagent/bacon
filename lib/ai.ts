@@ -12,6 +12,7 @@
 
 import { ask } from "./anthropic";
 import { askGemini, geminiEnabled } from "./gemini";
+import type { AiMeta } from "./usage";
 
 // A reply shorter than this almost always means Gemini refused or the delimited
 // format broke — hand it to Claude rather than persist an empty/garbled feed.
@@ -22,13 +23,16 @@ export async function askCheap(
   messages: { role: "user" | "assistant"; content: string }[],
   useSearch = true,
   maxTokens = 1100,
-  maxSearches?: number
+  maxSearches?: number,
+  meta?: AiMeta
 ): Promise<string> {
   if (geminiEnabled()) {
     try {
-      const out = await askGemini(system, messages, useSearch, maxTokens);
+      const out = await askGemini(system, messages, useSearch, maxTokens, meta);
       if (out.length >= MIN_USEFUL_CHARS) return out;
     } catch { /* fall through to Claude */ }
   }
-  return ask(system, messages, useSearch, maxTokens, maxSearches);
+  // A fallback bills BOTH providers; both get metered, so the console shows the
+  // real cost of a degenerate Gemini reply rather than hiding half of it.
+  return ask(system, messages, useSearch, maxTokens, maxSearches, meta);
 }

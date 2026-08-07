@@ -44,7 +44,8 @@ export async function GET(req: Request) {
   try {
     mw = (await readMarketWide(admin)) ?? await (async () => { const b = await fetchMarketWide(); await cacheMarketWide(admin, b); return b; })();
     if (mw.movers.length) {
-      const text = await askCheap(moversScoutPrompt(mw.movers), [{ role: "user", content: "Explain today's top movers and what to verify." }], true, 1400, 6);
+      // Shared across every swept user → metered as a system cost (no userId).
+      const text = await askCheap(moversScoutPrompt(mw.movers), [{ role: "user", content: "Explain today's top movers and what to verify." }], true, 1400, 6, { route: "sweep:movers" });
       moverPicks = parseScout(text).picks.map((p) => {
         const m = mw.movers.find((mv) => (mv.ticker || "").toUpperCase() === (p.ticker || "").toUpperCase());
         return { name: p.name, ticker: p.ticker, cls: p.cls, why: p.why, now: p.now, check: p.check, change_pct: m?.changePct ?? null };
@@ -84,7 +85,7 @@ async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: st
 
   // Fire the user's AI calls concurrently.
   const themeScoutP: Promise<ScoutResult | null> = themeLabels.length
-    ? askCheap(scoutPrompt(themeLabels), [{ role: "user", content: `Themes: ${themeLabels.join("; ")}` }], true, 1100, 6).then(parseScout).catch(() => null)
+    ? askCheap(scoutPrompt(themeLabels), [{ role: "user", content: `Themes: ${themeLabels.join("; ")}` }], true, 1100, 6, { route: "sweep:scout", userId }).then(parseScout).catch(() => null)
     : Promise.resolve(null);
   const newsP: Promise<NewsResult | null> = askCheap(
     newsPrompt(newsSource || "All", newsFocus || ""),
@@ -92,9 +93,10 @@ async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: st
     true,
     1500,
     4,
+    { route: "sweep:news", userId },
   ).then(parseNews).catch(() => null);
   const trackP = tracked.map((it) =>
-    askCheap(trackingUpdatePrompt(), [{ role: "user", content: `Asset: ${it.symbol}\nAsset class: ${it.asset_class}\n\nGive the monitoring update from current public information.` }], true, 1100, 3)
+    askCheap(trackingUpdatePrompt(), [{ role: "user", content: `Asset: ${it.symbol}\nAsset class: ${it.asset_class}\n\nGive the monitoring update from current public information.` }], true, 1100, 3, { route: "sweep:track", userId })
       .then((text) => ({ it, upd: parseTrackingUpdate(text) }))
       .catch(() => ({ it, upd: null }))
   );
@@ -114,7 +116,7 @@ async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: st
     voices,
     commodities: mw.commodities,
     fx: mw.fx,
-  }).catch(() => null);
+  }, { route: "sweep:brief", userId }).catch(() => null);
 
   const [themeRes, newsRes, trackResults, brief] = await Promise.all([themeScoutP, newsP, Promise.all(trackP), briefP]);
 

@@ -58,7 +58,10 @@ export async function fetchMarketWide(insiderDeadlineMs = 8000): Promise<MarketW
   let pulse: MarketWide["pulse"] = null;
   if (grokEnabled()) {
     const tickers = [...signals.gainers, ...signals.mostActive].map((m) => m.ticker).filter(Boolean).slice(0, 10);
-    const p = await communityPulse(tickers, "US markets today").catch(() => null);
+    // No userId: the day's snapshot is fetched once and shared by every user,
+    // so it meters as a system cost rather than being charged to whoever
+    // happened to trigger the fetch.
+    const p = await communityPulse(tickers, "US markets today", undefined, { route: "snapshot" }).catch(() => null);
     if (p) pulse = { text: p.text, crowding: Object.fromEntries(p.crowding) };
   }
   return {

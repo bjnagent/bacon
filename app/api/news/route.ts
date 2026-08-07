@@ -37,7 +37,8 @@ export async function POST(req: Request) {
       [{ role: "user", content: `Source focus: ${source}\nTopic focus: ${focus || "(general markets)"}\n\nSurface the latest market-moving business headlines now.` }],
       true,
       1500,
-      6
+      6,
+      { route: "news", userId: user.id }
     );
     const result = parseNews(text);
     if (result.items.length) {

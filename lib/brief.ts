@@ -3,6 +3,7 @@
 // Shared by the daily cron sweep and the on-demand /api/brief generator.
 
 import { ask } from "./anthropic";
+import type { AiMeta } from "./usage";
 import { opportunityBriefPrompt } from "./prompts";
 import { parseOpportunities, type OpportunityBrief } from "./parsers";
 import type { Mover } from "./market";
@@ -53,8 +54,8 @@ export function buildSignalBundle(b: SignalBundle): string {
   return parts.join("\n\n");
 }
 
-export async function generateBrief(bundle: SignalBundle): Promise<OpportunityBrief> {
-  const text = await ask(opportunityBriefPrompt(), [{ role: "user", content: buildSignalBundle(bundle) }], true, 1800, 6);
+export async function generateBrief(bundle: SignalBundle, meta?: AiMeta): Promise<OpportunityBrief> {
+  const text = await ask(opportunityBriefPrompt(), [{ role: "user", content: buildSignalBundle(bundle) }], true, 1800, 6, meta);
   return parseOpportunities(text);
 }
 

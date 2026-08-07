@@ -79,7 +79,7 @@ export async function POST() {
   });
 
   return textStreamResponse(
-    askStream(opportunityBriefPrompt(), [{ role: "user", content: bundle }], true, 1800, 6),
+    askStream(opportunityBriefPrompt(), [{ role: "user", content: bundle }], true, 1800, 6, { route: "brief", userId: user.id }),
     async (full, ok) => {
       if (!ok) return; // stream errored mid-flight — don't persist a truncated brief
       const brief = parseOpportunities(full);

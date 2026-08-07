@@ -53,6 +53,7 @@ export async function GET(req: Request) {
         killWatchPrompt(String(brief.brief_date)),
         [{ role: "user", content: `Opportunities & their kill conditions:\n${listing}\n\nCheck whether any kill condition has triggered.` }],
         true, 1000, 5,
+        { route: "watch", userId: u.user_id },
       );
       const { items: alerts, note } = parseKillWatch(text);
       const enriched = alerts.map((a) => {

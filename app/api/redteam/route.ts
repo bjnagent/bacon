@@ -27,7 +27,8 @@ export async function POST(req: Request) {
       [{ role: "user", content: `Asset: ${asset}\nAsset class: ${assetClass}\n\nI'm about to invest. Attack it — worst case, 10 reasons I lose my money, then your honest verdict.` }],
       true,
       1400,
-      6
+      6,
+      { route: "redteam", userId: user.id }
     );
     return NextResponse.json({ redteam: parseDebate(text) });
   } catch (err) {
