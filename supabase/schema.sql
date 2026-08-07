@@ -411,6 +411,12 @@ create policy "own ai_events" on ai_events for select using ((select auth.uid())
 --      public pseudo-role — the function stays live on /rest/v1/rpc/.
 -- ---------------------------------------------------------------------------
 
+-- `ai_events` is a ledger that starts the day it ships. Reading only from it
+-- made the console report "no data" on a product with weeks of history: the
+-- quota meter (`ai_usage`) and the content tables had been recording all along.
+-- The overview therefore returns TWO things — metered spend, and an `activity`
+-- block covering everything that predates metering — plus `meteringSince`, so
+-- "we weren't measuring yet" is never rendered as "nothing happened".
 create or replace function admin_usage_overview(p_days int default 30)
 returns jsonb
 language sql
@@ -424,6 +430,9 @@ as $$
   )
   select jsonb_build_object(
     'days', greatest(1, least(365, coalesce(p_days, 30))),
+    -- null until the first metered call. The console keys its "metering starts
+    -- here" note off this rather than off a zero total.
+    'meteringSince', (select min(created_at) from ai_events),
     'totals', (select jsonb_build_object(
         'calls', count(*),
         'input', coalesce(sum(input_tokens), 0),
@@ -438,6 +447,30 @@ as $$
         'p50ms', coalesce(percentile_disc(0.5) within group (order by ms) filter (where ms is not null), 0),
         'p95ms', coalesce(percentile_disc(0.95) within group (order by ms) filter (where ms is not null), 0)
       ) from ev),
+    -- Everything that predates the ledger. Call counts come from the quota
+    -- meter, which has no token or cost detail — hence a separate block rather
+    -- than faked-up ai_events rows.
+    'activity', jsonb_build_object(
+      'since', (select to_char(min(day), 'YYYY-MM-DD') from ai_usage),
+      'aiCalls', coalesce((select sum(calls) from ai_usage), 0),
+      'activeUsers', coalesce((select count(distinct user_id) from ai_usage), 0),
+      'byDay', (select coalesce(jsonb_agg(x order by x->>'day'), '[]'::jsonb) from (
+          select jsonb_build_object(
+            'day', to_char(day, 'YYYY-MM-DD'),
+            'calls', sum(calls),
+            'users', count(distinct user_id)
+          ) as x
+          from ai_usage group by day
+        ) u),
+      'briefs',    (select count(*) from daily_briefs),
+      'callsFiled',(select count(*) from calls),
+      'picks',     (select count(*) from scout_picks),
+      'news',      (select count(*) from news_items),
+      'chats',     (select count(*) from chat_messages),
+      'watchlist', (select count(*) from watchlist),
+      'themes',    (select count(*) from themes),
+      'outlooks',  (select count(*) from property_outlooks)
+    ),
     'daily', (select coalesce(jsonb_agg(x order by x->>'day'), '[]'::jsonb) from (
         select jsonb_build_object(
           'day', to_char(date_trunc('day', created_at), 'YYYY-MM-DD'),
@@ -475,8 +508,11 @@ as $$
   );
 $$;
 
--- Per-user behaviour + spend. `auth.users` supplies identity/signup; the
--- aggregates come from the metering ledger and the user's own content tables.
+-- Per-user behaviour. `auth.users` supplies identity/signup; the aggregates come
+-- from the metering ledger, the quota meter and the user's own content tables.
+-- Which NAMES and THEMES each account follows are returned as arrays, not just
+-- counts — "what is this account into" is the question the console exists for,
+-- and it is a lifetime question, not a 30-day one.
 create or replace function admin_user_activity(p_days int default 30, p_limit int default 100)
 returns jsonb
 language sql
@@ -511,7 +547,7 @@ as $$
     from route_counts
     order by user_id, n desc, route
   )
-  select coalesce(jsonb_agg(row order by (row->>'cost')::numeric desc), '[]'::jsonb)
+  select coalesce(jsonb_agg(row order by (row->>'cost')::numeric desc, (row->>'lifetimeCalls')::int desc), '[]'::jsonb)
   from (
     select jsonb_build_object(
       'userId', u.id,
@@ -526,18 +562,101 @@ as $$
       'routes', coalesce(g.routes, 0),
       'topRoute', tr.route,
       'lastCall', g.last_call,
+      -- Lifetime AI calls from the quota meter: the only per-user history that
+      -- predates the ledger, and the reason a user with cost=0 isn't inactive.
+      'lifetimeCalls', coalesce((select sum(a.calls) from ai_usage a where a.user_id = u.id), 0),
+      'usedToday', coalesce((select a.calls from ai_usage a where a.user_id = u.id and a.day = current_date), 0),
       'watchlist', (select count(*) from watchlist w where w.user_id = u.id),
       'themes', (select count(*) from themes t where t.user_id = u.id),
       'briefs', (select count(*) from daily_briefs d where d.user_id = u.id),
       'callsFiled', (select count(*) from calls c where c.user_id = u.id),
-      'usedToday', coalesce((select a.calls from ai_usage a where a.user_id = u.id and a.day = current_date), 0)
+      'chats', (select count(*) from chat_messages m where m.user_id = u.id and m.role = 'user'),
+      -- What they actually follow, not just how many.
+      'symbols', coalesce((select jsonb_agg(w.symbol order by w.created_at)
+                           from watchlist w where w.user_id = u.id), '[]'::jsonb),
+      'themeLabels', coalesce((select jsonb_agg(t.label order by t.created_at)
+                               from themes t where t.user_id = u.id), '[]'::jsonb),
+      'lastSeen', greatest(
+        u.last_sign_in_at,
+        (select max(m.created_at) from chat_messages m where m.user_id = u.id),
+        (select max(w.created_at) from watchlist w where w.user_id = u.id),
+        (select max(d.created_at) from daily_briefs d where d.user_id = u.id)
+      )
     ) as row
     from auth.users u
     left join usage g on g.user_id = u.id
     left join top_route tr on tr.user_id = u.id
-    order by coalesce(g.cost, 0) desc, u.created_at desc
+    order by coalesce(g.cost, 0) desc,
+             coalesce((select sum(a.calls) from ai_usage a where a.user_id = u.id), 0) desc,
+             u.created_at desc
     limit greatest(1, least(500, coalesce(p_limit, 100)))
   ) s;
+$$;
+
+-- Per-user drill-down: the chat transcript, the names and themes followed, and
+-- the calls filed. Split from the list above so the table isn't carrying a
+-- transcript per row — this loads only when a row is opened.
+create or replace function admin_user_detail(p_user uuid, p_limit int default 100)
+returns jsonb
+language sql
+stable
+security invoker
+set search_path = public, pg_catalog
+as $$
+  select jsonb_build_object(
+    'userId', p_user,
+    'email', (select email from auth.users where id = p_user),
+    'chat', (select coalesce(jsonb_agg(x order by x->>'at' desc), '[]'::jsonb) from (
+        select jsonb_build_object(
+          'at', m.created_at,
+          'conversation', m.conversation_id,
+          'role', m.role,
+          -- Truncated: the console is a behaviour view, not an archive, and a
+          -- long assistant answer would dominate the payload.
+          'text', left(m.content, 2000),
+          'truncated', length(m.content) > 2000
+        ) as x
+        from chat_messages m
+        where m.user_id = p_user
+        order by m.created_at desc
+        limit greatest(1, least(500, coalesce(p_limit, 100)))
+      ) c),
+    'watchlist', (select coalesce(jsonb_agg(x order by x->>'at' desc), '[]'::jsonb) from (
+        select jsonb_build_object(
+          'at', w.created_at, 'symbol', w.symbol, 'cls', w.asset_class,
+          'lean', w.lean, 'conviction', w.conviction, 'thesis', left(coalesce(w.thesis, ''), 400),
+          'note', left(coalesce(w.note, ''), 400), 'status', w.status, 'lastScan', w.last_scan_at
+        ) as x
+        from watchlist w where w.user_id = p_user
+      ) w2),
+    'themes', (select coalesce(jsonb_agg(x order by x->>'at'), '[]'::jsonb) from (
+        select jsonb_build_object('at', t.created_at, 'label', t.label) as x
+        from themes t where t.user_id = p_user
+      ) t2),
+    'calls', (select coalesce(jsonb_agg(x order by x->>'at' desc), '[]'::jsonb) from (
+        select jsonb_build_object(
+          'at', c.created_at, 'instrument', c.instrument, 'action', c.action,
+          'source', c.source, 'conviction', c.conviction, 'target', c.target_text,
+          'horizon', c.horizon_date, 'actualPct', c.actual_pct, 'benchPct', c.bench_pct,
+          'hit', c.direction_hit, 'gradedAt', c.graded_at
+        ) as x
+        from calls c where c.user_id = p_user
+        order by c.created_at desc limit 100
+      ) c2),
+    'briefs', (select coalesce(jsonb_agg(x order by x->>'day' desc), '[]'::jsonb) from (
+        select jsonb_build_object(
+          'day', to_char(d.brief_date, 'YYYY-MM-DD'),
+          'items', jsonb_array_length(coalesce(d.items, '[]'::jsonb)),
+          'reviewed', d.reviewed_at is not null
+        ) as x
+        from daily_briefs d where d.user_id = p_user
+        order by d.brief_date desc limit 60
+      ) d2),
+    'usage', (select coalesce(jsonb_agg(x order by x->>'day'), '[]'::jsonb) from (
+        select jsonb_build_object('day', to_char(a.day, 'YYYY-MM-DD'), 'calls', a.calls) as x
+        from ai_usage a where a.user_id = p_user
+      ) a2)
+  );
 $$;
 
 -- Most recent calls, for the live activity tail.
@@ -568,7 +687,9 @@ $$;
 -- `public` alone leaves these callable over PostgREST.
 revoke all on function admin_usage_overview(int) from public, anon, authenticated;
 revoke all on function admin_user_activity(int, int) from public, anon, authenticated;
+revoke all on function admin_user_detail(uuid, int) from public, anon, authenticated;
 revoke all on function admin_recent_events(int) from public, anon, authenticated;
 grant execute on function admin_usage_overview(int) to service_role;
 grant execute on function admin_user_activity(int, int) to service_role;
+grant execute on function admin_user_detail(uuid, int) to service_role;
 grant execute on function admin_recent_events(int) to service_role;

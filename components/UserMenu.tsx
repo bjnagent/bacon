@@ -1,11 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { User, LogOut, KeyRound, ChevronDown } from "lucide-react";
+import Link from "next/link";
+import { User, LogOut, KeyRound, ChevronDown, Gauge } from "lucide-react";
 
 // Account lives in a small popover (not a nav tab): the signed-in email, a
-// shortcut to change password, and sign out.
-export default function UserMenu({ email, onChangePassword }: { email: string; onChangePassword: () => void }) {
+// shortcut to change password, and sign out. Admins also get a way into the
+// operator console — without it the only route is typing /admin from memory.
+export default function UserMenu({
+  email, onChangePassword, isAdmin = false,
+}: { email: string; onChangePassword: () => void; isAdmin?: boolean }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -22,6 +26,11 @@ export default function UserMenu({ email, onChangePassword }: { email: string; o
       {open && (
         <div className="pr-usermenu-pop" role="menu">
           <div className="pr-usermenu-email">{email}</div>
+          {isAdmin && (
+            <Link className="pr-usermenu-item" role="menuitem" href="/admin" onClick={() => setOpen(false)}>
+              <Gauge size={14} /> Operator console
+            </Link>
+          )}
           <button className="pr-usermenu-item" role="menuitem" onClick={() => { setOpen(false); onChangePassword(); }}><KeyRound size={14} /> Change password</button>
           <form action="/api/auth/signout" method="post"><button type="submit" className="pr-usermenu-item" role="menuitem"><LogOut size={14} /> Sign out</button></form>
         </div>
