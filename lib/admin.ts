@@ -37,6 +37,21 @@ export interface AdminSession {
 }
 
 /**
+ * A denial is deliberately indistinguishable from a missing route in the
+ * browser, which also leaves the OPERATOR with no signal when it's their own
+ * allowlist entry that's wrong — the failure looks identical to a broken
+ * deploy. So say why, server-side only: never rendered, never sent to the
+ * client, but visible in the platform logs where the person debugging is.
+ *
+ * The allowlist itself is never logged, only how many entries it has — enough
+ * to tell "unset" from "set but doesn't match you", which is the distinction
+ * that actually costs time.
+ */
+function denied(reason: string): void {
+  console.warn(`[admin] denied — ${reason}`);
+}
+
+/**
  * Verify the current request comes from an allowlisted admin and hand back a
  * service-role client. Returns `ok:false` rather than throwing so callers choose
  * their own response (404 for the page, 403 for the API).
@@ -46,10 +61,24 @@ export async function requireAdmin(): Promise<AdminSession> {
     const sb = await createClient();
     const { data: { user } } = await sb.auth.getUser();
     const email = user?.email ?? null;
-    if (!user || !isAdminEmail(email)) return { ok: false, email, db: null };
-    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return { ok: false, email, db: null };
+    if (!user) {
+      denied("no signed-in session");
+      return { ok: false, email, db: null };
+    }
+    if (!isAdminEmail(email)) {
+      const n = adminEmails().length;
+      denied(
+        `${email} is not on the allowlist; ADMIN_EMAILS ${n === 0 ? "is unset or empty" : `has ${n} entr${n === 1 ? "y" : "ies"}`}`
+      );
+      return { ok: false, email, db: null };
+    }
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      denied("SUPABASE_SERVICE_ROLE_KEY is not set on this deployment");
+      return { ok: false, email, db: null };
+    }
     return { ok: true, email, db: createAdminClient() };
-  } catch {
+  } catch (err) {
+    denied(`the check itself threw: ${err instanceof Error ? err.message : String(err)}`);
     return { ok: false, email: null, db: null };
   }
 }
