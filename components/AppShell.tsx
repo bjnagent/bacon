@@ -51,7 +51,7 @@ function StatusBar({ module }: { module: string }) {
   );
 }
 
-export default function AppShell({ userEmail }: { userEmail: string }) {
+export default function AppShell({ userEmail, isAdmin = false }: { userEmail: string; isAdmin?: boolean }) {
   const [place, setPlace] = useState<Place>("discover");
   const [discoverTab, setDiscoverTab] = useState<DiscoverTab>("today");
   const [tool, setTool] = useState<Tool>(null);
@@ -155,7 +155,7 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
         </Link>
         <div className="pr-mobilehead-actions">
           <button className="pr-iconbtn" aria-label="Search & commands" onClick={() => setPaletteOpen(true)}><Search size={18} /></button>
-          <UserMenu email={userEmail} onChangePassword={() => setTool("account")} />
+          <UserMenu email={userEmail} isAdmin={isAdmin} onChangePassword={() => setTool("account")} />
         </div>
       </div>
 
@@ -187,7 +187,7 @@ export default function AppShell({ userEmail }: { userEmail: string }) {
             </button>
             <button className="pr-railbtn" onClick={() => setPaletteOpen(true)}><span className="pr-railidx" /><Command size={17} /><span className="lbl">Search</span><kbd className="pr-railkbd">⌘K</kbd></button>
             <div className="pr-railspacer" />
-            <UserMenu email={userEmail} onChangePassword={() => setTool("account")} />
+            <UserMenu email={userEmail} isAdmin={isAdmin} onChangePassword={() => setTool("account")} />
           </div>
           <div className="pr-railfoot">Charts via <a className="pr-foot-link" href="https://www.tradingview.com" target="_blank" rel="noopener noreferrer">TradingView</a> · not advice</div>
         </nav>

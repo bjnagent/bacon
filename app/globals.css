@@ -1190,9 +1190,55 @@ body { background: #EBE8E0; color: #1A1712; }
 .ad-tail-model{overflow:hidden;text-overflow:ellipsis}
 .ad-tail-n{text-align:right;font-variant-numeric:tabular-nums}
 
+.ad-good{color:var(--good);font-weight:600}
+.ad-strong{font-weight:700;color:var(--ink)}
+.ad-sub{font-size:11.5px;color:var(--muted);line-height:1.5;margin-top:3px;white-space:normal}
+
+/* All-time activity: bare call-count bars. Deliberately plainer than the spend
+   chart — it carries no dollars, and shouldn't look like it does. */
+.ad-bars{display:flex;align-items:flex-end;gap:5px;height:92px;margin-top:12px;background:var(--card);border:1px solid var(--line2);border-radius:9px;padding:12px 14px 8px}
+.ad-bar{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;gap:5px}
+.ad-bar-fill{width:100%;max-width:34px;background:var(--accent);opacity:0.82;border-radius:3px 3px 0 0}
+.ad-bar-lbl{font-family:var(--fm);font-size:9px;color:var(--muted2);white-space:nowrap}
+
+/* User rows expand in place. */
+.ad-row{cursor:pointer}
+.ad-row:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.ad-row.is-open{background:var(--paper2)}
+.ad-chev{width:26px;text-align:left !important;color:var(--muted)}
+.ad-chev-open{transform:rotate(90deg);transition:transform 120ms ease}
+.ad-syms{font-family:var(--fm);font-size:11px;color:var(--muted);max-width:210px;overflow:hidden;text-overflow:ellipsis}
+.ad-row-detail td{padding:0 !important;background:var(--paper2);white-space:normal}
+
+.ad-detail{padding:16px 18px 20px;border-top:1px solid var(--line2)}
+.ad-detail-cols{display:grid;grid-template-columns:1fr 1fr;gap:26px;align-items:start}
+.ad-h3{font-family:var(--fd);font-weight:700;font-size:13px;color:var(--ink);margin:0 0 9px;display:flex;align-items:baseline;gap:8px}
+.ad-detail-cols > div > .ad-h3:not(:first-child){margin-top:20px}
+.ad-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}
+.ad-list li{font-size:12.5px;line-height:1.5}
+.ad-pill{display:inline-block;margin-left:7px;font-family:var(--fm);font-size:9.5px;text-transform:uppercase;letter-spacing:0.06em;border-radius:3px;padding:1px 6px;background:var(--line2);color:var(--muted)}
+.ad-pill.is-constructive{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good)}
+.ad-pill.is-cautious{background:color-mix(in srgb,var(--bad) 15%,transparent);color:var(--bad)}
+.ad-chips{display:flex;flex-wrap:wrap;gap:6px}
+.ad-chip{font-family:var(--fm);font-size:10.5px;background:var(--card);border:1px solid var(--line2);border-radius:12px;padding:3px 10px;color:var(--muted)}
+.ad-chip.is-on{border-color:var(--accent);color:var(--ink)}
+
+/* Transcript. Capped and scrolled so one chatty account can't push the rest of
+   the table off the screen. */
+.ad-chat{display:flex;flex-direction:column;gap:9px;max-height:440px;overflow-y:auto;padding-right:4px}
+.ad-msg{background:var(--card);border:1px solid var(--line2);border-radius:8px;padding:9px 11px}
+.ad-msg.is-user{border-left:3px solid var(--accent)}
+.ad-msg.is-assistant{border-left:3px solid var(--line2)}
+.ad-msg-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:5px;font-family:var(--fm);font-size:9.5px;text-transform:uppercase;letter-spacing:0.08em}
+.ad-msg-role{color:var(--accent);font-weight:600}
+.ad-msg.is-assistant .ad-msg-role{color:var(--muted)}
+.ad-msg-body{font-size:12.5px;line-height:1.6;color:var(--ink);white-space:pre-wrap;word-break:break-word}
+
 @media (max-width:900px){
   .ad-wrap{padding:18px 16px 52px}
   .ad-cols{grid-template-columns:1fr}
+  .ad-detail-cols{grid-template-columns:1fr;gap:20px}
   .ad-tail-row{grid-template-columns:66px minmax(0,1fr) minmax(0,1fr) 74px}
   .ad-tail-model,.ad-tail-n:not(:last-child){display:none}
+  .ad-bars{height:72px}
 }

@@ -14,7 +14,7 @@
 
 import { createClient } from "./supabase/server";
 import { createAdminClient } from "./supabase/admin";
-import type { Overview, UserRow } from "./adminTypes";
+import type { Overview, UserRow, UserDetail } from "./adminTypes";
 
 export function adminEmails(): string[] {
   return (process.env.ADMIN_EMAILS ?? "")
@@ -110,4 +110,11 @@ export async function loadUsers(db: Db, days: number, limit: number): Promise<Us
   const { data, error } = await db.rpc("admin_user_activity", { p_days: days, p_limit: limit });
   if (error) return null;
   return (data ?? []) as unknown as UserRow[];
+}
+
+/** One user's transcript, followed names, themes and filed calls. */
+export async function loadUserDetail(db: Db, userId: string, limit: number): Promise<UserDetail | null> {
+  const { data, error } = await db.rpc("admin_user_detail", { p_user: userId, p_limit: limit });
+  if (error || !data) return null;
+  return data as unknown as UserDetail;
 }
