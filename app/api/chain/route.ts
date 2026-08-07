@@ -27,7 +27,8 @@ export async function POST(req: Request) {
       [{ role: "user", content: `Industry / trend / asset: ${asset}${assetClass ? ` (${assetClass})` : ""}\n\nMap the second- and third-degree winners and losers, give me the names I wouldn't think of, and call the real setups.` }],
       true,
       1600,
-      6
+      6,
+      { route: "chain", userId: user.id }
     );
     return NextResponse.json({ chain: parseDebate(text) });
   } catch (err) {

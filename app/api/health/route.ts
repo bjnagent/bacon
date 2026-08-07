@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
   let anthropicOk = false;
   let anthropicError: string | null = null;
   try {
-    await ask("You are a health check.", [{ role: "user", content: "reply OK" }], false, 16);
+    await ask("You are a health check.", [{ role: "user", content: "reply OK" }], false, 16, undefined, { route: "health" });
     anthropicOk = true;
   } catch (err) {
     anthropicError = err instanceof Error ? err.message : String(err);

@@ -9,6 +9,8 @@
 // Optional, like Gemini: unset XAI_API_KEY → every helper degrades to null and
 // the rest of bacon behaves exactly as before.
 
+import { meter, type AiMeta } from "./usage";
+
 const KEY = process.env.XAI_API_KEY;
 const MODEL = process.env.XAI_MODEL || "grok-3-mini";
 
@@ -16,8 +18,9 @@ export function grokEnabled(): boolean {
   return !!KEY;
 }
 
-async function askGrok(system: string, user: string, maxTokens = 700, signal?: AbortSignal): Promise<string | null> {
+async function askGrok(system: string, user: string, maxTokens = 700, signal?: AbortSignal, meta?: AiMeta): Promise<string | null> {
   if (!KEY) return null;
+  const t0 = Date.now();
   const body = {
     model: MODEL,
     max_tokens: maxTokens,
@@ -44,11 +47,31 @@ async function askGrok(system: string, user: string, maxTokens = 700, signal?: A
       delete plain.search_parameters;
       res = await call(plain);
     }
-    if (!res.ok) return null;
+    if (!res.ok) {
+      if (meta) meter({ ...meta, provider: "xai", model: MODEL, usage: { input: 0, output: 0 }, ms: Date.now() - t0, ok: false });
+      return null;
+    }
     const data = await res.json();
+    // OpenAI-compatible usage block; xAI also reports the Live Search tally,
+    // which is billed per source and is the expensive half of a pulse call.
+    if (meta) {
+      const u = data?.usage ?? {};
+      meter({
+        ...meta, provider: "xai", model: data?.model || MODEL, ms: Date.now() - t0,
+        usage: {
+          input: Number(u.prompt_tokens) || 0,
+          output: Number(u.completion_tokens) || 0,
+          cacheRead: Number(u.prompt_tokens_details?.cached_tokens) || 0,
+          webSearches: Number(u.num_sources_used) || 0,
+        },
+      });
+    }
     const text = data?.choices?.[0]?.message?.content;
     return typeof text === "string" && text.trim().length > 20 ? text.trim() : null;
-  } catch { return null; }
+  } catch {
+    if (meta) meter({ ...meta, provider: "xai", model: MODEL, usage: { input: 0, output: 0 }, ms: Date.now() - t0, ok: false });
+    return null;
+  }
 }
 
 export interface CommunityPulse {
@@ -58,7 +81,7 @@ export interface CommunityPulse {
 
 // One pulse call covering a set of tickers/topics. The CROWDING block is
 // machine-parsed (feeds the calibration loop); the rest is prompt grounding.
-export async function communityPulse(topics: string[], context = "US markets", signal?: AbortSignal): Promise<CommunityPulse | null> {
+export async function communityPulse(topics: string[], context = "US markets", signal?: AbortSignal, meta?: AiMeta): Promise<CommunityPulse | null> {
   const list = topics.filter(Boolean).slice(0, 12);
   if (!list.length || !KEY) return null;
   const text = await askGrok(
@@ -72,6 +95,7 @@ export async function communityPulse(topics: string[], context = "US markets", s
     `Context: ${context}\nNames: ${list.join(", ")}\n\nWhat is the community saying right now?`,
     700,
     signal,
+    meta,
   );
   if (!text) return null;
   const crowding = new Map<string, string>();

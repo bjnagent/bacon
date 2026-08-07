@@ -360,3 +360,215 @@ begin
 end $$;
 revoke execute on function public.replace_news(uuid, jsonb) from public, anon;
 grant  execute on function public.replace_news(uuid, jsonb) to authenticated, service_role;
+
+-- ---------------------------------------------------------------------------
+-- AI metering: one row per model call, with REAL token counts reported by the
+-- provider and the cost computed at write time (so historical spend doesn't
+-- shift when prices change). Powers the admin console. ai_usage above stays as
+-- the cheap per-day counter the quota gate reads; this is the detailed ledger.
+create table if not exists ai_events (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete set null,  -- null = system/cron
+  route text not null,            -- analyze | brief | chat | sweep | ...
+  provider text not null,         -- anthropic | gemini | xai
+  model text not null,
+  input_tokens int not null default 0,
+  output_tokens int not null default 0,
+  cache_read_tokens int not null default 0,
+  cache_write_tokens int not null default 0,
+  web_searches int not null default 0,     -- server-tool searches (billed per search)
+  cost_usd numeric(12,6) not null default 0,
+  priced boolean not null default true,   -- false = no rate card for this model
+  ms int,
+  ok boolean not null default true,
+  created_at timestamptz not null default now()
+);
+create index if not exists ai_events_created on ai_events (created_at desc);
+create index if not exists ai_events_user_created on ai_events (user_id, created_at desc);
+create index if not exists ai_events_route_created on ai_events (route, created_at desc);
+alter table ai_events enable row level security;
+-- Users may read their OWN usage; the admin console reads cross-user via the
+-- service role behind an app-level admin gate (lib/admin.ts), so no broad
+-- read policy is granted here.
+drop policy if exists "own ai_events" on ai_events;
+create policy "own ai_events" on ai_events for select using ((select auth.uid()) = user_id);
+
+-- ---------------------------------------------------------------------------
+-- Admin console aggregates (operator-only)
+--
+-- These read ACROSS users, so they are deliberately unreachable from the
+-- browser: EXECUTE is granted only to service_role. The only caller is the
+-- server-side admin API, behind the ADMIN_EMAILS gate in lib/admin.ts.
+--
+-- Two independent reasons a leak can't happen here, because one is not enough:
+--
+--   1. They are SECURITY INVOKER, so the caller's own privileges apply. Even if
+--      EXECUTE were somehow reachable, `authenticated` has no SELECT on
+--      auth.users and RLS on ai_events limits it to its own rows.
+--   2. EXECUTE is revoked from anon and authenticated BY NAME. Revoking from
+--      `public` alone is NOT sufficient on Supabase: default privileges grant
+--      the API roles explicitly, and a named grant survives a revoke from the
+--      public pseudo-role — the function stays live on /rest/v1/rpc/.
+-- ---------------------------------------------------------------------------
+
+create or replace function admin_usage_overview(p_days int default 30)
+returns jsonb
+language sql
+stable
+security invoker
+set search_path = public, pg_catalog
+as $$
+  with ev as (
+    select * from ai_events
+    where created_at >= now() - make_interval(days => greatest(1, least(365, coalesce(p_days, 30))))
+  )
+  select jsonb_build_object(
+    'days', greatest(1, least(365, coalesce(p_days, 30))),
+    'totals', (select jsonb_build_object(
+        'calls', count(*),
+        'input', coalesce(sum(input_tokens), 0),
+        'output', coalesce(sum(output_tokens), 0),
+        'cacheRead', coalesce(sum(cache_read_tokens), 0),
+        'cacheWrite', coalesce(sum(cache_write_tokens), 0),
+        'searches', coalesce(sum(web_searches), 0),
+        'cost', coalesce(sum(cost_usd), 0),
+        'errors', count(*) filter (where not ok),
+        'unpriced', count(*) filter (where not priced),
+        'users', count(distinct user_id),
+        'p50ms', coalesce(percentile_disc(0.5) within group (order by ms) filter (where ms is not null), 0),
+        'p95ms', coalesce(percentile_disc(0.95) within group (order by ms) filter (where ms is not null), 0)
+      ) from ev),
+    'daily', (select coalesce(jsonb_agg(x order by x->>'day'), '[]'::jsonb) from (
+        select jsonb_build_object(
+          'day', to_char(date_trunc('day', created_at), 'YYYY-MM-DD'),
+          'calls', count(*),
+          'tokens', coalesce(sum(input_tokens + output_tokens), 0),
+          'cost', coalesce(sum(cost_usd), 0),
+          'users', count(distinct user_id),
+          'errors', count(*) filter (where not ok)
+        ) as x
+        from ev group by date_trunc('day', created_at)
+      ) d),
+    'byRoute', (select coalesce(jsonb_agg(x order by (x->>'cost')::numeric desc), '[]'::jsonb) from (
+        select jsonb_build_object(
+          'route', route,
+          'calls', count(*),
+          'tokens', coalesce(sum(input_tokens + output_tokens), 0),
+          'searches', coalesce(sum(web_searches), 0),
+          'cost', coalesce(sum(cost_usd), 0),
+          'errors', count(*) filter (where not ok),
+          'avgMs', coalesce(round(avg(ms) filter (where ms is not null)), 0)
+        ) as x
+        from ev group by route
+      ) r),
+    'byModel', (select coalesce(jsonb_agg(x order by (x->>'cost')::numeric desc), '[]'::jsonb) from (
+        select jsonb_build_object(
+          'provider', provider, 'model', model,
+          'calls', count(*),
+          'input', coalesce(sum(input_tokens), 0),
+          'output', coalesce(sum(output_tokens), 0),
+          'cost', coalesce(sum(cost_usd), 0),
+          'priced', bool_and(priced)
+        ) as x
+        from ev group by provider, model
+      ) m)
+  );
+$$;
+
+-- Per-user behaviour + spend. `auth.users` supplies identity/signup; the
+-- aggregates come from the metering ledger and the user's own content tables.
+create or replace function admin_user_activity(p_days int default 30, p_limit int default 100)
+returns jsonb
+language sql
+stable
+security invoker
+set search_path = public, pg_catalog
+as $$
+  with bounds as (
+    select now() - make_interval(days => greatest(1, least(365, coalesce(p_days, 30)))) as since
+  ),
+  usage as (
+    select e.user_id,
+           count(*) as calls,
+           coalesce(sum(e.input_tokens + e.output_tokens), 0) as tokens,
+           coalesce(sum(e.cost_usd), 0) as cost,
+           coalesce(sum(e.web_searches), 0) as searches,
+           count(*) filter (where not e.ok) as errors,
+           max(e.created_at) as last_call,
+           count(distinct e.route) as routes
+    from ai_events e, bounds b
+    where e.user_id is not null and e.created_at >= b.since
+    group by e.user_id
+  ),
+  route_counts as (
+    select e.user_id, e.route, count(*) as n
+    from ai_events e, bounds b
+    where e.user_id is not null and e.created_at >= b.since
+    group by e.user_id, e.route
+  ),
+  top_route as (
+    select distinct on (user_id) user_id, route
+    from route_counts
+    order by user_id, n desc, route
+  )
+  select coalesce(jsonb_agg(row order by (row->>'cost')::numeric desc), '[]'::jsonb)
+  from (
+    select jsonb_build_object(
+      'userId', u.id,
+      'email', u.email,
+      'signedUp', to_char(u.created_at, 'YYYY-MM-DD'),
+      'lastSignIn', to_char(u.last_sign_in_at, 'YYYY-MM-DD'),
+      'calls', coalesce(g.calls, 0),
+      'tokens', coalesce(g.tokens, 0),
+      'cost', coalesce(g.cost, 0),
+      'searches', coalesce(g.searches, 0),
+      'errors', coalesce(g.errors, 0),
+      'routes', coalesce(g.routes, 0),
+      'topRoute', tr.route,
+      'lastCall', g.last_call,
+      'watchlist', (select count(*) from watchlist w where w.user_id = u.id),
+      'themes', (select count(*) from themes t where t.user_id = u.id),
+      'briefs', (select count(*) from daily_briefs d where d.user_id = u.id),
+      'callsFiled', (select count(*) from calls c where c.user_id = u.id),
+      'usedToday', coalesce((select a.calls from ai_usage a where a.user_id = u.id and a.day = current_date), 0)
+    ) as row
+    from auth.users u
+    left join usage g on g.user_id = u.id
+    left join top_route tr on tr.user_id = u.id
+    order by coalesce(g.cost, 0) desc, u.created_at desc
+    limit greatest(1, least(500, coalesce(p_limit, 100)))
+  ) s;
+$$;
+
+-- Most recent calls, for the live activity tail.
+create or replace function admin_recent_events(p_limit int default 60)
+returns jsonb
+language sql
+stable
+security invoker
+set search_path = public, pg_catalog
+as $$
+  select coalesce(jsonb_agg(row order by row->>'at' desc), '[]'::jsonb)
+  from (
+    select jsonb_build_object(
+      'at', e.created_at, 'email', u.email, 'route', e.route,
+      'provider', e.provider, 'model', e.model,
+      'tokens', e.input_tokens + e.output_tokens,
+      'searches', e.web_searches,
+      'cost', e.cost_usd, 'ms', e.ms, 'ok', e.ok
+    ) as row
+    from ai_events e
+    left join auth.users u on u.id = e.user_id
+    order by e.created_at desc
+    limit greatest(1, least(200, coalesce(p_limit, 60)))
+  ) s;
+$$;
+
+-- anon/authenticated are named explicitly — see the note above; revoking from
+-- `public` alone leaves these callable over PostgREST.
+revoke all on function admin_usage_overview(int) from public, anon, authenticated;
+revoke all on function admin_user_activity(int, int) from public, anon, authenticated;
+revoke all on function admin_recent_events(int) from public, anon, authenticated;
+grant execute on function admin_usage_overview(int) to service_role;
+grant execute on function admin_user_activity(int, int) to service_role;
+grant execute on function admin_recent_events(int) to service_role;

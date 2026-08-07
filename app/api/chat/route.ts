@@ -59,7 +59,7 @@ export async function POST(req: Request) {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        for await (const chunk of askStream(system, messages, true, 1024, 5)) {
+        for await (const chunk of askStream(system, messages, true, 1024, 5, { route: "chat", userId: user.id })) {
           full += chunk;
           controller.enqueue(encoder.encode(chunk));
         }

@@ -37,7 +37,8 @@ export async function POST(req: Request) {
       [{ role: "user", content: `Themes: ${themes.join("; ") || "(none — scan broadly)"}\n\nScout current candidates to research, emphasizing recent catalysts.` }],
       true,
       1100,
-      6
+      6,
+      { route: "scout", userId: user.id }
     );
     return NextResponse.json({ result: parseScout(text) });
   } catch (err) {

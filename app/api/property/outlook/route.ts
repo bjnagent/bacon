@@ -35,7 +35,7 @@ export async function POST(req: Request) {
   };
   const [series, pulse, calibration, instrumentMemo] = await Promise.all([
     getPropertySeries(sb, market.key).catch(() => null),
-    raceAbort((signal) => communityPulse([market.label], `${market.country === "SG" ? "Singapore" : "Australia"} property market`, signal), 12_000, null),
+    raceAbort((signal) => communityPulse([market.label], `${market.country === "SG" ? "Singapore" : "Australia"} property market`, signal, { route: "property", userId: user.id }), 12_000, null),
     getCalibrationMemo(sb),
     // Episodic memory: prior calls on THIS market and how they aged.
     getInstrumentMemo(sb, market.key),
@@ -49,7 +49,7 @@ export async function POST(req: Request) {
   const pulseCtx = pulse ? `\n\nCOMMUNITY PULSE (live X via Grok — weigh in SENTIMENT; noisy, contrarian at extremes):\n${pulse.text}` : "";
   const calCtx = calibration ? `\n\nYOUR CALIBRATION (from your graded past calls — correct for these biases in the VERDICT):\n${calibration}` : "";
   return textStreamResponse(
-    askStream(propertyOutlookPrompt(market.label, statsLine), [{ role: "user", content: `Write the current deep view for ${market.label} — policy, rates, supply, district development & major projects, sentiment, rentals, 12-mo scenarios, 5/10-yr long run, the rent-vs-mortgage carry math, and your verdict.${pulseCtx}${calCtx}${instrumentMemo}` }], true, 1800, 6),
+    askStream(propertyOutlookPrompt(market.label, statsLine), [{ role: "user", content: `Write the current deep view for ${market.label} — policy, rates, supply, district development & major projects, sentiment, rentals, 12-mo scenarios, 5/10-yr long run, the rent-vs-mortgage carry math, and your verdict.${pulseCtx}${calCtx}${instrumentMemo}` }], true, 1800, 6, { route: "property", userId: user.id }),
     async (full, ok) => {
       if (!ok) return; // don't persist a truncated outlook
       const sec = parseDebate(full); // generic ===SECTION=== splitter

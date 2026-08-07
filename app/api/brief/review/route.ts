@@ -31,9 +31,9 @@ export async function POST(req: Request) {
     // part of "how did it age" (euphoria then vs silence now is itself a grade).
     const withDeadline = <T,>(p: Promise<T>, ms: number, fallback: T) =>
       Promise.race([p, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);
-    const pulse = await withDeadline(communityPulse(items.map((o) => o.ticker || o.name), "grading past investment calls").catch(() => null), 12_000, null);
+    const pulse = await withDeadline(communityPulse(items.map((o) => o.ticker || o.name), "grading past investment calls", undefined, { route: "brief-review", userId: user.id }).catch(() => null), 12_000, null);
     const pulseCtx = pulse ? `\n\nCURRENT COMMUNITY PULSE on these names (live X via Grok — weigh the sentiment SHIFT since the call in your outcomes):\n${pulse.text}` : "";
-    const text = await ask(briefReviewPrompt(String(row.brief_date)), [{ role: "user", content: `Opportunities flagged on ${row.brief_date}:\n${listing}${pulseCtx}\n\nReview what has happened to each since.` }], true, 1400, 6);
+    const text = await ask(briefReviewPrompt(String(row.brief_date)), [{ role: "user", content: `Opportunities flagged on ${row.brief_date}:\n${listing}${pulseCtx}\n\nReview what has happened to each since.` }], true, 1400, 6, { route: "brief-review", userId: user.id });
     const review = parseBriefReview(text);
     const reviewed = items.map((o, i) => {
       const match = review.items.find((r) => r.ticker.toUpperCase().includes((o.ticker || o.name).toUpperCase())) ?? review.items[i];

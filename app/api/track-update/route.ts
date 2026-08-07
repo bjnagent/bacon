@@ -28,7 +28,8 @@ export async function POST(req: Request) {
       [{ role: "user", content: `Asset: ${symbol}\nAsset class: ${assetClass}\n\nGive the monitoring update from current public information.` }],
       true,
       1100,
-      4
+      4,
+      { route: "track-update", userId: user.id }
     );
     const u = parseTrackingUpdate(text);
     const last_scan_at = new Date().toISOString();

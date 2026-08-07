@@ -48,7 +48,7 @@ export async function POST(req: Request) {
     withDeadline(getMacroSnapshot().catch(() => []), 4000, [] as Awaited<ReturnType<typeof getMacroSnapshot>>),
     isEquity ? getMovingAverages(asset).catch(() => null) : Promise.resolve(null),
     isStock ? raceAbort((signal) => getFundamentals(cleanTicker(asset) ?? asset, sb, signal), 8000, null) : Promise.resolve(null),
-    raceAbort((signal) => communityPulse([asset], `the asset ${asset}`, signal), 12_000, null),
+    raceAbort((signal) => communityPulse([asset], `the asset ${asset}`, signal, { route: "analyze", userId: user.id }), 12_000, null),
     getCalibrationMemo(sb),
     // Episodic memory: what we called on THIS name before, and how it aged.
     getInstrumentMemo(sb, asset),
@@ -75,7 +75,8 @@ export async function POST(req: Request) {
       [{ role: "user", content: `Asset: ${asset}\nAsset class: ${assetClass}${macroCtx}${maCtx}${fundCtx}${pulseCtx}${calCtx}${instrumentMemo}\n\nProduce the full multi-lens BACON briefing using current public information.` }],
       true,
       1700,
-      6
+      6,
+      { route: "analyze", userId: user.id }
     ),
     async (full, ok) => {
       if (!ok) return;
