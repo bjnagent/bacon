@@ -103,7 +103,16 @@ export async function loadOverview(db: Db, days: number): Promise<Overview | nul
     db.rpc("admin_recent_events", { p_limit: 60 }),
   ]);
   if (overview.error || !overview.data) return null;
-  return { ...(overview.data as unknown as Overview), recent: (recent.data ?? []) as Overview["recent"] };
+  const o = overview.data as unknown as Overview;
+  return {
+    ...o,
+    recent: (recent.data ?? []) as Overview["recent"],
+    // A project running the previous schema returns an object without these
+    // keys. The console is built to degrade rather than crash when a migration
+    // is outstanding, and `.map()` on undefined would break that promise.
+    byFeature: o.byFeature ?? [],
+    topSubjects: o.topSubjects ?? [],
+  };
 }
 
 export async function loadUsers(db: Db, days: number, limit: number): Promise<UserRow[] | null> {
@@ -116,5 +125,7 @@ export async function loadUsers(db: Db, days: number, limit: number): Promise<Us
 export async function loadUserDetail(db: Db, userId: string, limit: number): Promise<UserDetail | null> {
   const { data, error } = await db.rpc("admin_user_detail", { p_user: userId, p_limit: limit });
   if (error || !data) return null;
-  return data as unknown as UserDetail;
+  const d = data as unknown as UserDetail;
+  // Same reason as loadOverview: absent on a pre-migration schema.
+  return { ...d, events: d.events ?? [], featureTotals: d.featureTotals ?? [] };
 }

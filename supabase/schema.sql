@@ -394,6 +394,35 @@ drop policy if exists "own ai_events" on ai_events;
 create policy "own ai_events" on ai_events for select using ((select auth.uid()) = user_id);
 
 -- ---------------------------------------------------------------------------
+-- Behaviour ledger: which parts of the product each account actually uses.
+--
+-- ai_events above answers "what did we spend"; this answers "what did they
+-- open". The two are deliberately separate — most of the product costs nothing
+-- to look at, so a view of Radar or the track record leaves no trace in the
+-- cost ledger at all. Without this table the console can only see the AI
+-- surface, and every free feature looks unused.
+--
+-- Written by the browser through the user's OWN session (app/api/track), so
+-- RLS is what pins each row to its sender; the route never trusts a user_id
+-- from the body. Append-only by policy: insert and select, no update or
+-- delete, so a client cannot rewrite its own history.
+create table if not exists user_events (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  kind text not null,        -- view | action
+  name text not null,        -- today | radar | news | analyze | discuss | ...
+  detail text,               -- optional subject, e.g. the ticker analyzed
+  created_at timestamptz not null default now()
+);
+create index if not exists user_events_user_created on user_events (user_id, created_at desc);
+create index if not exists user_events_name_created on user_events (name, created_at desc);
+alter table user_events enable row level security;
+drop policy if exists "own user_events read"   on user_events;
+drop policy if exists "own user_events insert" on user_events;
+create policy "own user_events read"   on user_events for select using ((select auth.uid()) = user_id);
+create policy "own user_events insert" on user_events for insert with check ((select auth.uid()) = user_id);
+
+-- ---------------------------------------------------------------------------
 -- Admin console aggregates (operator-only)
 --
 -- These read ACROSS users, so they are deliberately unreachable from the
@@ -426,6 +455,10 @@ set search_path = public, pg_catalog
 as $$
   with ev as (
     select * from ai_events
+    where created_at >= now() - make_interval(days => greatest(1, least(365, coalesce(p_days, 30))))
+  ),
+  uev as (
+    select * from user_events
     where created_at >= now() - make_interval(days => greatest(1, least(365, coalesce(p_days, 30))))
   )
   select jsonb_build_object(
@@ -504,7 +537,34 @@ as $$
           'priced', bool_and(priced)
         ) as x
         from ev group by provider, model
-      ) m)
+      ) m),
+    -- Feature popularity. Ranked by REACH (distinct users) rather than raw
+    -- hits: one account leaving a tab open all day shouldn't outrank a feature
+    -- half the userbase opens once. Both numbers are returned so the console
+    -- can show depth alongside reach.
+    'byFeature', (select coalesce(jsonb_agg(x order by (x->>'users')::int desc, (x->>'hits')::int desc), '[]'::jsonb) from (
+        select jsonb_build_object(
+          'name', name,
+          'kind', min(kind),
+          'hits', count(*),
+          'users', count(distinct user_id),
+          'lastAt', max(created_at)
+        ) as x
+        from uev group by name
+      ) f),
+    -- Top subjects across all accounts — which NAMES people analyze and
+    -- discuss, which is the question that motivates the ledger.
+    'topSubjects', (select coalesce(jsonb_agg(x order by (x->>'hits')::int desc), '[]'::jsonb) from (
+        select jsonb_build_object(
+          'detail', detail,
+          'hits', count(*),
+          'users', count(distinct user_id)
+        ) as x
+        from uev where detail is not null and detail <> ''
+        group by detail
+        order by count(*) desc, count(distinct user_id) desc
+        limit 25
+      ) ts)
   );
 $$;
 
@@ -546,6 +606,29 @@ as $$
     select distinct on (user_id) user_id, route
     from route_counts
     order by user_id, n desc, route
+  ),
+  -- Behaviour, from the free surface. Distinct-day count is the engagement
+  -- number that matters: 40 events on one day is a trial, 40 across 12 days is
+  -- a habit, and a single total can't tell those apart.
+  behaviour as (
+    select e.user_id,
+           count(*) as events,
+           count(distinct date_trunc('day', e.created_at)) as active_days,
+           max(e.created_at) as last_event
+    from user_events e, bounds b
+    where e.created_at >= b.since
+    group by e.user_id
+  ),
+  feature_counts as (
+    select e.user_id, e.name, count(*) as n
+    from user_events e, bounds b
+    where e.created_at >= b.since
+    group by e.user_id, e.name
+  ),
+  top_feature as (
+    select distinct on (user_id) user_id, name
+    from feature_counts
+    order by user_id, n desc, name
   )
   select coalesce(jsonb_agg(row order by (row->>'cost')::numeric desc, (row->>'lifetimeCalls')::int desc), '[]'::jsonb)
   from (
@@ -562,6 +645,11 @@ as $$
       'routes', coalesce(g.routes, 0),
       'topRoute', tr.route,
       'lastCall', g.last_call,
+      -- Behaviour on the free surface, which the cost ledger cannot see.
+      'events', coalesce(bh.events, 0),
+      'activeDays', coalesce(bh.active_days, 0),
+      'topFeature', tf.name,
+      'lastEvent', bh.last_event,
       -- Lifetime AI calls from the quota meter: the only per-user history that
       -- predates the ledger, and the reason a user with cost=0 isn't inactive.
       'lifetimeCalls', coalesce((select sum(a.calls) from ai_usage a where a.user_id = u.id), 0),
@@ -578,6 +666,7 @@ as $$
                                from themes t where t.user_id = u.id), '[]'::jsonb),
       'lastSeen', greatest(
         u.last_sign_in_at,
+        bh.last_event,
         (select max(m.created_at) from chat_messages m where m.user_id = u.id),
         (select max(w.created_at) from watchlist w where w.user_id = u.id),
         (select max(d.created_at) from daily_briefs d where d.user_id = u.id)
@@ -586,6 +675,8 @@ as $$
     from auth.users u
     left join usage g on g.user_id = u.id
     left join top_route tr on tr.user_id = u.id
+    left join behaviour bh on bh.user_id = u.id
+    left join top_feature tf on tf.user_id = u.id
     order by coalesce(g.cost, 0) desc,
              coalesce((select sum(a.calls) from ai_usage a where a.user_id = u.id), 0) desc,
              u.created_at desc
@@ -655,7 +746,28 @@ as $$
     'usage', (select coalesce(jsonb_agg(x order by x->>'day'), '[]'::jsonb) from (
         select jsonb_build_object('day', to_char(a.day, 'YYYY-MM-DD'), 'calls', a.calls) as x
         from ai_usage a where a.user_id = p_user
-      ) a2)
+      ) a2),
+    -- The session trail: where this account went, in order. Reading it top to
+    -- bottom is the closest the console gets to watching someone use the
+    -- product, and it's the only view that shows what they tried and abandoned.
+    'events', (select coalesce(jsonb_agg(x order by x->>'at' desc), '[]'::jsonb) from (
+        select jsonb_build_object(
+          'at', e.created_at, 'kind', e.kind, 'name', e.name, 'detail', e.detail
+        ) as x
+        from user_events e
+        where e.user_id = p_user
+        order by e.created_at desc
+        limit greatest(1, least(1000, coalesce(p_limit, 100) * 5))
+      ) e2),
+    -- Rolled up, so "opens Radar constantly, never touched Analyze" is one
+    -- glance rather than a scroll through the trail above.
+    'featureTotals', (select coalesce(jsonb_agg(x order by (x->>'hits')::int desc), '[]'::jsonb) from (
+        select jsonb_build_object(
+          'name', e.name, 'kind', min(e.kind), 'hits', count(*), 'lastAt', max(e.created_at)
+        ) as x
+        from user_events e where e.user_id = p_user
+        group by e.name
+      ) f2)
   );
 $$;
 

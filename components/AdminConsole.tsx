@@ -133,8 +133,44 @@ function ActivityPanel({ a, metered }: { a: Overview["activity"]; metered: boole
 // The drill-down: what one account is actually doing. Loaded on demand — a
 // transcript per row would make the user table's payload enormous.
 function UserDetailPanel({ d }: { d: UserDetail }) {
+  const trailTotal = d.featureTotals.reduce((n, f) => n + f.hits, 0);
   return (
     <div className="ad-detail">
+      {/* Where they went, before what they own. The rollup answers "which parts
+          of the product does this account actually use" in one glance; the trail
+          below it is the only view that shows what they opened and abandoned. */}
+      <h3 className="ad-h3">
+        Where they went
+        <span className="ad-h-sub">
+          {trailTotal ? `${trailTotal} events across ${d.featureTotals.length} feature${d.featureTotals.length === 1 ? "" : "s"}` : "no behaviour recorded"}
+        </span>
+      </h3>
+      {d.featureTotals.length ? (
+        <>
+          <div className="ad-chips">
+            {d.featureTotals.map((f) => (
+              <span key={f.name} className={`ad-chip${f.kind === "action" ? " is-on" : ""}`} title={`last ${ago(f.lastAt)}`}>
+                {f.name} · {f.hits}
+              </span>
+            ))}
+          </div>
+          <div className="ad-trail">
+            {d.events.map((e, i) => (
+              <div key={`${e.at}-${i}`} className="ad-trail-row">
+                <span className="ad-dim">{ago(e.at)}</span>
+                <span className={e.kind === "action" ? "ad-strong" : ""}>{e.name}</span>
+                <span className="ad-mono ad-dim">{e.detail ?? ""}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : (
+        <p className="ad-empty-cell">
+          Nothing yet — behaviour is only recorded from the release that added the tracker, so an
+          established account can be busy here and still show empty.
+        </p>
+      )}
+
       <div className="ad-detail-cols">
         <div>
           <h3 className="ad-h3">Following <span className="ad-h-sub">{d.watchlist.length} name{d.watchlist.length === 1 ? "" : "s"}</span></h3>
@@ -373,13 +409,60 @@ export default function AdminConsole({
               </section>
             </div>
 
+            {/* Feature popularity. "By surface" above only sees routes that cost
+                money — most of the product is free to open and never appears
+                there, which reads as nobody using it. Ranked by reach, because
+                one account with a tab open all day is not a popular feature. */}
+            <div className="ad-cols">
+              <section className="ad-sec">
+                <h2 className="ad-h">What they open <span className="ad-h-sub">by reach, last {ov.days} days</span></h2>
+                <table className="ad-table">
+                  <thead><tr><th>Feature</th><th>Users</th><th>Opens</th><th>Last</th></tr></thead>
+                  <tbody>
+                    {ov.byFeature.map((f) => (
+                      <tr key={f.name}>
+                        <td className="ad-mono">{f.name}{f.kind === "action" ? <span className="ad-pill">action</span> : null}</td>
+                        <td>{compact(f.users)}</td>
+                        <td>{compact(f.hits)}</td>
+                        <td className="ad-dim">{f.lastAt ? ago(f.lastAt) : "—"}</td>
+                      </tr>
+                    ))}
+                    {!ov.byFeature.length ? (
+                      <tr><td colSpan={4} className="ad-empty-cell">
+                        No behaviour recorded yet — tracking starts from the release that added it.
+                      </td></tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </section>
+
+              <section className="ad-sec">
+                <h2 className="ad-h">Names they look at <span className="ad-h-sub">analyzed &amp; discussed</span></h2>
+                <table className="ad-table">
+                  <thead><tr><th>Name</th><th>Users</th><th>Times</th></tr></thead>
+                  <tbody>
+                    {ov.topSubjects.map((s) => (
+                      <tr key={s.detail}>
+                        <td className="ad-mono">{s.detail}</td>
+                        <td>{compact(s.users)}</td>
+                        <td>{compact(s.hits)}</td>
+                      </tr>
+                    ))}
+                    {!ov.topSubjects.length ? (
+                      <tr><td colSpan={3} className="ad-empty-cell">Nothing analyzed in this window.</td></tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </section>
+            </div>
+
             <section className="ad-sec">
               <h2 className="ad-h">Users <span className="ad-h-sub">click a row for their chat log, names followed and filed calls</span></h2>
               <div className="ad-scroll">
                 <table className="ad-table">
                   <thead>
                     <tr>
-                      <th></th><th>Account</th><th>Last seen</th><th>Calls</th><th>Chats</th>
+                      <th></th><th>Account</th><th>Last seen</th><th>Uses</th><th>Calls</th><th>Chats</th>
                       <th>Following</th><th>Themes</th><th>Briefs</th><th>Today</th><th>Cost</th>
                     </tr>
                   </thead>
@@ -404,6 +487,12 @@ export default function AdminConsole({
                           </td>
                           <td className="ad-mono">{shortEmail(u.email)}</td>
                           <td className="ad-dim">{ago(u.lastSeen)}</td>
+                          {/* Which feature they lean on, over how many distinct
+                              days — 40 opens in one sitting is a trial, 40 over
+                              twelve days is a habit, and one total hides that. */}
+                          <td className="ad-syms" title={u.events ? `${u.events} events, ${u.activeDays} active day${u.activeDays === 1 ? "" : "s"}` : undefined}>
+                            {u.topFeature ? `${u.topFeature}${u.activeDays > 1 ? ` · ${u.activeDays}d` : ""}` : "—"}
+                          </td>
                           {/* Lifetime calls, not the windowed metered count — a user
                               with no metered spend is not an inactive user. */}
                           <td>{u.lifetimeCalls || "—"}</td>
@@ -424,7 +513,7 @@ export default function AdminConsole({
                         </tr>,
                         open ? (
                           <tr key={`${u.userId}-d`} className="ad-row-detail">
-                            <td colSpan={10}>
+                            <td colSpan={11}>
                               {details[u.userId]
                                 ? <UserDetailPanel d={details[u.userId]} />
                                 : <div className="ad-empty"><Loader2 size={14} className="pr-spin" /> Loading {shortEmail(u.email)}…</div>}
@@ -433,7 +522,7 @@ export default function AdminConsole({
                         ) : null,
                       ];
                     })}
-                    {!users.length ? <tr><td colSpan={10} className="ad-empty-cell">No accounts yet.</td></tr> : null}
+                    {!users.length ? <tr><td colSpan={11} className="ad-empty-cell">No accounts yet.</td></tr> : null}
                   </tbody>
                 </table>
               </div>

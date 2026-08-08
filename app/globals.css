@@ -1223,6 +1223,12 @@ body { background: #EBE8E0; color: #1A1712; }
 .ad-chip{font-family:var(--fm);font-size:10.5px;background:var(--card);border:1px solid var(--line2);border-radius:12px;padding:3px 10px;color:var(--muted)}
 .ad-chip.is-on{border-color:var(--accent);color:var(--ink)}
 
+/* Session trail. Capped and scrolled for the same reason as the transcript —
+   an active account can have hundreds of steps. */
+.ad-trail{display:flex;flex-direction:column;gap:2px;max-height:220px;overflow-y:auto;margin-top:10px;padding-right:4px}
+.ad-trail-row{display:grid;grid-template-columns:76px 108px minmax(0,1fr);gap:10px;align-items:baseline;font-size:11.5px;padding:3px 0;border-bottom:1px solid var(--line2)}
+.ad-trail-row span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
 /* Transcript. Capped and scrolled so one chatty account can't push the rest of
    the table off the screen. */
 .ad-chat{display:flex;flex-direction:column;gap:9px;max-height:440px;overflow-y:auto;padding-right:4px}
