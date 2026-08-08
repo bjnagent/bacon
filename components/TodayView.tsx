@@ -8,12 +8,103 @@ import { parseOpportunities } from "@/lib/parsers";
 import { auditFigures } from "@/lib/verify";
 import { readTextStream } from "@/lib/readStream";
 import { cachedJson, invalidate } from "@/lib/clientCache";
+import { track } from "@/lib/track";
+import { SAMPLE_INTRO, SAMPLE_ITEMS } from "@/lib/sampleBrief";
 import MacroBackdrop from "./MacroBackdrop";
 import BaconMark from "./BaconMark";
 import TVLink from "./TVLink";
 
 interface BriefItem { id: string; name: string; ticker: string; cls: string; horizon: string; thesis: string; signals: string; checks: string; action?: string; target?: string }
 interface Brief { intro: string | null; caveat: string | null; generatedAt: string | null; items: BriefItem[] }
+
+// Shown to an account that has never swept. `GET /api/brief` returns the latest
+// brief with no date filter, so an empty response means "never generated one",
+// not "none today" — which makes this precisely a first-run surface rather than
+// something a returning user sees every morning before the cron fires.
+//
+// The example is marked in three independent places — the banner, a chip on
+// every card, and the dashed frame — because the one thing worse than a blank
+// slate on a financial product is a persuasive brief the user thinks is theirs.
+// The cards deliberately carry no Track or Run-lenses buttons: acting on an
+// example is never the intended next step, and the single CTA says so.
+function SampleBrief({ onSweep }: { onSweep: () => void }) {
+  const [autoOn, setAutoOn] = useState(false);
+  const [savingAuto, setSavingAuto] = useState(false);
+  useEffect(() => { track("view", "sample-brief"); }, []);
+
+  // The nightly cron only sweeps accounts with scout_interval_minutes > 0, and
+  // that defaults to 0 — so a new user's brief never arrives on its own, and
+  // the only switch for it lives over on Radar where they have no reason to
+  // look. Offering it here is the difference between one curious sweep and a
+  // product that shows up tomorrow.
+  const enableDaily = async () => {
+    if (savingAuto || autoOn) return;
+    setSavingAuto(true); setAutoOn(true);
+    track("action", "auto-sweep-on", "from-sample");
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scout_interval_minutes: 1440 }),   // daily; the cron honors per-user cadence
+      });
+      if (!res.ok) throw new Error("save failed");
+      invalidate("/api/settings");
+    } catch { setAutoOn(false); }
+    finally { setSavingAuto(false); }
+  };
+
+  return (
+    <section className="pr-sample" aria-label="Example brief">
+      <div className="pr-sample-head">
+        <BaconMark size={44} />
+        <div className="pr-sample-copy">
+          <div className="pr-sample-tag">Example — not your data</div>
+          <strong>This is the shape of a brief.</strong> Bacon reads the movers, the filings and the macro
+          backdrop, then writes up only the places where more than one signal agrees — no query needed.
+          Below is an example; yours is built from today&apos;s real market.
+        </div>
+        {/* No busy state needed: `generating` unmounts this in favour of the
+            full-width loader, so the button never lives long enough to spin. */}
+        <button className="pr-btn" onClick={() => { track("action", "sweep", "from-sample"); onSweep(); }}>
+          <RefreshCw size={14} /> SWEEP MY REAL SIGNALS
+        </button>
+      </div>
+
+      <div className="pr-summary is-sample">{SAMPLE_INTRO}</div>
+      <div className="pr-opp-list is-sample">
+        {SAMPLE_ITEMS.map((o, i) => (
+          <div key={o.id} className="pr-opp is-sample">
+            <div className="pr-opp-rank">{String(i + 1).padStart(2, "0")}</div>
+            <div className="pr-opp-main">
+              <div className="pr-pick-head">
+                <div className="pr-pick-name">{o.name}<span className="pr-sample-chip">example</span>{o.horizon && <span className="pr-opp-horizon">◷ {o.horizon}</span>}</div>
+                <span className="pr-pick-class">{o.cls}</span>
+              </div>
+              <div className="pr-pick-why">{o.thesis}</div>
+              <div className="pr-pick-now"><span>SIGNALS ▸</span> {o.signals}</div>
+              <div className="pr-pick-check"><span>VERIFY</span> {o.checks}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+      {/* Deliberately stated as opt-in rather than promised: nothing arrives on
+          its own until this is switched on. */}
+      <div className="pr-sample-foot">
+        <span>
+          {autoOn
+            ? "Auto-sweep is on — tomorrow's brief will be waiting for you."
+            : "Briefs don't arrive on their own yet. Turn on the daily sweep and Bacon assembles tomorrow's before you're up."}
+        </span>
+        <button className={`pr-mailtoggle ${autoOn ? "is-on" : ""}`} onClick={enableDaily} disabled={savingAuto || autoOn}>
+          {autoOn ? <>✓ Daily sweep on</> : "Sweep for me daily"}
+        </button>
+      </div>
+      <div className="pr-disclaimer">
+        An illustration of the format, not a recommendation — the subjects are generic on purpose. Your
+        brief names real securities, states its call, and shows the kill condition that would end it.
+      </div>
+    </section>
+  );
+}
 
 // The cockpit: the system pieces together today's signals overnight and the
 // user opens this to SEE what it found — no query required.
@@ -144,12 +235,7 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
         {emailErr && <div className="pr-nudge"><AlertTriangle size={14} /> {emailErr}</div>}
         {error && <div className="pr-error"><AlertTriangle size={18} /><div><strong>Couldn&apos;t assemble the brief.</strong><div className="pr-error-detail">{error}. Try again.</div></div></div>}
 
-        {loaded && !hasBrief && !generating && (
-          <div className="pr-empty">
-            <BaconMark size={54} />
-            <div><strong>The system hunts while you&apos;re away.</strong> Every day it pieces together real movers, headlines, and the macro backdrop to surface under-the-radar opportunities — no query needed. Your first brief lands with the nightly sweep, or hit <strong>Sweep now</strong>.</div>
-          </div>
-        )}
+        {loaded && !hasBrief && !generating && <SampleBrief onSweep={generate} />}
 
         {hasBrief && (
           <>
