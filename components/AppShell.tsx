@@ -6,6 +6,7 @@ import { Sunrise, Search, Command, History, Radar as RadarIcon, Newspaper, Build
 import { deriveContext, type ChatContext } from "@/lib/prompts";
 import { splitSymCls } from "@/lib/lenses";
 import { cachedJson } from "@/lib/clientCache";
+import { track } from "@/lib/track";
 import { Boot, HelpOverlay } from "./Terminal";
 import BaconMark from "./BaconMark";
 import DiscoverView, { type DiscoverTab } from "./DiscoverView";
@@ -80,7 +81,18 @@ export default function AppShell({ userEmail, isAdmin = false }: { userEmail: st
     return () => { cancelled = true; };
   }, []);
 
+  // One hook covers every destination, however it was reached — bottom bar,
+  // palette, or a deep link out of another view. Instrumenting each handler
+  // instead would silently miss whichever route someone adds next.
+  useEffect(() => {
+    if (booting) return;
+    track("view", place === "analyze" ? "analyze" : discoverTab);
+  }, [place, discoverTab, booting]);
+
   const openAnalyze = useCallback((t: { asset: string; cls: string }) => {
+    // The asset is the point of the event: "ran analyze" is far less useful
+    // than "ran analyze on NVDA".
+    track("action", "analyze", t.asset);
     setAnalyzeTarget({ ...t, token: Date.now() });
     setPlace("analyze");
   }, []);
@@ -100,6 +112,7 @@ export default function AppShell({ userEmail, isAdmin = false }: { userEmail: st
   const analyzeSym = useCallback((sym: string) => { const { sym: s, cls } = splitSymCls(sym); openAnalyze({ asset: s, cls }); }, [openAnalyze]);
 
   const openChat = useCallback((ctx?: ChatContext) => {
+    track("action", "discuss", ctx?.asset ?? undefined);
     if (ctx) { setChatContext(ctx); setChatOpen(true); return; }
     const view = place === "analyze" ? "analyze" : (discoverTab === "news" ? "news" : "radar");
     setChatContext(deriveContext(view, analyzeTarget ?? null, watchlistSyms.map((s) => ({ asset: s }))));

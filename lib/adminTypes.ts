@@ -29,10 +29,23 @@ export interface Activity {
   briefs: number; callsFiled: number; picks: number; news: number;
   chats: number; watchlist: number; themes: number; outlooks: number;
 }
+/**
+ * Feature popularity from the behaviour ledger. Most of the product costs
+ * nothing to open, so none of it appears in `byRoute` — this is the only view
+ * that shows whether Radar, News or the track record are used at all.
+ */
+export interface FeatureRow {
+  name: string; kind: string; hits: number; users: number; lastAt: string | null;
+}
+export interface SubjectRow { detail: string; hits: number; users: number }
 export interface Overview {
   days: number; totals: Totals; daily: DayRow[];
   byRoute: RouteRow[]; byModel: ModelRow[]; recent: EventRow[];
   activity: Activity;
+  /** Ranked by reach (distinct users), not raw hits. */
+  byFeature: FeatureRow[];
+  /** Most-analyzed / most-discussed names across all accounts. */
+  topSubjects: SubjectRow[];
   /** First metered call. Null = metering hasn't recorded yet — NOT "no usage". */
   meteringSince: string | null;
 }
@@ -40,6 +53,12 @@ export interface UserRow {
   userId: string; email: string | null; signedUp: string; lastSignIn: string | null;
   calls: number; tokens: number; cost: number; searches: number; errors: number; routes: number;
   topRoute: string | null; lastCall: string | null;
+  /** Behaviour on the free surface — invisible to the cost ledger. */
+  events: number;
+  /** Distinct days with activity: separates a one-day trial from a habit. */
+  activeDays: number;
+  topFeature: string | null;
+  lastEvent: string | null;
   watchlist: number; themes: number; briefs: number; callsFiled: number; usedToday: number;
   /** Lifetime calls from the quota meter — the only per-user history predating the ledger. */
   lifetimeCalls: number;
@@ -60,6 +79,8 @@ export interface CallRow {
   target: string | null; horizon: string | null;
   actualPct: number | null; benchPct: number | null; hit: boolean | null; gradedAt: string | null;
 }
+/** One step in the session trail: where this account went, and on what. */
+export interface TrailRow { at: string; kind: string; name: string; detail: string | null }
 export interface UserDetail {
   userId: string;
   email: string | null;
@@ -69,4 +90,6 @@ export interface UserDetail {
   calls: CallRow[];
   briefs: { day: string; items: number; reviewed: boolean }[];
   usage: { day: string; calls: number }[];
+  events: TrailRow[];
+  featureTotals: { name: string; kind: string; hits: number; lastAt: string }[];
 }
