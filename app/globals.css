@@ -766,6 +766,31 @@ body { background: #EBE8E0; color: #1A1712; }
 .pr-opp-horizon{font-family:var(--fm);font-size:10px;color:var(--muted);border:1px solid var(--line2);border-radius:99px;padding:2px 9px;text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap}
 @media (max-width:880px){.pr-opp{flex-direction:column;gap:8px}.pr-opp-rank{font-size:18px}}
 
+/* First-run example brief. Held visually apart from a real brief on purpose:
+   dashed frame, muted spine, and a chip on every card. A new user should be
+   able to tell at a glance that none of this is theirs — the copy says so, but
+   the copy is what people skip. */
+.pr-sample{border:1px dashed var(--line2);border-radius:12px;padding:20px;background:var(--paper2)}
+.pr-sample-head{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:6px}
+.pr-sample-head>svg,.pr-sample-head .pr-prism{flex-shrink:0;color:var(--accent)}
+.pr-sample-copy{flex:1;min-width:240px;font-size:13px;line-height:1.65;color:var(--muted)}
+.pr-sample-copy strong{color:var(--ink);font-weight:600}
+/* Filled rather than accent-on-paper: this is the label that tells someone the
+   brief isn't theirs, so it has to clear AA, and --accent as text only reaches
+   3.31:1 on --paper2. White on --accent2 is 5.12:1 and, being self-contained,
+   holds in both themes without a dark-mode override. */
+.pr-sample-tag{display:inline-block;font-family:var(--fm);font-size:9.5px;text-transform:uppercase;letter-spacing:0.1em;background:var(--accent2);color:#fff;border-radius:3px;padding:2px 7px;margin-bottom:7px}
+.pr-sample-chip{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:0.08em;border:1px solid var(--line2);border-radius:99px;padding:2px 8px;color:var(--muted2);font-weight:400}
+/* Muted spine + no lift: the sample must not read as interactive, because the
+   only action worth taking from it is the sweep button above. */
+.pr-opp.is-sample::before{background:var(--line2)}
+.pr-opp.is-sample{border-style:dashed}
+.pr-opp.is-sample:hover{transform:none;border-color:var(--line2);box-shadow:none}
+.pr-opp.is-sample:hover .pr-opp-rank{color:var(--line2)}
+.pr-summary.is-sample{color:var(--muted);border-image:none;border-left-color:var(--line2)}
+.pr-sample-foot{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid var(--line2);font-size:12.5px;line-height:1.6;color:var(--muted)}
+.pr-sample-foot>span{flex:1;min-width:220px}
+
 /* All-time scoreboard — the headline strip above the record list. */
 .pr-score{display:flex;flex-wrap:wrap;align-items:stretch;gap:0;background:var(--card);border:1px solid var(--line2);border-radius:10px;overflow:hidden;margin-bottom:16px}
 .pr-score-cell{flex:1;min-width:110px;display:flex;flex-direction:column;gap:3px;padding:13px 16px;border-right:1px solid var(--line)}
