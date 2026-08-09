@@ -791,6 +791,34 @@ body { background: #EBE8E0; color: #1A1712; }
 .pr-sample-foot{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid var(--line2);font-size:12.5px;line-height:1.6;color:var(--muted)}
 .pr-sample-foot>span{flex:1;min-width:220px}
 
+/* First-action checklist. Sits above the brief it refers to, quiet enough that
+   a returning user isn't shouted at, but with the live step's button carrying
+   real weight. */
+.pr-checklist{border:1px solid var(--line2);border-radius:10px;background:var(--paper2);padding:14px 16px;margin:16px 0 4px}
+.pr-checklist-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.pr-checklist-title{font-family:var(--fd);font-weight:700;font-size:13px;color:var(--ink)}
+.pr-checklist-count{font-family:var(--fm);font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted)}
+.pr-checklist-x{margin-left:auto;background:none;border:0;color:var(--muted);cursor:pointer;padding:6px;margin:-6px;line-height:0;border-radius:4px}
+.pr-checklist-x:hover{color:var(--ink)}
+.pr-checklist-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;counter-reset:none}
+.pr-checklist-list li{display:flex;align-items:center;gap:12px;padding:9px 0;border-top:1px solid var(--line)}
+.pr-checklist-list li:first-child{border-top:0}
+.pr-checklist-mark{flex-shrink:0;width:22px;height:22px;border-radius:99px;border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-family:var(--fm);font-size:11px;color:var(--muted)}
+.pr-checklist-list li.is-done .pr-checklist-mark{background:var(--good);border-color:var(--good);color:#fff}
+.pr-checklist-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.pr-checklist-label{font-size:13px;font-weight:600;color:var(--ink);line-height:1.4}
+.pr-checklist-list li.is-done .pr-checklist-label{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--line2)}
+.pr-checklist-hint{font-size:11.5px;line-height:1.55;color:var(--muted)}
+.pr-checklist-list li.is-done .pr-checklist-hint{display:none}
+.pr-checklist-status{flex-shrink:0;font-family:var(--fm);font-size:9.5px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted2)}
+.pr-checklist-themes{margin-top:10px;padding-top:11px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.pr-checklist-chips{display:flex;flex-wrap:wrap;gap:6px}
+@media (max-width:620px){
+  .pr-checklist-list li{flex-wrap:wrap}
+  .pr-checklist-body{flex-basis:calc(100% - 34px)}
+  .pr-checklist-list li>.pr-btn-sm,.pr-checklist-status{margin-left:34px}
+}
+
 /* All-time scoreboard — the headline strip above the record list. */
 .pr-score{display:flex;flex-wrap:wrap;align-items:stretch;gap:0;background:var(--card);border:1px solid var(--line2);border-radius:10px;overflow:hidden;margin-bottom:16px}
 .pr-score-cell{flex:1;min-width:110px;display:flex;flex-direction:column;gap:3px;padding:13px 16px;border-right:1px solid var(--line)}
