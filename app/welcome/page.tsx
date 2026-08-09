@@ -53,8 +53,8 @@ export default async function WelcomePage() {
               <div className="pr-w-card-kicker">Honest by design</div>
               <div className="pr-w-card-title">A self-grading record</div>
               <div className="pr-w-card-body">
-                Every brief is archived and Bacon grades its own calls later. Real data
-                only; it never invents a price.
+                Bacon files dated calls and prices them against SPY thirty days later —
+                misses included. <Link href="/record">See the house record →</Link>
               </div>
             </div>
           </section>
@@ -72,7 +72,7 @@ export default async function WelcomePage() {
           <div className="pr-w-cta">{cta}</div>
 
           <footer className="pr-w-foot">
-            Convergence builds conviction · Verify yourself · Not financial advice
+            <Link href="/record">The house record</Link> · Convergence builds conviction · Verify yourself · Not financial advice
           </footer>
         </div>
       </div>

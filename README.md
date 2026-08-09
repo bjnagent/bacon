@@ -139,6 +139,42 @@ vercel.json              ← cron schedule (route lands in a later slice)
 
 > `app/globals.css` is generated from the artifact's `const CSS` by `node scripts/build-globals.mjs` (font `@import` hoisted, base reset + login styles appended). Don't hand-edit the ported block.
 
+## The house record (public `/record`)
+
+Every user's track record is their own — `calls` is RLS-scoped per account, only
+grades 30 days after a call is filed, and needs eight graded calls in a cohort
+before the calibration memo says anything. So the product's strongest claim —
+*it grades its own calls* — is invisible to a new user for a month and to a
+prospect forever.
+
+The **house account** fixes that: one designated account sweeps daily through
+exactly the same code path as everyone else, and its graded calls are published
+at `/record` with no login.
+
+1. Create a dedicated account (not your personal one — its calls become public).
+2. Sign in as it once and flip **Auto-sweep daily** on the Radar. The cron only
+   touches users who've opted in.
+3. Copy its `auth.users.id` into **`HOUSE_USER_ID`** in your environment.
+
+Grading needs no extra wiring: `/api/cron/sweep` already grades every user's
+calls, including the house account's.
+
+What the page shows, and why it's structured this way:
+
+- **Every priced call, wins and misses.** `summarise()` has no outcome filter and
+  the loader passes it everything, so a flattering subset can't be selected —
+  by accident or otherwise.
+- **Open calls are labelled open.** A call is priced at 30 days but only settles
+  when its horizon lands; hiding the in-flight ones would let the record be timed.
+- **Alpha is computed on the benchmarked subset only**, both sides — averaging
+  Bacon over every priced call and SPY over the subset with a benchmark would
+  flatter whichever had the better sample.
+- **Live calls never appear.** Pricing lags a call by 30 days, so the public page
+  can't front-run the paying product.
+
+Unset `HOUSE_USER_ID` and `/record` reports that the record isn't live yet. It
+never falls back to another account.
+
 ## Non-negotiable constraints
 
 1. **No fabricated data.** Bacon never invents prices, quotes, or figures. All AI features run on live web search of the public record and stay qualitative.
