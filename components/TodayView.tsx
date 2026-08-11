@@ -8,11 +8,12 @@ import { parseOpportunities } from "@/lib/parsers";
 import { auditFigures } from "@/lib/verify";
 import { readTextStream } from "@/lib/readStream";
 import { cachedJson, invalidate } from "@/lib/clientCache";
-import { track } from "@/lib/track";
+import { track as trackEvent } from "@/lib/track";
 import { SAMPLE_INTRO, SAMPLE_ITEMS } from "@/lib/sampleBrief";
 import MacroBackdrop from "./MacroBackdrop";
 import BaconMark from "./BaconMark";
 import TVLink from "./TVLink";
+import ActivationChecklist, { type ActivationState } from "./ActivationChecklist";
 
 interface BriefItem { id: string; name: string; ticker: string; cls: string; horizon: string; thesis: string; signals: string; checks: string; action?: string; target?: string }
 interface Brief { intro: string | null; caveat: string | null; generatedAt: string | null; items: BriefItem[] }
@@ -30,7 +31,7 @@ interface Brief { intro: string | null; caveat: string | null; generatedAt: stri
 function SampleBrief({ onSweep }: { onSweep: () => void }) {
   const [autoOn, setAutoOn] = useState(false);
   const [savingAuto, setSavingAuto] = useState(false);
-  useEffect(() => { track("view", "sample-brief"); }, []);
+  useEffect(() => { trackEvent("view", "sample-brief"); }, []);
 
   // The nightly cron only sweeps accounts with scout_interval_minutes > 0, and
   // that defaults to 0 — so a new user's brief never arrives on its own, and
@@ -40,7 +41,7 @@ function SampleBrief({ onSweep }: { onSweep: () => void }) {
   const enableDaily = async () => {
     if (savingAuto || autoOn) return;
     setSavingAuto(true); setAutoOn(true);
-    track("action", "auto-sweep-on", "from-sample");
+    trackEvent("action", "auto-sweep-on", "from-sample");
     try {
       const res = await fetch("/api/settings", {
         method: "PATCH", headers: { "Content-Type": "application/json" },
@@ -64,7 +65,7 @@ function SampleBrief({ onSweep }: { onSweep: () => void }) {
         </div>
         {/* No busy state needed: `generating` unmounts this in favour of the
             full-width loader, so the button never lives long enough to spin. */}
-        <button className="pr-btn" onClick={() => { track("action", "sweep", "from-sample"); onSweep(); }}>
+        <button className="pr-btn" onClick={() => { trackEvent("action", "sweep", "from-sample"); onSweep(); }}>
           <RefreshCw size={14} /> SWEEP MY REAL SIGNALS
         </button>
       </div>
@@ -119,18 +120,21 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
   const [savingEmail, setSavingEmail] = useState(false);
   const [watchOn, setWatchOn] = useState(false);
   const [savingWatch, setSavingWatch] = useState(false);
+  const [activation, setActivation] = useState<ActivationState | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [bd, wd, std] = await Promise.all([
+        const [bd, wd, std, ad] = await Promise.all([
           cachedJson("/api/brief", 60_000), cachedJson("/api/watchlist", 30_000), cachedJson("/api/settings", 60_000),
-        ]) as [Record<string, unknown> & { brief?: Brief }, { items?: { symbol: string }[] }, { settings?: { brief_email_enabled?: boolean; watch_enabled?: boolean } }];
+          cachedJson("/api/activation", 60_000),
+        ]) as [Record<string, unknown> & { brief?: Brief }, { items?: { symbol: string }[] }, { settings?: { brief_email_enabled?: boolean; watch_enabled?: boolean } }, Partial<ActivationState>];
         if (cancelled) return;
         if (bd.brief) setBrief(bd.brief);
         if (Array.isArray(wd.items)) { const t: Record<string, boolean> = {}; wd.items.forEach((it: { symbol: string }) => { t[it.symbol.toUpperCase()] = true; }); setTracked(t); }
         if (std.settings) { setEmailOn(!!std.settings.brief_email_enabled); setWatchOn(!!std.settings.watch_enabled); }
+        if (typeof ad.swept === "boolean") setActivation({ swept: ad.swept, tracked: !!ad.tracked, analyzed: !!ad.analyzed });
       } catch { /* empty state handles it */ }
       finally { if (!cancelled) setLoaded(true); }
     })();
@@ -161,6 +165,11 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
       if (rafId) cancelAnimationFrame(rafId);
       const bEnd = toItems(last); if (bEnd) setBrief(bEnd);
       invalidate("/api/brief");
+      // The checklist reads from the server, but this sweep just happened —
+      // waiting for a refetch would leave step one unticked in front of the
+      // person who just completed it.
+      invalidate("/api/activation");
+      setActivation((a) => (a ? { ...a, swept: true } : a));
       // Swap in the persisted canonical brief (real row ids + timestamp).
       try {
         const res = await fetch("/api/brief");
@@ -203,10 +212,18 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
     const sym = ticker.toUpperCase();
     if (tracked[sym]) return;
     setTracked((t) => ({ ...t, [sym]: true }));
-    try { await fetch("/api/watchlist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: sym, asset_class: cls }) }); invalidate("/api/watchlist"); } catch { /* ignore */ }
+    setActivation((a) => (a ? { ...a, tracked: true } : a));
+    try { await fetch("/api/watchlist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ symbol: sym, asset_class: cls }) }); invalidate("/api/watchlist"); invalidate("/api/activation"); } catch { /* ignore */ }
   };
 
   const hasBrief = !!brief && brief.items.length > 0;
+  // The checklist points every step at the SAME name — the top idea from
+  // today's brief — so the three actions compose into one story rather than
+  // asking the user to pick a subject three times.
+  const top = brief?.items[0];
+  const firstIdea = top
+    ? { sym: (top.ticker && top.ticker !== "—") ? top.ticker : top.name, cls: mapClass(top.cls) }
+    : null;
 
   return (
     <div className="pr-view">
@@ -236,6 +253,19 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
         {error && <div className="pr-error"><AlertTriangle size={18} /><div><strong>Couldn&apos;t assemble the brief.</strong><div className="pr-error-detail">{error}. Try again.</div></div></div>}
 
         {loaded && !hasBrief && !generating && <SampleBrief onSweep={generate} />}
+
+        {/* Only once a brief exists. Before that the sample above is the
+            guidance and carries one clear CTA; a second competing checklist
+            would split attention at exactly the moment we want a single act. */}
+        {hasBrief && activation && (
+          <ActivationChecklist
+            state={activation}
+            firstIdea={firstIdea}
+            onSweep={generate}
+            onTrack={(sym, cls) => void track(sym, cls)}
+            onAnalyze={(t) => { invalidate("/api/activation"); onAnalyze(t); }}
+          />
+        )}
 
         {hasBrief && (
           <>
