@@ -22,8 +22,11 @@ function send(events: Ev[], beacon: boolean): void {
   const body = JSON.stringify({ events });
   try {
     if (beacon && typeof navigator !== "undefined" && navigator.sendBeacon) {
-      navigator.sendBeacon("/api/track", new Blob([body], { type: "application/json" }));
-      return;
+      // Returns false when the browser's beacon queue is full or the payload is
+      // over its limit. Falling through to keepalive fetch gives those events a
+      // second chance instead of dropping them silently — it may itself be
+      // cancelled if the tab is already closing, which is no worse.
+      if (navigator.sendBeacon("/api/track", new Blob([body], { type: "application/json" }))) return;
     }
     void fetch("/api/track", {
       method: "POST",

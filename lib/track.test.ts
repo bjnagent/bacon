@@ -102,6 +102,21 @@ describe("track", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("falls back to fetch when the beacon queue rejects the payload", async () => {
+    // sendBeacon returns false when its queue is full or the body is oversized.
+    // Treating that as sent would drop the batch without a trace.
+    const beacon = vi.fn(() => false);
+    vi.stubGlobal("navigator", { sendBeacon: beacon });
+    const track = await fresh();
+    track("view", "today");
+
+    window.dispatchEvent(new Event("pagehide"));
+
+    expect(beacon).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(bodyOf(fetchMock.mock.calls[0]).events).toEqual([{ kind: "view", name: "today" }]);
+  });
+
   it("never throws when the transport fails — analytics must not break a user action", async () => {
     fetchMock.mockImplementation(() => Promise.reject(new Error("offline")));
     const track = await fresh();

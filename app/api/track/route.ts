@@ -12,7 +12,30 @@ import { createClient } from "@/lib/supabase/server";
 
 const KINDS = new Set(["view", "action"]);
 const MAX_BATCH = 20;
+// Per-user daily ceiling. The batching client emits at most a few hundred
+// events in a heavy day, so this never touches a real session — it exists
+// because nothing obliges a caller to use our client. Every other write route
+// carries a quota gate; this one was the exception.
+const MAX_PER_DAY = 2000;
 const clip = (s: unknown, n: number) => (typeof s === "string" ? s.slice(0, n) : null);
+
+// Cheap because it stops at the cap: `limit(MAX_PER_DAY)` short-circuits once
+// enough rows are seen, where an exact count would tally every row the user has
+// written today just to compare against a constant.
+async function overDailyCap(sb: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<boolean> {
+  const midnightUtc = new Date();
+  midnightUtc.setUTCHours(0, 0, 0, 0);
+  const { data, error } = await sb
+    .from("user_events")
+    .select("id")
+    .eq("user_id", userId)
+    .gte("created_at", midnightUtc.toISOString())
+    .limit(MAX_PER_DAY);
+  // Fail OPEN, as the quota gate does: a metering read that errors must not
+  // start dropping data.
+  if (error) return false;
+  return (data?.length ?? 0) >= MAX_PER_DAY;
+}
 
 export async function POST(req: Request) {
   try {
@@ -33,7 +56,11 @@ export async function POST(req: Request) {
       })
       .filter((r): r is NonNullable<typeof r> => r !== null);
 
-    if (rows.length) await sb.from("user_events").insert(rows);
+    // Checked only when there is something to write, so an empty or malformed
+    // batch costs nothing.
+    if (rows.length && !(await overDailyCap(sb, user.id))) {
+      await sb.from("user_events").insert(rows);
+    }
     return new NextResponse(null, { status: 204 });
   } catch {
     return new NextResponse(null, { status: 204 });

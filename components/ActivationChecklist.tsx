@@ -46,7 +46,15 @@ export default function ActivationChecklist({
   const [themeCount, setThemeCount] = useState<number | null>(null);
   const [addingTheme, setAddingTheme] = useState<string | null>(null);
 
+  const done = state.swept && state.tracked && state.analyzed;
+  const hidden = dismissed || done;
+
+  // Gated on `hidden`, not just mounted: hooks run before the early return
+  // below, so an ungated fetch here would cost a request on every Today load
+  // for everyone who has already dismissed or finished the checklist — the
+  // majority of users, forever.
   useEffect(() => {
+    if (hidden) return;
     let cancelled = false;
     (async () => {
       try {
@@ -55,7 +63,7 @@ export default function ActivationChecklist({
       } catch { if (!cancelled) setThemeCount(null); }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [hidden]);
 
   const addTheme = async (label: string) => {
     if (addingTheme) return;
@@ -70,12 +78,11 @@ export default function ActivationChecklist({
     finally { setAddingTheme(null); }
   };
 
-  const done = state.swept && state.tracked && state.analyzed;
   useEffect(() => {
-    if (!dismissed && !done) track("view", "activation-checklist");
-  }, [dismissed, done]);
+    if (!hidden) track("view", "activation-checklist");
+  }, [hidden]);
 
-  if (dismissed || done) return null;
+  if (hidden) return null;
 
   const dismiss = () => {
     track("action", "activation-dismiss");

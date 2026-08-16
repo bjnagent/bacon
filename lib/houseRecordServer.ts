@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { summarise, toPublicCall, type CallRecord, type HouseSummary, type PublicCall } from "@/lib/houseRecord";
 
@@ -14,9 +15,10 @@ export interface HouseRecord {
 }
 
 const MAX_CALLS = 500;
+const CACHE_SECONDS = 300;
 
 /** Returns `configured: false` when HOUSE_USER_ID is unset — never a fallback account. */
-export async function loadHouseRecord(): Promise<HouseRecord> {
+async function fetchHouseRecord(): Promise<HouseRecord> {
   const houseId = process.env.HOUSE_USER_ID;
   if (!houseId) return { configured: false, summary: null, calls: [], truncated: false };
 
@@ -42,3 +44,22 @@ export async function loadHouseRecord(): Promise<HouseRecord> {
     return { configured: true, summary: null, calls: [], truncated: false };
   }
 }
+
+// /record is public and identical for every visitor, and it is the surface most
+// likely to take a traffic spike — it exists to be linked from a launch post.
+// Left uncached it ran one service-role query per pageview. Grading runs
+// nightly, so five minutes of staleness costs nothing.
+//
+// Cached at the DATA layer rather than with the page's `revalidate` export, so
+// the page stays dynamic. A statically generated page would be prerendered at
+// build time, where the service-role key is absent — baking the "couldn't load"
+// state into the first response every deploy serves.
+//
+// `unstable_cache` is deprecated in Next 16 in favour of `use cache`, but that
+// directive requires `cacheComponents: true`, an app-wide opt-in that changes
+// caching semantics on every route. That migration deserves its own change.
+export const loadHouseRecord = unstable_cache(
+  fetchHouseRecord,
+  ["house-record"],
+  { revalidate: CACHE_SECONDS, tags: ["house-record"] },
+);
