@@ -20,10 +20,13 @@ import { createClient } from "@/lib/supabase/server";
 // feature.
 export const dynamic = "force-dynamic";
 
-async function has(p: PromiseLike<{ count: number | null; error: unknown }>): Promise<boolean> {
+// `limit(1)` rather than an exact count: the question is "is there at least
+// one?", and counting every matching row to answer it means a full index scan
+// of a user's ai_events on each Today load.
+async function has(p: PromiseLike<{ data: unknown[] | null; error: unknown }>): Promise<boolean> {
   try {
-    const { count, error } = await p;
-    return !error && (count ?? 0) > 0;
+    const { data, error } = await p;
+    return !error && (data?.length ?? 0) > 0;
   } catch { return false; }
 }
 
@@ -32,11 +35,10 @@ export async function GET() {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  const head = { count: "exact" as const, head: true };
   const [swept, tracked, analyzed] = await Promise.all([
-    has(sb.from("daily_briefs").select("id", head)),
-    has(sb.from("watchlist").select("id", head)),
-    has(sb.from("ai_events").select("id", head).eq("route", "analyze").eq("user_id", user.id)),
+    has(sb.from("daily_briefs").select("id").limit(1)),
+    has(sb.from("watchlist").select("id").limit(1)),
+    has(sb.from("ai_events").select("id").eq("route", "analyze").eq("user_id", user.id).limit(1)),
   ]);
 
   return NextResponse.json({ swept, tracked, analyzed });

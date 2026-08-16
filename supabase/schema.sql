@@ -414,6 +414,12 @@ create table if not exists user_events (
   detail text,               -- optional subject, e.g. the ticker analyzed
   created_at timestamptz not null default now()
 );
+-- The admin rollups scan a time window across ALL users (feature popularity,
+-- per-user event counts), with no user or name predicate to lead with — so
+-- created_at needs an index of its own. `ai_events` carries the same one for
+-- the same reason; without it both scans fall back to a seq scan of the
+-- highest-volume table in the schema.
+create index if not exists user_events_created on user_events (created_at desc);
 create index if not exists user_events_user_created on user_events (user_id, created_at desc);
 create index if not exists user_events_name_created on user_events (name, created_at desc);
 alter table user_events enable row level security;
