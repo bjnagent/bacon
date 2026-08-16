@@ -9,6 +9,11 @@ import { sendKillAlertEmail, emailEnabled } from "@/lib/email";
 
 export const maxDuration = 300;
 
+// Behaviour events older than this are deleted nightly. Comfortably past the
+// console's widest range (365 days is its ceiling, 90 its default view), so
+// pruning never removes something the operator can still ask for.
+const RETENTION_DAYS = 400;
+
 // Kill-condition watcher (daily cron, protected by CRON_SECRET). For each user
 // who opted in, re-checks their most recent brief's still-open ideas against
 // their KILL conditions using live web search, and writes any triggers back onto
@@ -26,8 +31,23 @@ export async function GET(req: Request) {
   // real prices + SPY — no model grades its own homework.
   const grading = await gradeCalls(admin).catch(() => ({ graded: 0, finalized: 0 }));
 
+  // Behaviour-ledger retention. `user_events` gains a row per view and is the
+  // highest-volume table in the schema by design, with nothing else pruning it.
+  // The console never looks past a 365-day window, so anything older is dead
+  // weight. Rides this cron rather than the sweep because the sweep returns
+  // early when no user is due, and housekeeping shouldn't depend on that.
+  // `count` rather than `.select()`: the point of a prune is that the row set
+  // can be large, and returning every deleted id would be the one query that
+  // scales with exactly the thing being cleaned up.
+  const cutoff = new Date(Date.now() - RETENTION_DAYS * 86_400_000).toISOString();
+  let pruned = 0;
+  try {
+    const { count } = await admin.from("user_events").delete({ count: "exact" }).lt("created_at", cutoff);
+    pruned = count ?? 0;
+  } catch { /* housekeeping is best-effort; never fail the watch run over it */ }
+
   const { data: users } = await admin.from("settings").select("user_id,brief_email_enabled").eq("watch_enabled", true);
-  if (!users?.length) return NextResponse.json({ ok: true, watched: 0, alerts: 0, ...grading });
+  if (!users?.length) return NextResponse.json({ ok: true, watched: 0, alerts: 0, pruned, ...grading });
 
   // Per-user kill-condition check. Isolated + returns counts so it can run with
   // bounded concurrency instead of serializing every user's web-search ask()
@@ -86,5 +106,5 @@ export async function GET(req: Request) {
     const res = await Promise.all(users.slice(i, i + POOL).map(watchUser));
     for (const r of res) { watched += r.watched; alertCount += r.alerts; }
   }
-  return NextResponse.json({ ok: true, watched, alerts: alertCount, ...grading });
+  return NextResponse.json({ ok: true, watched, alerts: alertCount, pruned, ...grading });
 }

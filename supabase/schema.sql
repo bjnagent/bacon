@@ -635,6 +635,45 @@ as $$
     select distinct on (user_id) user_id, name
     from feature_counts
     order by user_id, n desc, name
+  ),
+  -- Per-user totals as grouped CTEs joined once, rather than a correlated
+  -- subquery per field per row. The previous shape ran ~13 of them for every
+  -- user returned — about 2,600 subqueries at the console's 200-row limit,
+  -- with the lifetime-calls lookup executed twice (once for output, once for
+  -- the ORDER BY). Output is byte-identical; each CTE below reproduces its
+  -- subquery exactly, including the details that are easy to lose:
+  --   * `chats` counts only role='user', but lastSeen wants the newest message
+  --     of ANY role — hence separate columns off one scan of chat_messages.
+  --   * users with no rows are absent from these CTEs, so every count needs a
+  --     coalesce on the left join to match count(*)'s 0.
+  --   * greatest() ignores NULLs in Postgres, so the missing-row case still
+  --     behaves as it did with the subqueries.
+  meter as (
+    select a.user_id,
+           sum(a.calls) as lifetime_calls,
+           max(a.calls) filter (where a.day = current_date) as used_today
+    from ai_usage a group by a.user_id
+  ),
+  wl as (
+    select w.user_id, count(*) as n,
+           jsonb_agg(w.symbol order by w.created_at) as symbols,
+           max(w.created_at) as last_at
+    from watchlist w group by w.user_id
+  ),
+  th as (
+    select t.user_id, count(*) as n, jsonb_agg(t.label order by t.created_at) as labels
+    from themes t group by t.user_id
+  ),
+  br as (
+    select d.user_id, count(*) as n, max(d.created_at) as last_at
+    from daily_briefs d group by d.user_id
+  ),
+  cl as (select c.user_id, count(*) as n from calls c group by c.user_id),
+  cm as (
+    select m.user_id,
+           count(*) filter (where m.role = 'user') as n,
+           max(m.created_at) as last_at
+    from chat_messages m group by m.user_id
   )
   select coalesce(jsonb_agg(row order by (row->>'cost')::numeric desc, (row->>'lifetimeCalls')::int desc), '[]'::jsonb)
   from (
@@ -658,33 +697,31 @@ as $$
       'lastEvent', bh.last_event,
       -- Lifetime AI calls from the quota meter: the only per-user history that
       -- predates the ledger, and the reason a user with cost=0 isn't inactive.
-      'lifetimeCalls', coalesce((select sum(a.calls) from ai_usage a where a.user_id = u.id), 0),
-      'usedToday', coalesce((select a.calls from ai_usage a where a.user_id = u.id and a.day = current_date), 0),
-      'watchlist', (select count(*) from watchlist w where w.user_id = u.id),
-      'themes', (select count(*) from themes t where t.user_id = u.id),
-      'briefs', (select count(*) from daily_briefs d where d.user_id = u.id),
-      'callsFiled', (select count(*) from calls c where c.user_id = u.id),
-      'chats', (select count(*) from chat_messages m where m.user_id = u.id and m.role = 'user'),
+      'lifetimeCalls', coalesce(mt.lifetime_calls, 0),
+      'usedToday', coalesce(mt.used_today, 0),
+      'watchlist', coalesce(wl.n, 0),
+      'themes', coalesce(th.n, 0),
+      'briefs', coalesce(br.n, 0),
+      'callsFiled', coalesce(cl.n, 0),
+      'chats', coalesce(cm.n, 0),
       -- What they actually follow, not just how many.
-      'symbols', coalesce((select jsonb_agg(w.symbol order by w.created_at)
-                           from watchlist w where w.user_id = u.id), '[]'::jsonb),
-      'themeLabels', coalesce((select jsonb_agg(t.label order by t.created_at)
-                               from themes t where t.user_id = u.id), '[]'::jsonb),
-      'lastSeen', greatest(
-        u.last_sign_in_at,
-        bh.last_event,
-        (select max(m.created_at) from chat_messages m where m.user_id = u.id),
-        (select max(w.created_at) from watchlist w where w.user_id = u.id),
-        (select max(d.created_at) from daily_briefs d where d.user_id = u.id)
-      )
+      'symbols', coalesce(wl.symbols, '[]'::jsonb),
+      'themeLabels', coalesce(th.labels, '[]'::jsonb),
+      'lastSeen', greatest(u.last_sign_in_at, bh.last_event, cm.last_at, wl.last_at, br.last_at)
     ) as row
     from auth.users u
     left join usage g on g.user_id = u.id
     left join top_route tr on tr.user_id = u.id
     left join behaviour bh on bh.user_id = u.id
     left join top_feature tf on tf.user_id = u.id
+    left join meter mt on mt.user_id = u.id
+    left join wl on wl.user_id = u.id
+    left join th on th.user_id = u.id
+    left join br on br.user_id = u.id
+    left join cl on cl.user_id = u.id
+    left join cm on cm.user_id = u.id
     order by coalesce(g.cost, 0) desc,
-             coalesce((select sum(a.calls) from ai_usage a where a.user_id = u.id), 0) desc,
+             coalesce(mt.lifetime_calls, 0) desc,
              u.created_at desc
     limit greatest(1, least(500, coalesce(p_limit, 100)))
   ) s;
