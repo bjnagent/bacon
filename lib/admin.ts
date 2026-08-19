@@ -112,6 +112,7 @@ export async function loadOverview(db: Db, days: number): Promise<Overview | nul
     // is outstanding, and `.map()` on undefined would break that promise.
     byFeature: o.byFeature ?? [],
     topSubjects: o.topSubjects ?? [],
+    searches: o.searches ?? [],
   };
 }
 
@@ -127,5 +128,5 @@ export async function loadUserDetail(db: Db, userId: string, limit: number): Pro
   if (error || !data) return null;
   const d = data as unknown as UserDetail;
   // Same reason as loadOverview: absent on a pre-migration schema.
-  return { ...d, events: d.events ?? [], featureTotals: d.featureTotals ?? [] };
+  return { ...d, events: d.events ?? [], featureTotals: d.featureTotals ?? [], searches: d.searches ?? [] };
 }

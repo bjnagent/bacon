@@ -7,6 +7,7 @@ import { toPoints, parseBriefing, type Briefing, type Debate } from "@/lib/parse
 import { auditBriefingText } from "@/lib/verify";
 import { readTextStream } from "@/lib/readStream";
 import { invalidate } from "@/lib/clientCache";
+import { track } from "@/lib/track";
 import type { ChatContext } from "@/lib/prompts";
 import Spectrum from "./Spectrum";
 import BaconMark from "./BaconMark";
@@ -41,6 +42,17 @@ export default function AnalyzeView({ target, onDiscuss, quickSyms = [] }: { tar
   const [chainLoading, setChainLoading] = useState(false);
   const [chainError, setChainError] = useState<string | null>(null);
   const prevToken = useRef(0);
+
+  // Analyses launched from elsewhere (palette, Today, News, the checklist) are
+  // tracked by AppShell as it routes them here. The two entry points BELOW
+  // reach `run` directly and so were never counted — which meant the box people
+  // actually type names into was the one search surface with no record of what
+  // they searched for. Deliberately not inside `run`: the effect that reacts to
+  // an incoming `target` calls it too, and that path is already tracked.
+  const trackSearch = (asset: string) => {
+    const a = asset.trim();
+    if (a) track("action", "analyze", a.slice(0, 120));
+  };
 
   const run = async (assetArg?: string, clsArg?: string) => {
     const asset = (assetArg ?? query).trim();
@@ -161,7 +173,7 @@ export default function AnalyzeView({ target, onDiscuss, quickSyms = [] }: { tar
         </div>
       )}
 
-      <form onSubmit={(e) => { e.preventDefault(); run(); }} className="pr-command">
+      <form onSubmit={(e) => { e.preventDefault(); trackSearch(query); run(); }} className="pr-command">
         <div className="pr-command-row">
           <span className="pr-command-prompt">›</span>
           <input className="pr-input" placeholder="TICKER OR ASSET — e.g. NVDA, USD/JPY, GOLD, VOO, BTC" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Asset to analyze" />
@@ -173,7 +185,7 @@ export default function AnalyzeView({ target, onDiscuss, quickSyms = [] }: { tar
           <div className="pr-quickrun">
             <span className="pr-quickrun-lbl">Your radar ▸</span>
             {quickSyms.slice(0, 8).map((s) => (
-              <button key={s} type="button" className="pr-chip" onClick={() => { setQuery(s); setAssetClass(s.includes("/") ? "FX / Currency pair" : assetClass); run(s, s.includes("/") ? "FX / Currency pair" : undefined); }}>{s}</button>
+              <button key={s} type="button" className="pr-chip" onClick={() => { trackSearch(s); setQuery(s); setAssetClass(s.includes("/") ? "FX / Currency pair" : assetClass); run(s, s.includes("/") ? "FX / Currency pair" : undefined); }}>{s}</button>
             ))}
           </div>
         )}

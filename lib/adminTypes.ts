@@ -38,6 +38,16 @@ export interface FeatureRow {
   name: string; kind: string; hits: number; users: number; lastAt: string | null;
 }
 export interface SubjectRow { detail: string; hits: number; users: number }
+/**
+ * One query typed into the ⌘K palette, folded across case and surrounding
+ * space. `ran`/`nav`/`dropped` are the outcomes of those same hits, so they sum
+ * to `hits` — a row where `dropped` is the whole of it is a search the product
+ * had no answer for.
+ */
+export interface SearchRow {
+  q: string; hits: number; users: number;
+  ran: number; nav: number; dropped: number; lastAt: string;
+}
 export interface Overview {
   days: number; totals: Totals; daily: DayRow[];
   byRoute: RouteRow[]; byModel: ModelRow[]; recent: EventRow[];
@@ -46,6 +56,9 @@ export interface Overview {
   byFeature: FeatureRow[];
   /** Most-analyzed / most-discussed names across all accounts. */
   topSubjects: SubjectRow[];
+  /** Raw palette queries. Deliberately NOT merged into topSubjects: a search
+   *  that went nowhere has no subject to be a top one of. */
+  searches: SearchRow[];
   /** First metered call. Null = metering hasn't recorded yet — NOT "no usage". */
   meteringSince: string | null;
 }
@@ -81,6 +94,8 @@ export interface CallRow {
 }
 /** One step in the session trail: where this account went, and on what. */
 export interface TrailRow { at: string; kind: string; name: string; detail: string | null }
+/** One search this account typed, with what they did about it. */
+export interface UserSearchRow { at: string; q: string; outcome: "analyzed" | "navigated" | "abandoned" }
 export interface UserDetail {
   userId: string;
   email: string | null;
@@ -92,4 +107,5 @@ export interface UserDetail {
   usage: { day: string; calls: number }[];
   events: TrailRow[];
   featureTotals: { name: string; kind: string; hits: number; lastAt: string }[];
+  searches: UserSearchRow[];
 }

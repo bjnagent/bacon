@@ -171,6 +171,27 @@ function UserDetailPanel({ d }: { d: UserDetail }) {
         </p>
       )}
 
+      {/* What they were looking FOR, which the trail above cannot show: it
+          records where someone went, not what they typed to get there — and
+          says nothing at all about the times they typed and left. */}
+      <h3 className="ad-h3">
+        What they searched
+        <span className="ad-h-sub">
+          {d.searches.length ? `${d.searches.length} quer${d.searches.length === 1 ? "y" : "ies"}, newest first` : "nothing typed into the palette"}
+        </span>
+      </h3>
+      {d.searches.length ? (
+        <div className="ad-trail">
+          {d.searches.map((sr, i) => (
+            <div key={`${sr.at}-${i}`} className="ad-trail-row">
+              <span className="ad-dim">{ago(sr.at)}</span>
+              <span className="ad-mono ad-strong">{sr.q}</span>
+              <span className={sr.outcome === "abandoned" ? "ad-bad" : "ad-dim"}>{sr.outcome}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
       <div className="ad-detail-cols">
         <div>
           <h3 className="ad-h3">Following <span className="ad-h-sub">{d.watchlist.length} name{d.watchlist.length === 1 ? "" : "s"}</span></h3>
@@ -309,6 +330,15 @@ export default function AdminConsole({
   // Lifetime, not the metered window — otherwise every account reads as
   // inactive until the ledger has been running a while.
   const activeUsers = useMemo(() => users.filter((u) => u.lifetimeCalls > 0).length, [users]);
+
+  // Searches that produced nothing: typed, then abandoned without running an
+  // analyze or matching a command. Called out separately because it is the one
+  // number here that names something the product is MISSING, and it would
+  // otherwise sit unremarked in the middle of a ranked table.
+  const deadSearches = useMemo(
+    () => (ov?.searches ?? []).filter((sr) => sr.ran + sr.nav === 0),
+    [ov],
+  );
 
   return (
     <div className="pr-app">
@@ -455,6 +485,49 @@ export default function AdminConsole({
                 </table>
               </section>
             </div>
+
+            {/* The search box is the one place users say, in their own words,
+                what they came for. A query that ran an analyze is demand the
+                product met. One typed and then abandoned is demand it did NOT
+                meet — and that name exists in no content table anywhere, which
+                makes this the only view in the console that can show it. */}
+            <section className="ad-sec">
+              <h2 className="ad-h">What they search for <span className="ad-h-sub">⌘K palette, last {ov.days} days</span></h2>
+              {ov.searches.length ? (
+                <>
+                  {deadSearches.length ? (
+                    <p className="ad-note">
+                      {deadSearches.length === 1
+                        ? <><span className="ad-mono ad-strong">{deadSearches[0].q}</span> was searched and abandoned — nothing was run against it.</>
+                        : <>{deadSearches.length} queries went nowhere — typed, then abandoned without running anything. Top of that list: {deadSearches.slice(0, 3).map((d) => d.q).join(", ")}.</>}
+                    </p>
+                  ) : null}
+                  <table className="ad-table">
+                    <thead><tr><th>Query</th><th>Users</th><th>Times</th><th>What happened</th><th>Last</th></tr></thead>
+                    <tbody>
+                      {ov.searches.map((sr) => (
+                        <tr key={sr.q}>
+                          <td className="ad-mono">{sr.q}</td>
+                          <td>{compact(sr.users)}</td>
+                          <td>{compact(sr.hits)}</td>
+                          <td>
+                            {sr.ran ? <span className="ad-pill is-constructive">{sr.ran} analyzed</span> : null}
+                            {sr.nav ? <span className="ad-pill">{sr.nav} navigated</span> : null}
+                            {sr.dropped ? <span className={`ad-pill${sr.ran + sr.nav === 0 ? " is-cautious" : ""}`}>{sr.dropped} abandoned</span> : null}
+                          </td>
+                          <td className="ad-dim">{ago(sr.lastAt)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              ) : (
+                <p className="ad-empty-cell">
+                  No searches in this window. Palette queries are recorded from the release that added
+                  search tracking — an account that used ⌘K before it will still show empty here.
+                </p>
+              )}
+            </section>
 
             <section className="ad-sec">
               <h2 className="ad-h">Users <span className="ad-h-sub">click a row for their chat log, names followed and filed calls</span></h2>
