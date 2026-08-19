@@ -566,11 +566,40 @@ as $$
           'hits', count(*),
           'users', count(distinct user_id)
         ) as x
-        from uev where detail is not null and detail <> ''
+        -- Palette queries carry a detail too, but they are raw search text,
+        -- not a name someone opened — and a search that ran an analyze would
+        -- otherwise be counted here twice, once per event. They get their own
+        -- rollup below.
+        from uev where detail is not null and detail <> '' and name not like 'search-%'
         group by detail
         order by count(*) desc, count(distinct user_id) desc
         limit 25
-      ) ts)
+      ) ts),
+    -- What people typed into the command palette — the product's search box.
+    -- Separate from topSubjects because a search is not a visit: the query that
+    -- matters most is the one that led NOWHERE, and that name never appears in
+    -- any content table by definition.
+    --
+    -- Case- and space-folded so NVDA / nvda / " nvda " are one row; for a box
+    -- people type tickers into, that is the same search. Outcomes are returned
+    -- alongside the count rather than as a second list, so the console can show
+    -- "went nowhere" without a second scan of the same rows.
+    'searches', (select coalesce(jsonb_agg(x order by (x->>'users')::int desc, (x->>'hits')::int desc), '[]'::jsonb) from (
+        select jsonb_build_object(
+          'q', upper(btrim(detail)),
+          'hits', count(*),
+          'users', count(distinct user_id),
+          'ran', count(*) filter (where name = 'search-run'),
+          'nav', count(*) filter (where name = 'search-nav'),
+          'dropped', count(*) filter (where name = 'search-drop'),
+          'lastAt', max(created_at)
+        ) as x
+        from uev
+        where name like 'search-%' and detail is not null and btrim(detail) <> ''
+        group by upper(btrim(detail))
+        order by count(distinct user_id) desc, count(*) desc
+        limit 40
+      ) sq)
   );
 $$;
 
@@ -810,7 +839,25 @@ as $$
         ) as x
         from user_events e where e.user_id = p_user
         group by e.name
-      ) f2)
+      ) f2),
+    -- Every query this account typed into the palette, newest first. Read as a
+    -- list it answers the question the trail above cannot: what they were
+    -- looking FOR, including the times they didn't find it.
+    'searches', (select coalesce(jsonb_agg(x order by x->>'at' desc), '[]'::jsonb) from (
+        select jsonb_build_object(
+          'at', e.created_at,
+          'q', e.detail,
+          'outcome', case e.name
+            when 'search-run' then 'analyzed'
+            when 'search-nav' then 'navigated'
+            else 'abandoned' end
+        ) as x
+        from user_events e
+        where e.user_id = p_user and e.name like 'search-%'
+          and e.detail is not null and btrim(e.detail) <> ''
+        order by e.created_at desc
+        limit 200
+      ) s2)
   );
 $$;
 
