@@ -608,11 +608,30 @@ $$;
 -- Which NAMES and THEMES each account follows are returned as arrays, not just
 -- counts — "what is this account into" is the question the console exists for,
 -- and it is a lifetime question, not a 30-day one.
+--
+-- SECURITY DEFINER, deliberately, and only on the three functions that read
+-- auth.users. That table grants SELECT to `postgres` alone — service_role holds
+-- nothing on it — so as SECURITY INVOKER these ran as the caller and raised
+-- "permission denied for table users" for the only caller they have. The
+-- console showed spend and feature rollups (admin_usage_overview touches no
+-- auth table, so it still worked) beside an empty user list and an empty live
+-- tail, which read as a product nobody uses rather than as a failure.
+--
+-- Granting service_role SELECT on auth.users would fix it far more broadly and
+-- far worse: password hashes and recovery tokens would open to every
+-- service-role query in the app, to repair three functions. Definer confines
+-- the elevation to these bodies, whose text is fixed here.
+--
+-- What keeps that safe is the grant block at the end of this file: EXECUTE is
+-- revoked from public, anon and authenticated BY NAME and granted to
+-- service_role only, so no browser-reachable role can call them. search_path is
+-- pinned below for the reason it is pinned on every other definer function
+-- here — an unpinned search_path is what turns a definer into an escalation.
 create or replace function admin_user_activity(p_days int default 30, p_limit int default 100)
 returns jsonb
 language sql
 stable
-security invoker
+security definer
 set search_path = public, pg_catalog
 as $$
   with bounds as (
@@ -759,11 +778,13 @@ $$;
 -- Per-user drill-down: the chat transcript, the names and themes followed, and
 -- the calls filed. Split from the list above so the table isn't carrying a
 -- transcript per row — this loads only when a row is opened.
+-- SECURITY DEFINER for the same reason as admin_user_activity above: it reads
+-- auth.users for the account's email.
 create or replace function admin_user_detail(p_user uuid, p_limit int default 100)
 returns jsonb
 language sql
 stable
-security invoker
+security definer
 set search_path = public, pg_catalog
 as $$
   select jsonb_build_object(
@@ -861,12 +882,13 @@ as $$
   );
 $$;
 
--- Most recent calls, for the live activity tail.
+-- Most recent calls, for the live activity tail. SECURITY DEFINER for the same
+-- reason as the two above: it joins auth.users to label each call with an email.
 create or replace function admin_recent_events(p_limit int default 60)
 returns jsonb
 language sql
 stable
-security invoker
+security definer
 set search_path = public, pg_catalog
 as $$
   select coalesce(jsonb_agg(row order by row->>'at' desc), '[]'::jsonb)

@@ -24,14 +24,24 @@ export default async function AdminPage() {
     loadUsers(db, DEFAULT_DAYS, 200),
   ]);
 
+  // `null` from a loader means the query FAILED; an empty array means it ran and
+  // found nothing. Collapsing the two is what let a permission error on
+  // admin_user_activity read as "No accounts yet." on a console with eight live
+  // accounts behind it — so the two are kept apart here and the failure is said
+  // out loud. The reason lands in the server logs via lib/admin's rpcFailed.
+  const loadError = !overview
+    ? "Couldn't load metrics — has the ai_events migration been applied?"
+    : !users
+      ? "Couldn't load the user list — the query failed, so this is not an empty product. The reason is in the server logs."
+      : null;
+
   return (
     <AdminConsole
       email={email ?? ""}
       days={DEFAULT_DAYS}
       overview={overview}
       users={users ?? []}
-      // Only real failure mode worth surfacing: the migration isn't applied yet.
-      loadError={overview ? null : "Couldn't load metrics — has the ai_events migration been applied?"}
+      loadError={loadError}
     />
   );
 }
