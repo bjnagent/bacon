@@ -10,6 +10,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { computeRoi, cleanTicker } from "./market";
 import { getCachedSeries } from "./priceCache";
 import { getPropertySeries } from "./property";
+import { orNull } from "@/lib/log";
 
 export interface NewCall {
   source: "brief" | "analyze" | "property";
@@ -132,13 +133,13 @@ interface CallRow {
 async function actualPct(admin: SupabaseClient, row: CallRow): Promise<{ pct: number; latest: number } | null> {
   const since = String(row.created_at).slice(0, 10);
   if (row.source === "property") {
-    const series = await getPropertySeries(admin, row.instrument).catch(() => null);
+    const series = await getPropertySeries(admin, row.instrument).catch(orNull(`grading: property series ${row.instrument}`));
     const roi = series && computeRoi(series, since, 1);
     return roi ? { pct: roi.roiPct, latest: roi.asOfClose } : null;
   }
   const ticker = cleanTicker(row.instrument);
   if (!ticker) return null;
-  const series = await getCachedSeries(admin, ticker, since).catch(() => null);
+  const series = await getCachedSeries(admin, ticker, since).catch(orNull(`grading: price series ${ticker}`));
   const roi = series && computeRoi(series, since, 1);
   return roi ? { pct: roi.roiPct, latest: roi.asOfClose } : null;
 }
@@ -163,7 +164,7 @@ export async function gradeCalls(admin: SupabaseClient): Promise<{ graded: numbe
   // Resolve the SPY benchmark series ONCE (covering the oldest call) and price
   // each window off it, instead of a getCachedSeries('SPY') round-trip per row.
   const earliest = rows.reduce((m, r) => (String(r.created_at) < m ? String(r.created_at) : m), String(rows[0].created_at)).slice(0, 10);
-  const spySeries = await getCachedSeries(admin, "SPY", earliest).catch(() => null);
+  const spySeries = await getCachedSeries(admin, "SPY", earliest).catch(orNull("grading: SPY benchmark series"));
 
   let graded = 0, finalized = 0;
   const gradeOne = async (row: CallRow) => {

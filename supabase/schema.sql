@@ -11,7 +11,14 @@ create table if not exists profiles (
 -- per-user settings (scout scheduler + news prefs)
 create table if not exists settings (
   user_id uuid primary key references auth.users(id) on delete cascade,
-  scout_interval_minutes int default 0,     -- 0 = off; 15/30/60/240
+  -- Daily, ON by default. This used to default to 0 (off), which meant a new
+  -- account's brief never arrived unless they found the switch — and the
+  -- behaviour ledger showed exactly that: 2 of 8 accounts swept, so the product
+  -- silently did nothing for everyone else. A research radar that only runs
+  -- when you remember to ask it isn't a radar. The cron honours per-user
+  -- cadence, so 1440 means "once per daily run"; 0 still means off for anyone
+  -- who turns it off. Email stays opt-in separately (brief_email_enabled).
+  scout_interval_minutes int default 1440,  -- 0 = off; 1440 = daily
   last_sweep_at timestamptz,
   news_source text default 'All',
   news_focus text default '',

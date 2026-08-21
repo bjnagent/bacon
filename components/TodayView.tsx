@@ -14,6 +14,7 @@ import MacroBackdrop from "./MacroBackdrop";
 import BaconMark from "./BaconMark";
 import TVLink from "./TVLink";
 import ActivationChecklist, { type ActivationState } from "./ActivationChecklist";
+import { swallowed } from "@/lib/log";
 
 interface BriefItem { id: string; name: string; ticker: string; cls: string; horizon: string; thesis: string; signals: string; checks: string; action?: string; target?: string }
 interface Brief { intro: string | null; caveat: string | null; generatedAt: string | null; items: BriefItem[] }
@@ -33,11 +34,11 @@ function SampleBrief({ onSweep }: { onSweep: () => void }) {
   const [savingAuto, setSavingAuto] = useState(false);
   useEffect(() => { trackEvent("view", "sample-brief"); }, []);
 
-  // The nightly cron only sweeps accounts with scout_interval_minutes > 0, and
-  // that defaults to 0 — so a new user's brief never arrives on its own, and
-  // the only switch for it lives over on Radar where they have no reason to
-  // look. Offering it here is the difference between one curious sweep and a
-  // product that shows up tomorrow.
+  // New accounts now default to a daily sweep, so this is no longer the only
+  // thing standing between a user and tomorrow's brief. It still earns its
+  // place: accounts created before that default, and anyone who switched the
+  // sweep off, land here with nothing arriving on its own — and the only other
+  // switch lives over on Radar, where they have no reason to look.
   const enableDaily = async () => {
     if (savingAuto || autoOn) return;
     setSavingAuto(true); setAutoOn(true);
@@ -135,7 +136,12 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
         if (Array.isArray(wd.items)) { const t: Record<string, boolean> = {}; wd.items.forEach((it: { symbol: string }) => { t[it.symbol.toUpperCase()] = true; }); setTracked(t); }
         if (std.settings) { setEmailOn(!!std.settings.brief_email_enabled); setWatchOn(!!std.settings.watch_enabled); }
         if (typeof ad.swept === "boolean") setActivation({ swept: ad.swept, tracked: !!ad.tracked, analyzed: !!ad.analyzed });
-      } catch { /* empty state handles it */ }
+      } catch (err) {
+        // The empty state still handles it — but silently swallowing this is
+        // how a real failure comes to look exactly like a new account with
+        // nothing in it, which is the same trap the admin console fell into.
+        swallowed("today: initial load", err);
+      }
       finally { if (!cancelled) setLoaded(true); }
     })();
     return () => { cancelled = true; };

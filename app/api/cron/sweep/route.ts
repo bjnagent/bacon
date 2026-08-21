@@ -9,6 +9,7 @@ import { readMarketWide, fetchMarketWide, cacheMarketWide, type MarketWide } fro
 import { generateBrief, briefToRows, briefToDailyRow, splitVoices } from "@/lib/brief";
 import { sendBriefEmail, emailEnabled } from "@/lib/email";
 import { mapClass } from "@/lib/lenses";
+import { orNull } from "@/lib/log";
 
 // Background sweep: surface fresh opportunities (today's real movers + theme
 // scout) into each user's "fresh finds" feed, and refresh their tracked names —
@@ -85,7 +86,7 @@ async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: st
 
   // Fire the user's AI calls concurrently.
   const themeScoutP: Promise<ScoutResult | null> = themeLabels.length
-    ? askCheap(scoutPrompt(themeLabels), [{ role: "user", content: `Themes: ${themeLabels.join("; ")}` }], true, 1100, 6, { route: "sweep:scout", userId }).then(parseScout).catch(() => null)
+    ? askCheap(scoutPrompt(themeLabels), [{ role: "user", content: `Themes: ${themeLabels.join("; ")}` }], true, 1100, 6, { route: "sweep:scout", userId }).then(parseScout).catch(orNull("sweep:scout"))
     : Promise.resolve(null);
   const newsP: Promise<NewsResult | null> = askCheap(
     newsPrompt(newsSource || "All", newsFocus || ""),
@@ -94,7 +95,7 @@ async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: st
     1500,
     4,
     { route: "sweep:news", userId },
-  ).then(parseNews).catch(() => null);
+  ).then(parseNews).catch(orNull("sweep:news"));
   const trackP = tracked.map((it) =>
     askCheap(trackingUpdatePrompt(), [{ role: "user", content: `Asset: ${it.symbol}\nAsset class: ${it.asset_class}\n\nGive the monitoring update from current public information.` }], true, 1100, 3, { route: "sweep:track", userId })
       .then((text) => ({ it, upd: parseTrackingUpdate(text) }))
@@ -116,7 +117,7 @@ async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: st
     voices,
     commodities: mw.commodities,
     fx: mw.fx,
-  }, { route: "sweep:brief", userId }).catch(() => null);
+  }, { route: "sweep:brief", userId }).catch(orNull("sweep:brief"));
 
   const [themeRes, newsRes, trackResults, brief] = await Promise.all([themeScoutP, newsP, Promise.all(trackP), briefP]);
 
