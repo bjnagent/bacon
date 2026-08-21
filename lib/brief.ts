@@ -55,7 +55,12 @@ export function buildSignalBundle(b: SignalBundle): string {
 }
 
 export async function generateBrief(bundle: SignalBundle, meta?: AiMeta): Promise<OpportunityBrief> {
-  const text = await ask(opportunityBriefPrompt(), [{ role: "user", content: buildSignalBundle(bundle) }], true, 1800, 6, meta);
+  // 3, down from 6. Search count drives input cost super-linearly, because each
+  // result is re-read on every later turn of the loop: the ledger's one 4-search
+  // brief used 49,688 input tokens against 76–89k for every 5-search run. The
+  // cap was never the binding constraint on quality — runs landed on 5, not 6 —
+  // so this trades the least valuable search for ~40% of the input bill.
+  const text = await ask(opportunityBriefPrompt(), [{ role: "user", content: buildSignalBundle(bundle) }], true, 1800, 3, meta);
   return parseOpportunities(text);
 }
 

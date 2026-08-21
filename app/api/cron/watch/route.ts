@@ -72,7 +72,10 @@ export async function GET(req: Request) {
       const text = await ask(
         killWatchPrompt(String(brief.brief_date)),
         [{ role: "user", content: `Opportunities & their kill conditions:\n${listing}\n\nCheck whether any kill condition has triggered.` }],
-        true, 1000, 5,
+        // 3, down from 5 — same reasoning as the brief: each extra search is
+        // re-read on every later turn, and watch runs land between 24k and 58k
+        // input tokens purely on how many searches they take.
+        true, 1000, 3,
         { route: "watch", userId: u.user_id },
       );
       const { items: alerts, note } = parseKillWatch(text);

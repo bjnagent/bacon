@@ -10,6 +10,7 @@ import { parseBriefing } from "@/lib/parsers";
 import { recordCalls, parseVerdictCall, getCalibrationMemo, getInstrumentMemo } from "@/lib/calls";
 import { textStreamResponse } from "@/lib/streamRoute";
 import { withinQuota, QUOTA_MESSAGE } from "@/lib/quota";
+import { orEmpty, orNull } from "@/lib/log";
 
 // Live web search can take 20–40s; stream the briefing so lens panels appear
 // as they're written instead of after the whole generation.
@@ -45,8 +46,8 @@ export async function POST(req: Request) {
   // lets the 8s deadline cancel a slow SEC fetch.
   const isStock = /equity|stock/i.test(assetClass) || !assetClass;
   const [macro, ma, fundamentals, pulse, calibration, instrumentMemo] = await Promise.all([
-    withDeadline(getMacroSnapshot().catch(() => []), 4000, [] as Awaited<ReturnType<typeof getMacroSnapshot>>),
-    isEquity ? getMovingAverages(asset).catch(() => null) : Promise.resolve(null),
+    withDeadline(getMacroSnapshot().catch(orEmpty("analyze: macro snapshot")), 4000, [] as Awaited<ReturnType<typeof getMacroSnapshot>>),
+    isEquity ? getMovingAverages(asset).catch(orNull(`analyze: moving averages ${asset}`)) : Promise.resolve(null),
     isStock ? raceAbort((signal) => getFundamentals(cleanTicker(asset) ?? asset, sb, signal), 8000, null) : Promise.resolve(null),
     raceAbort((signal) => communityPulse([asset], `the asset ${asset}`, signal, { route: "analyze", userId: user.id }), 12_000, null),
     getCalibrationMemo(sb),

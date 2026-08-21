@@ -5,6 +5,7 @@ import { briefReviewPrompt } from "@/lib/prompts";
 import { parseBriefReview } from "@/lib/parsers";
 import { communityPulse } from "@/lib/grok";
 import type { StoredBriefItem } from "@/lib/brief";
+import { orNull } from "@/lib/log";
 
 export const maxDuration = 300;
 
@@ -31,7 +32,7 @@ export async function POST(req: Request) {
     // part of "how did it age" (euphoria then vs silence now is itself a grade).
     const withDeadline = <T,>(p: Promise<T>, ms: number, fallback: T) =>
       Promise.race([p, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);
-    const pulse = await withDeadline(communityPulse(items.map((o) => o.ticker || o.name), "grading past investment calls", undefined, { route: "brief-review", userId: user.id }).catch(() => null), 12_000, null);
+    const pulse = await withDeadline(communityPulse(items.map((o) => o.ticker || o.name), "grading past investment calls", undefined, { route: "brief-review", userId: user.id }).catch(orNull("brief-review community pulse")), 12_000, null);
     const pulseCtx = pulse ? `\n\nCURRENT COMMUNITY PULSE on these names (live X via Grok — weigh the sentiment SHIFT since the call in your outcomes):\n${pulse.text}` : "";
     const text = await ask(briefReviewPrompt(String(row.brief_date)), [{ role: "user", content: `Opportunities flagged on ${row.brief_date}:\n${listing}${pulseCtx}\n\nReview what has happened to each since.` }], true, 1400, 6, { route: "brief-review", userId: user.id });
     const review = parseBriefReview(text);

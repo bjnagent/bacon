@@ -1,7 +1,47 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { meter, type AiMeta } from "./usage";
 
-const MODEL = process.env.BACON_MODEL ?? "claude-sonnet-4-6";
+// Sonnet 5 lists at the same $3/$15 as the 4.6 it replaces — and until
+// 2026-08-31 runs at introductory $2/$10, so this is cheaper AND newer, not a
+// trade. Kept in an env var so `BACON_MODEL=claude-sonnet-4-6` rolls the whole
+// thing back without a deploy if the briefs read worse.
+const MODEL = process.env.BACON_MODEL ?? "claude-sonnet-5";
+
+// Thinking is the one thing that does NOT carry over from 4.6 untouched.
+// Omitting the parameter meant "no thinking" on Sonnet 4.6; on Sonnet 5 it means
+// ADAPTIVE thinking, and thinking tokens bill as output and count against
+// max_tokens. Every caller here budgets 1000–1800 tokens for a delimited format
+// that gets parsed downstream, so silently adopting thinking would eat that
+// budget and truncate briefs mid-section. Off keeps behaviour identical to what
+// the ledger already measured; it's the safe half of this migration.
+const THINKING = { type: "disabled" as const };
+
+/**
+ * The stable half of every request. The system prompt is the only part that
+ * repeats — messages carry the per-call payload — so the breakpoint belongs
+ * here and not on the last block.
+ *
+ * Below the ~1024-token minimum a prefix silently isn't cached, which is most
+ * of these prompts. Only the brief's is long enough to qualify today; the rest
+ * cost nothing to mark and start paying off if they grow.
+ */
+const cachedSystem = (system: string) => [
+  { type: "text" as const, text: system, cache_control: { type: "ephemeral" as const } },
+];
+
+/**
+ * `web_search_20260209` filters result content dynamically rather than feeding
+ * every hit back verbatim. That matters more here than almost anywhere: results
+ * are re-read on each turn of the search loop, and the ledger showed a single
+ * extra search costing roughly 32,000 input tokens on the daily brief.
+ */
+const searchTool = (maxSearches?: number) => ({
+  type: "web_search_20260209" as const,
+  name: "web_search" as const,
+  // max_uses bounds the search loop — it's what keeps latency and search spend
+  // predictable; an uncapped loop can run for minutes.
+  ...(maxSearches ? { max_uses: maxSearches } : {}),
+});
 
 // Lazily construct the client so importing this module (e.g. during `next build`,
 // when route handlers are traced) never throws on a missing key. The key is only
@@ -39,15 +79,10 @@ export async function ask(
     res = await getClient().messages.create({
       model: MODEL,
       max_tokens: maxTokens,
-      system,
+      system: cachedSystem(system),
+      thinking: THINKING,
       messages,
-      ...(useSearch
-        ? {
-            // max_uses bounds the search loop — it's what keeps latency and
-            // search spend predictable; an uncapped loop can run for minutes.
-            tools: [{ type: "web_search_20250305" as const, name: "web_search", ...(maxSearches ? { max_uses: maxSearches } : {}) }],
-          }
-        : {}),
+      ...(useSearch ? { tools: [searchTool(maxSearches)] } : {}),
     });
   } catch (err) {
     // Record the failure so the console shows error rate, not just spend.
@@ -96,10 +131,11 @@ export async function* askStream(
     const stream = await getClient().messages.create({
       model: MODEL,
       max_tokens: maxTokens,
-      system,
+      system: cachedSystem(system),
+      thinking: THINKING,
       messages,
       stream: true,
-      ...(useSearch ? { tools: [{ type: "web_search_20250305" as const, name: "web_search", ...(maxSearches ? { max_uses: maxSearches } : {}) }] } : {}),
+      ...(useSearch ? { tools: [searchTool(maxSearches)] } : {}),
     });
     for await (const ev of stream) {
       if (ev.type === "message_start") {

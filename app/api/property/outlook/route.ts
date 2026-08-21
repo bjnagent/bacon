@@ -9,6 +9,7 @@ import { communityPulse } from "@/lib/grok";
 import { recordCalls, getCalibrationMemo, getInstrumentMemo } from "@/lib/calls";
 import { textStreamResponse } from "@/lib/streamRoute";
 import { withinQuota, QUOTA_MESSAGE } from "@/lib/quota";
+import { orNull } from "@/lib/log";
 
 export const maxDuration = 300;
 
@@ -34,7 +35,7 @@ export async function POST(req: Request) {
     return make(ctrl.signal).catch(() => fallback).finally(() => clearTimeout(timer));
   };
   const [series, pulse, calibration, instrumentMemo] = await Promise.all([
-    getPropertySeries(sb, market.key).catch(() => null),
+    getPropertySeries(sb, market.key).catch(orNull(`property series ${market.key}`)),
     raceAbort((signal) => communityPulse([market.label], `${market.country === "SG" ? "Singapore" : "Australia"} property market`, signal, { route: "property", userId: user.id }), 12_000, null),
     getCalibrationMemo(sb),
     // Episodic memory: prior calls on THIS market and how they aged.

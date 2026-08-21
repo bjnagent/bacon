@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { PROPERTY_MARKETS, marketByKey, getPropertySeries, computeMarketStats, valueProperty } from "@/lib/property";
+import { orNull } from "@/lib/log";
 
 export const maxDuration = 60;
 
@@ -13,7 +14,7 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
   const [seriesList, propsRes, outlooksRes] = await Promise.all([
-    Promise.all(PROPERTY_MARKETS.map(async (m) => ({ m, series: await getPropertySeries(sb, m.key).catch(() => null) }))),
+    Promise.all(PROPERTY_MARKETS.map(async (m) => ({ m, series: await getPropertySeries(sb, m.key).catch(orNull(`property series ${m.key}`)) }))),
     sb.from("properties").select("id,label,market_key,purchase_price,purchase_date,notes,created_at").order("created_at", { ascending: true }),
     sb.from("property_outlooks").select("market_key,body,created_at"),
   ]);
