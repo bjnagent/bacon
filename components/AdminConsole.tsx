@@ -558,7 +558,18 @@ export default function AdminConsole({
                               ? <Loader2 size={13} className="pr-spin" />
                               : <ChevronRight size={13} className={open ? "ad-chev-open" : ""} />}
                           </td>
-                          <td className="ad-mono">{shortEmail(u.email)}</td>
+                          <td className="ad-mono">
+                            {shortEmail(u.email)}
+                            {/* This database is shared with another app, so its
+                                signups land in the same auth.users and get bacon
+                                rows provisioned for them. Without this marker
+                                they are indistinguishable from real users here,
+                                which is how six of them once read as a userbase
+                                with an activation problem. */}
+                            {u.events + u.watchlist + u.chats === 0
+                              ? <span className="ad-pill is-cautious" title="No bacon activity — signed up, but has never opened this app. Likely an account from the other app sharing this database.">not a user</span>
+                              : null}
+                          </td>
                           <td className="ad-dim">{ago(u.lastSeen)}</td>
                           {/* Which feature they lean on, over how many distinct
                               days — 40 opens in one sitting is a trial, 40 over
@@ -603,6 +614,11 @@ export default function AdminConsole({
                 &ldquo;Calls&rdquo; is lifetime AI calls from the quota meter, so it covers usage from
                 before cost metering existed. &ldquo;Today&rdquo; counts against the 150/day quota.
                 A blank cell means zero.
+                {" "}An account marked <span className="ad-pill is-cautious">not a user</span> has never
+                opened bacon — no view, no tracked name, no message. This database is shared with another
+                app, whose signups land in the same <span className="ad-mono">auth.users</span> and get
+                bacon rows created for them. Count those rows as signups and you are counting someone
+                else&rsquo;s userbase; the nightly sweep skips them.
               </p>
             </section>
 

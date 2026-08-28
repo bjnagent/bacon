@@ -37,6 +37,36 @@ export async function GET(req: Request) {
     .sort((a, b) => (String(a.last_sweep_at ?? "") < String(b.last_sweep_at ?? "") ? -1 : 1));
   if (!due.length) return NextResponse.json({ ok: true, swept: 0 });
 
+  // Sweeping is gated on the account having actually USED bacon, not merely
+  // existing.
+  //
+  // This Postgres project is shared with another app, so every signup THERE
+  // lands in the same auth.users, and handle_new_user() provisions bacon
+  // profiles/settings rows for it. Those accounts are indistinguishable from
+  // real ones in the settings table — which is exactly how six of them ended up
+  // swept nightly, generating research briefs nobody had asked for and billing
+  // real money for it. A settings row means someone signed up to *an* app; only
+  // a footprint means they use this one.
+  //
+  // Footprint counts only what a PERSON creates: any UI interaction, a tracked
+  // name, or a chat message. Briefs and filed calls are deliberately excluded —
+  // the sweep writes those itself, so counting them would make the first sweep
+  // self-justifying and the gate could never close again.
+  const hasFootprint = async (userId: string): Promise<boolean> => {
+    for (const table of ["user_events", "watchlist", "chat_messages"] as const) {
+      const { data } = await admin.from(table).select("user_id").eq("user_id", userId).limit(1);
+      if (data?.length) return true;
+    }
+    return false;
+  };
+  const footprints = await Promise.all(due.map((u) => hasFootprint(u.user_id)));
+  const active = due.filter((_, i) => footprints[i]);
+  const skipped = due.length - active.length;
+  // Reported rather than silent: "swept 2, skipped 6" is the line that would
+  // have made the contamination obvious weeks earlier.
+  if (skipped) console.warn(`[sweep] skipped ${skipped} account(s) with no bacon footprint`);
+  if (!active.length) return NextResponse.json({ ok: true, swept: 0, skipped });
+
   // Market-wide signals → build the day's snapshot ONCE (and cache it so
   // Sweep-now reuses it), then reuse across every user in this sweep.
   const empty: MarketWide = { movers: [], losers: [], mostActive: [], sectors: [], macro: [], commodities: [], fx: [], insiders: [] };
@@ -58,8 +88,8 @@ export async function GET(req: Request) {
   // longer aborts the whole sweep or serializes the rest to the 300s ceiling.
   let swept = 0, failed = 0;
   const POOL = 3;
-  for (let i = 0; i < due.length; i += POOL) {
-    const batch = due.slice(i, i + POOL);
+  for (let i = 0; i < active.length; i += POOL) {
+    const batch = active.slice(i, i + POOL);
     const results = await Promise.all(batch.map((u) =>
       sweepUser(admin, u.user_id, moverPicks, u.news_source, u.news_focus, mw, !!u.brief_email_enabled, splitVoices(u.voices))
         .then(() => true)
@@ -67,7 +97,7 @@ export async function GET(req: Request) {
     ));
     for (const ok of results) { if (ok) swept++; else failed++; }
   }
-  return NextResponse.json({ ok: true, swept, failed });
+  return NextResponse.json({ ok: true, swept, failed, skipped });
 }
 
 async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: string, moverPicks: MoverPick[], newsSource: string | null, newsFocus: string | null, mw: MarketWide, emailOptIn: boolean, voices: string[]) {

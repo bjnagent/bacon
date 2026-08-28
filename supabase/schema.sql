@@ -18,6 +18,13 @@ create table if not exists settings (
   -- when you remember to ask it isn't a radar. The cron honours per-user
   -- cadence, so 1440 means "once per daily run"; 0 still means off for anyone
   -- who turns it off. Email stays opt-in separately (brief_email_enabled).
+  --
+  -- Safe to default ON only because the sweep independently requires a bacon
+  -- FOOTPRINT before it spends anything (app/api/cron/sweep). This database is
+  -- shared with another app, so a row here does NOT mean the account uses this
+  -- one — it means someone signed up to something. A new account carries 1440
+  -- from day one and is still skipped until they actually open bacon, at which
+  -- point the first tracked view lets them in.
   scout_interval_minutes int default 1440,  -- 0 = off; 1440 = daily
   last_sweep_at timestamptz,
   news_source text default 'All',
