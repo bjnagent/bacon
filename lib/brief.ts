@@ -2,7 +2,7 @@
 // the synthesis pass that finds convergent, under-the-radar opportunities.
 // Shared by the daily cron sweep and the on-demand /api/brief generator.
 
-import { ask } from "./anthropic";
+import { ask, BULK_MODEL } from "./anthropic";
 import type { AiMeta } from "./usage";
 import { opportunityBriefPrompt } from "./prompts";
 import { parseOpportunities, type OpportunityBrief } from "./parsers";
@@ -55,12 +55,21 @@ export function buildSignalBundle(b: SignalBundle): string {
 }
 
 export async function generateBrief(bundle: SignalBundle, meta?: AiMeta): Promise<OpportunityBrief> {
-  // 3, down from 6. Search count drives input cost super-linearly, because each
-  // result is re-read on every later turn of the loop: the ledger's one 4-search
-  // brief used 49,688 input tokens against 76–89k for every 5-search run. The
-  // cap was never the binding constraint on quality — runs landed on 5, not 6 —
-  // so this trades the least valuable search for ~40% of the input bill.
-  const text = await ask(opportunityBriefPrompt(), [{ role: "user", content: buildSignalBundle(bundle) }], true, 1800, 3, meta);
+  // 2 searches, on the cheap model. Two rounds of measurement got here.
+  //
+  // First: search count drove INPUT cost super-linearly, because each result was
+  // re-read on every later turn — 6 -> 3 took the brief from ~82k input tokens
+  // to ~1.6k once caching landed alongside it.
+  //
+  // Then the shape of the bill changed. Dynamic-filtering search runs code per
+  // turn, so output rose 2,105 -> 3,712 tokens, and output bills at 5x input.
+  // Turns are now the expensive axis and the search fee is the small part, which
+  // is why this drops to 2 rather than stopping at 3.
+  //
+  // The model is BULK_MODEL for the same reason: nobody waits on the nightly
+  // brief, and its output is a delimited format the parser consumes, not prose a
+  // person reads — so the frontier model buys little here and costs 3x.
+  const text = await ask(opportunityBriefPrompt(), [{ role: "user", content: buildSignalBundle(bundle) }], true, 1800, 2, meta, BULK_MODEL);
   return parseOpportunities(text);
 }
 

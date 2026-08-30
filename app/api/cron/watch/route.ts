@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { ask } from "@/lib/anthropic";
+import { askCheap } from "@/lib/ai";
+import { swallowed } from "@/lib/log";
 import { killWatchPrompt } from "@/lib/prompts";
 import { parseKillWatch } from "@/lib/parsers";
 import { gradeCalls } from "@/lib/calls";
@@ -69,13 +70,19 @@ export async function GET(req: Request) {
       if (!openIdeas.length) return { watched: 0, alerts: 0 };
 
       const listing = openIdeas.map((o, i) => `${i + 1}. ${o.name} (${o.ticker || "—"}) — thesis: ${o.thesis} — ${o.checks}`).join("\n");
-      const text = await ask(
+      // askCheap, not ask. This is the same shape of job as sweep:track — read
+      // current public information about a named position and report whether a
+      // stated condition has triggered — and that runs on Gemini for $0.0006.
+      // This route was running the identical judgement on Sonnet at $0.208, 350x
+      // more, and had quietly become 35% of the entire bill on 7 calls a week.
+      // askCheap keeps the quality floor: a short or degenerate reply falls
+      // through to Claude, now on the bulk model rather than the frontier one.
+      const text = await askCheap(
         killWatchPrompt(String(brief.brief_date)),
         [{ role: "user", content: `Opportunities & their kill conditions:\n${listing}\n\nCheck whether any kill condition has triggered.` }],
-        // 3, down from 5 — same reasoning as the brief: each extra search is
-        // re-read on every later turn, and watch runs land between 24k and 58k
-        // input tokens purely on how many searches they take.
-        true, 1000, 3,
+        // Governs the Claude fallback only — askGemini takes no search cap. 2,
+        // matching the brief: turns drive output, and output is 5x input.
+        true, 1000, 2,
         { route: "watch", userId: u.user_id },
       );
       const { items: alerts, note } = parseKillWatch(text);
@@ -100,7 +107,12 @@ export async function GET(req: Request) {
         } catch { /* email is best-effort */ }
       }
       return { watched: 1, alerts: enriched.length };
-    } catch { return { watched: 0, alerts: 0 }; }
+    } catch (err) {
+      // Reported, not swallowed: this route just changed providers, so a new
+      // failure mode here should not look like "no ideas had a kill condition".
+      swallowed(`watch: user ${u.user_id}`, err);
+      return { watched: 0, alerts: 0 };
+    }
   };
 
   let watched = 0, alertCount = 0;
