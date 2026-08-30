@@ -10,7 +10,7 @@
 // personas, track-record review) keep calling ask()/askStream() directly and
 // always run on Claude.
 
-import { ask } from "./anthropic";
+import { ask, BULK_MODEL } from "./anthropic";
 import { askGemini, geminiEnabled } from "./gemini";
 import type { AiMeta } from "./usage";
 
@@ -34,5 +34,8 @@ export async function askCheap(
   }
   // A fallback bills BOTH providers; both get metered, so the console shows the
   // real cost of a degenerate Gemini reply rather than hiding half of it.
-  return ask(system, messages, useSearch, maxTokens, maxSearches, meta);
+  // Falls back to the BULK model, not the frontier one. Every askCheap caller is
+  // background work, so a degenerate Gemini reply should not silently escalate
+  // the most expensive routes in the app to the most expensive model.
+  return ask(system, messages, useSearch, maxTokens, maxSearches, meta, BULK_MODEL);
 }
