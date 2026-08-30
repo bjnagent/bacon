@@ -1,5 +1,25 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { cleanTicker, closeOnOrBefore, computeRoi, movingAveragesFrom, getDailySeries, type DailySeries, type DailyBar } from "./market";
+import { cleanTicker, stooqSupports, closeOnOrBefore, computeRoi, movingAveragesFrom, getDailySeries, type DailySeries, type DailyBar } from "./market";
+
+// Stooq is queried with a hardcoded `.us` market, so a foreign listing there is
+// a request that cannot resolve. Skipping it is purely removing failed work —
+// anything unrecognised still tries Stooq.
+describe("stooqSupports", () => {
+  it("keeps US symbols and US share classes on Stooq", () => {
+    expect(stooqSupports("AAPL")).toBe(true);
+    expect(stooqSupports("SPY")).toBe(true);
+    expect(stooqSupports("BRK.B")).toBe(true);   // share class, not an exchange
+  });
+  it("skips Stooq for foreign listings", () => {
+    for (const t of ["0700.HK", "7203.T", "600519.SS", "D05.SI", "RELIANCE.NS", "SHOP.TO", "BHP.AX", "AZN.L"]) {
+      expect(stooqSupports(t)).toBe(false);
+    }
+  });
+  it("skips Stooq for crypto pairs and FX", () => {
+    expect(stooqSupports("BTC-USD")).toBe(false);
+    expect(stooqSupports("EURUSD=X")).toBe(false);
+  });
+});
 
 describe("cleanTicker", () => {
   it("pulls a plausible symbol out of the stored ticker field", () => {

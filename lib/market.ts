@@ -73,8 +73,6 @@ export async function getTopGainers(limit = 8): Promise<Mover[]> {
 export interface DailyBar { date: string; close: number } // date: YYYY-MM-DD
 export interface DailySeries { ticker: string; bars: DailyBar[] }  // bars sorted newest-first
 
-// Extract a plausible US-equity symbol from a stored ticker field (which may be
-// "—", empty, a pair like "ORKA / SPYR", or "BRK.B"). Returns null if none.
 /**
  * Pull a usable symbol out of a stored instrument field, which may be prose
  * ("YAGEO (Taiwan: 2327.TW / OTC ADR access)") rather than a bare ticker.
@@ -116,6 +114,31 @@ const UA = "Mozilla/5.0 (compatible; BaconResearch/1.0)";
 const clean = (bars: DailyBar[]) =>
   bars.filter((b) => /^\d{4}-\d{2}-\d{2}$/.test(b.date) && Number.isFinite(b.close) && b.close > 0)
       .sort((a, b) => (a.date < b.date ? 1 : -1)); // newest-first
+
+/**
+ * Stooq's CSV endpoint is market-namespaced and this app only ever asks for the
+ * US one (`&s=<sym>.us`). A symbol carrying a foreign exchange suffix therefore
+ * becomes a request that cannot resolve — 7203.T asks for "7203-t.us" — so it
+ * burns a guaranteed-failed round trip before falling through to Yahoo, which
+ * serves those natively.
+ *
+ * Suffixes are matched against known EXCHANGES rather than by shape, because
+ * shape cannot separate them: BRK.B is a US share class and AZN.L is London,
+ * both a dot and one letter. Anything unrecognised still tries Stooq, so this
+ * can only skip work that was already certain to fail.
+ */
+const NON_US_SUFFIX = new Set([
+  "L", "T", "HK", "SS", "SZ", "TO", "V", "AX", "NS", "BO", "SI", "TW", "KS", "KQ",
+  "DE", "F", "PA", "MI", "SW", "AS", "BR", "LS", "MC", "VI", "ST", "OL", "CO",
+  "HE", "IR", "NZ", "JK", "KL", "BK", "TA", "SA", "MX", "BA", "SN", "IS", "AT", "WA",
+]);
+
+export function stooqSupports(ticker: string): boolean {
+  if (/[-=]/.test(ticker)) return false;            // BTC-USD, EURUSD=X
+  const dot = ticker.lastIndexOf(".");
+  if (dot < 0) return true;                         // plain US symbol
+  return !NON_US_SUFFIX.has(ticker.slice(dot + 1).toUpperCase());
+}
 
 // --- Source 1: Stooq (keyless, no daily cap) — one CSV = full daily history. ---
 async function fetchStooq(ticker: string): Promise<DailyBar[]> {
@@ -172,7 +195,10 @@ export async function getDailySeries(rawTicker: string, since?: string): Promise
   if (cached && Date.now() - cached.at < SERIES_TTL_MS) return cached.data;
 
   const sources: Array<() => Promise<DailyBar[]>> = [
-    () => fetchStooq(ticker),
+    // Stooq only where it can actually answer; for a foreign listing it leads
+    // with a request that cannot resolve, and Yahoo is the source that serves
+    // those anyway.
+    ...(stooqSupports(ticker) ? [() => fetchStooq(ticker)] : []),
     () => fetchYahoo(ticker),
     async () => { let b = await fetchAlphaVantage(ticker, false); if (b.length && !reaches(b)) b = await fetchAlphaVantage(ticker, true); return b; },
   ];
