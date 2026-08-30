@@ -75,11 +75,36 @@ export interface DailySeries { ticker: string; bars: DailyBar[] }  // bars sorte
 
 // Extract a plausible US-equity symbol from a stored ticker field (which may be
 // "—", empty, a pair like "ORKA / SPYR", or "BRK.B"). Returns null if none.
+/**
+ * Pull a usable symbol out of a stored instrument field, which may be prose
+ * ("YAGEO (Taiwan: 2327.TW / OTC ADR access)") rather than a bare ticker.
+ *
+ * Exchange suffixes are the norm outside the US — 0700.HK, 600519.SS, 7203.T,
+ * D05.SI, RELIANCE.NS, BHP.AX, SHOP.TO — as are crypto pairs (BTC-USD) and
+ * Yahoo FX (EURUSD=X). The previous pattern allowed at most five letters and a
+ * ONE-letter suffix, so it silently truncated all of them: 0700.HK became "HK",
+ * 7203.T became "T", SHOP.TO became "SHOP.T", D05.SI became "D".
+ *
+ * Those are worse than errors, because they resolve. This function gates every
+ * price path in the app — series, moving averages, ROI, the price cache and
+ * call grading — so a truncated symbol quietly grades a Tokyo call against
+ * whatever US ticker the fragment happens to name.
+ */
 export function cleanTicker(raw: string | null | undefined): string | null {
   if (!raw) return null;
-  const m = String(raw).toUpperCase().match(/[A-Z]{1,5}(?:\.[A-Z])?/);
-  const t = m ? m[0] : "";
-  return t && t !== "—" ? t : null;
+  const s = String(raw).toUpperCase();
+  // Root, then an optional exchange / pair suffix. The root may be alphanumeric
+  // (D05) or purely numeric (0700, 600519) — but a bare number is not a ticker,
+  // so a numeric root only counts when a suffix follows it.
+  const re = /([A-Z0-9]{1,10})(\.[A-Z]{1,3}|-[A-Z]{2,5}|=X)?/g;
+  for (const m of s.matchAll(re)) {
+    const root = m[1];
+    const suffix = m[2] ?? "";
+    if (!root) continue;
+    if (!/[A-Z]/.test(root) && !suffix) continue;   // "123" is not a symbol
+    return root + suffix;
+  }
+  return null;
 }
 
 // Per-ticker cache: daily bars change at most once a day, and Alpha Vantage's

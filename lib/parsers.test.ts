@@ -131,6 +131,44 @@ paraphrased; verify at source`);
   });
 });
 
+// A label wrapped in markdown emphasis is what BOUNDS the previous field, so an
+// unrecognised `**class:**` makes `ticker` swallow every field after it. That
+// shipped real rows like "** BTC-USD / IBIT\nclass: Crypto / ETF\nhorizon: weeks"
+// into the instrument column once the model changed its formatting.
+describe("blockReader emphasis tolerance", () => {
+  const BARE = [
+    "@@OPP@@",
+    "name: Tencent",
+    "ticker: 0700.HK",
+    "class: Equity",
+    "horizon: weeks",
+    "thesis: Gaming recovery.",
+    "signals: Licence approvals.",
+    "action: accumulate",
+    "target: HK$420 est.",
+    "confirm: Q3 print",
+    "kill: Regulatory reversal",
+  ].join("\n");
+  const BOLDED = BARE.replace(
+    /^(name|ticker|class|horizon|thesis|signals|action|target|confirm|kill):/gm,
+    "**$1:**",
+  );
+
+  it("parses bolded labels identically to bare ones", () => {
+    const bare = parseOpportunities(BARE).items[0];
+    const bold = parseOpportunities(BOLDED).items[0];
+    expect(bold).toEqual(bare);
+  });
+
+  it("does not let one field swallow the next", () => {
+    const o = parseOpportunities(BOLDED).items[0];
+    expect(o.ticker).toBe("0700.HK");
+    expect(o.ticker).not.toContain("class:");
+    expect(o.action).toBe("accumulate");
+    expect(o.cls).toBe("Equity");
+  });
+});
+
 describe("parseOpportunities", () => {
   const sample = `===INTRO===
 Signals point at a supply-chain reprice.

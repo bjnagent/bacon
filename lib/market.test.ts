@@ -8,6 +8,31 @@ describe("cleanTicker", () => {
     expect(cleanTicker("BRK.B")).toBe("BRK.B");
     expect(cleanTicker("ORKA / SPYR")).toBe("ORKA"); // pair → first leg
   });
+
+  // Every one of these used to truncate to something that still RESOLVES —
+  // 0700.HK to "HK", 7203.T to "T" (AT&T), SHOP.TO to "SHOP.T" — so a Tokyo or
+  // Hong Kong call was graded against a different real instrument, silently.
+  it("keeps exchange suffixes intact", () => {
+    expect(cleanTicker("0700.HK")).toBe("0700.HK");        // Hong Kong
+    expect(cleanTicker("7203.T")).toBe("7203.T");          // Tokyo
+    expect(cleanTicker("600519.SS")).toBe("600519.SS");    // Shanghai
+    expect(cleanTicker("000001.SZ")).toBe("000001.SZ");    // Shenzhen
+    expect(cleanTicker("D05.SI")).toBe("D05.SI");          // Singapore
+    expect(cleanTicker("RELIANCE.NS")).toBe("RELIANCE.NS");// India, 8-char root
+    expect(cleanTicker("SHOP.TO")).toBe("SHOP.TO");        // Toronto
+    expect(cleanTicker("BHP.AX")).toBe("BHP.AX");          // Australia
+    expect(cleanTicker("AZN.L")).toBe("AZN.L");            // London
+  });
+
+  it("keeps crypto pairs and FX whole", () => {
+    expect(cleanTicker("BTC-USD")).toBe("BTC-USD");
+    expect(cleanTicker("ETH-USD")).toBe("ETH-USD");
+    expect(cleanTicker("EURUSD=X")).toBe("EURUSD=X");
+  });
+
+  it("still takes the first leg out of prose", () => {
+    expect(cleanTicker("TYOYY (ADR) / 6976.T (Tokyo)")).toBe("TYOYY");
+  });
   it("rejects empties and placeholders", () => {
     expect(cleanTicker("—")).toBeNull();
     expect(cleanTicker("")).toBeNull();
