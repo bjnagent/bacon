@@ -19,10 +19,22 @@ function stripMd(s: string): string {
 function blockReader(block: string, keys: string[]) {
   const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const labels = keys.map(esc).join("|");
+  // Labels may arrive wrapped in markdown emphasis — `**ticker:** NVDA` rather
+  // than `ticker: NVDA`. Tolerating that is not cosmetic: the lookahead is what
+  // BOUNDS each value, so when a bolded label goes unrecognised the field runs
+  // straight through every field after it. That is not hypothetical — it put
+  // rows like "** BTC-USD / IBIT\nclass: Crypto / ETF\nhorizon: weeks" into the
+  // instrument column, roughly a third of filed calls, from the day the model
+  // changed its formatting. `EMPH` is applied on both sides of every label and
+  // after the colon, so bare and bolded output parse identically.
+  const EMPH = "[*_]{0,2}";
   return (key: string): string => {
-    const re = new RegExp(`${esc(key)}\\s*:\\s*([\\s\\S]*?)(?=\\r?\\n[ \\t]*(?:${labels})[ \\t]*:|$)`, "i");
+    const re = new RegExp(
+      `${EMPH}${esc(key)}${EMPH}\\s*:\\s*${EMPH}\\s*([\\s\\S]*?)(?=\\r?\\n[ \\t]*${EMPH}(?:${labels})${EMPH}[ \\t]*:|$)`,
+      "i",
+    );
     const m = block.match(re);
-    return m ? stripMd(m[1].trim()) : "";
+    return m ? stripMd(m[1].trim()).replace(/^[*_\s]+/, "").trim() : "";
   };
 }
 
