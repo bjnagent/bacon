@@ -16,7 +16,7 @@ import TVLink from "./TVLink";
 import ActivationChecklist, { type ActivationState } from "./ActivationChecklist";
 import { swallowed } from "@/lib/log";
 
-interface BriefItem { id: string; name: string; ticker: string; cls: string; horizon: string; thesis: string; signals: string; checks: string; action?: string; target?: string }
+interface BriefItem { id: string; name: string; ticker: string; cls: string; horizon: string; thesis: string; signals: string; checks: string; action?: string; target?: string; entry?: string; stop?: string; size?: string }
 interface Brief { intro: string | null; caveat: string | null; generatedAt: string | null; items: BriefItem[] }
 
 // Shown to an account that has never swept. `GET /api/brief` returns the latest
@@ -290,13 +290,25 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
                         <span className="pr-pick-class">{o.cls}</span>
                       </div>
                       <div className="pr-pick-why">{o.thesis}</div>
-                      {(o.action || o.target) && (() => {
+                      {(o.action || o.target || o.entry || o.stop || o.size) && (() => {
                         const head = (o.action || "").split(/[—-]/)[0].trim().toLowerCase();
-                        const tone = head.startsWith("watch") ? "is-hold" : head.startsWith("sell") || head.startsWith("avoid") ? "is-sell" : "is-buy";
+                        // TRIM and HOLD arrive only in advice mode. Without them
+                        // a "TRIM" call would render in buy green, which is the
+                        // one place a colour is genuinely misleading.
+                        const tone =
+                          head.startsWith("sell") || head.startsWith("avoid") ? "is-sell"
+                          : head.startsWith("trim") || head.startsWith("hold") || head.startsWith("watch") ? "is-hold"
+                          : "is-buy";
                         return (
                           <div className={`pr-call ${tone}`}>
                             {o.action && <span className="pr-call-action">{o.action}</span>}
                             {o.target && <span className="pr-call-target">◎ {o.target}</span>}
+                            {/* Advice mode only — the levels that make a call
+                                actionable rather than directional. Absent in
+                                research mode, so the block simply doesn't render. */}
+                            {o.entry && <span className="pr-call-level"><b>ENTRY</b> {o.entry}</span>}
+                            {o.stop && <span className="pr-call-level is-stop"><b>STOP</b> {o.stop}</span>}
+                            {o.size && <span className="pr-call-level"><b>SIZE</b> {o.size}</span>}
                           </div>
                         );
                       })()}

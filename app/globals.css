@@ -1187,6 +1187,13 @@ body { background: #EBE8E0; color: #1A1712; }
 .pr-call.is-buy .pr-call-action{color:var(--good)}
 .pr-call.is-sell .pr-call-action{color:var(--bad)}
 .pr-call.is-hold .pr-call-action{color:var(--warn)}
+/* Advice-mode levels: entry / stop / size. Monospace because they are numbers
+   a person acts on, and the stop is tinted because it is the one that limits
+   the loss rather than describing the hope. */
+.pr-call-level{font-family:var(--fm);font-size:11px;color:var(--muted);letter-spacing:0.02em}
+.pr-call-level b{font-weight:600;color:var(--muted2);letter-spacing:0.08em;margin-right:4px}
+.pr-call-level.is-stop{color:var(--bad)}
+.pr-call-level.is-stop b{color:var(--bad)}
 .pr-call-target{font-family:var(--fm);font-size:11px;color:var(--muted);letter-spacing:0.02em}
 
 /* Property deep-view dimensions (POLICY / RATES / SUPPLY / SENTIMENT / RENTAL). */

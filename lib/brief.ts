@@ -54,7 +54,7 @@ export function buildSignalBundle(b: SignalBundle): string {
   return parts.join("\n\n");
 }
 
-export async function generateBrief(bundle: SignalBundle, meta?: AiMeta): Promise<OpportunityBrief> {
+export async function generateBrief(bundle: SignalBundle, meta?: AiMeta, advice = false): Promise<OpportunityBrief> {
   // 2 searches, on the cheap model. Two rounds of measurement got here.
   //
   // First: search count drove INPUT cost super-linearly, because each result was
@@ -69,7 +69,7 @@ export async function generateBrief(bundle: SignalBundle, meta?: AiMeta): Promis
   // The model is BULK_MODEL for the same reason: nobody waits on the nightly
   // brief, and its output is a delimited format the parser consumes, not prose a
   // person reads — so the frontier model buys little here and costs 3x.
-  const text = await ask(opportunityBriefPrompt(), [{ role: "user", content: buildSignalBundle(bundle) }], true, 1800, 2, meta, BULK_MODEL);
+  const text = await ask(opportunityBriefPrompt(advice), [{ role: "user", content: buildSignalBundle(bundle) }], true, 1800, 2, meta, BULK_MODEL);
   return parseOpportunities(text);
 }
 
@@ -78,7 +78,8 @@ export async function generateBrief(bundle: SignalBundle, meta?: AiMeta): Promis
 export interface StoredBriefItem {
   name: string; ticker: string; cls: string; horizon: string;
   thesis: string; signals: string; checks: string;
-  action?: string; target?: string;   // the call: Buy/Accumulate/Watch + 12-mo est.
+  action?: string; target?: string;   // the call + 12-mo est.
+  entry?: string; stop?: string; size?: string;  // advice mode only
   outcome?: string; verdict?: string; // played-out | developing | faded | invalidated
 }
 
@@ -86,6 +87,7 @@ export function briefToDailyRow(userId: string, brief: OpportunityBrief) {
   const items: StoredBriefItem[] = brief.items.map((o) => ({
     name: o.name, ticker: o.ticker, cls: o.cls, horizon: o.horizon,
     thesis: o.thesis, signals: o.signals, action: o.action, target: o.target,
+    entry: o.entry || undefined, stop: o.stop || undefined, size: o.size || undefined,
     checks: [o.confirm && `Confirm: ${o.confirm}`, o.kill && `Kill: ${o.kill}`].filter(Boolean).join(" · "),
   }));
   return { user_id: userId, intro: brief.intro ?? "", caveat: brief.caveat ?? "", items };

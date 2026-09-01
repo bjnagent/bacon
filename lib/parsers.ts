@@ -117,10 +117,17 @@ export interface OpportunityItem {
   horizon: string;
   thesis: string;
   signals: string;
-  action: string;  // Buy | Accumulate | Watch — why now
+  action: string;  // research: Buy | Accumulate | Watch · advice: BUY | SELL | TRIM | HOLD
   target: string;  // 12-mo estimate, labeled est.
   confirm: string;
   kill: string;
+  // Advice-mode only, and empty in research mode. The schema is a SUPERSET
+  // rather than a second shape so one parser and one storage path serve both
+  // modes — the entitlement decides what the model is asked for, not how the
+  // result is read back.
+  entry: string;   // level or band to act in, with its anchor
+  stop: string;    // level or condition at which the position is wrong
+  size: string;    // position size as a % of the sleeve, and why that size
 }
 
 export interface OpportunityBrief {
@@ -138,8 +145,16 @@ export function parseOpportunities(text: string): OpportunityBrief {
   const blocks = text.split(/@@OPP@@/i).slice(1);
   const items = blocks.map((raw) => {
     const b = raw.split(/===\s*CAVEAT/i)[0];
-    const get = blockReader(b, ["name", "ticker", "class", "horizon", "thesis", "signals", "action", "target", "confirm", "kill"]);
-    return { name: get("name"), ticker: get("ticker"), cls: get("class"), horizon: get("horizon"), thesis: get("thesis"), signals: get("signals"), action: get("action"), target: get("target"), confirm: get("confirm"), kill: get("kill") };
+    // Every advice label belongs in this list even though research mode never
+    // emits them: the list is what BOUNDS each field, so an unlisted `stop:`
+    // would be swallowed whole by `target` rather than simply being absent.
+    const get = blockReader(b, ["name", "ticker", "class", "horizon", "thesis", "signals", "action", "entry", "target", "stop", "size", "confirm", "kill"]);
+    return {
+      name: get("name"), ticker: get("ticker"), cls: get("class"), horizon: get("horizon"),
+      thesis: get("thesis"), signals: get("signals"), action: get("action"),
+      target: get("target"), confirm: get("confirm"), kill: get("kill"),
+      entry: get("entry"), stop: get("stop"), size: get("size"),
+    };
   }).filter((o) => o.name || (o.ticker && o.ticker !== "—"));
   return { intro, items, caveat };
 }
