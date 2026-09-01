@@ -18,6 +18,7 @@ import { swallowed } from "@/lib/log";
 
 interface BriefItem { id: string; name: string; ticker: string; cls: string; horizon: string; thesis: string; signals: string; checks: string; action?: string; target?: string; entry?: string; stop?: string; size?: string }
 interface Brief { intro: string | null; caveat: string | null; generatedAt: string | null; items: BriefItem[] }
+interface QuoteLite { price: number; changePct: number | null; live: boolean; source: string }
 
 // Shown to an account that has never swept. `GET /api/brief` returns the latest
 // brief with no date filter, so an empty response means "never generated one",
@@ -122,6 +123,10 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
   const [watchOn, setWatchOn] = useState(false);
   const [savingWatch, setSavingWatch] = useState(false);
   const [activation, setActivation] = useState<ActivationState | null>(null);
+  // Current prices for the names in today's brief. Crypto comes back real-time;
+  // equities come back as the last close and are labelled as such — an entry or
+  // stop level is only actionable against a price whose staleness is stated.
+  const [quotes, setQuotes] = useState<Record<string, QuoteLite>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -146,6 +151,24 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
     })();
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    const syms = (brief?.items ?? []).map((o) => o.ticker).filter((t): t is string => !!t && t !== "—");
+    if (!syms.length) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/quotes?symbols=${encodeURIComponent(syms.join(","))}`);
+        const d = await res.json() as { quotes?: Record<string, QuoteLite> };
+        if (!cancelled && d.quotes) setQuotes(d.quotes);
+      } catch (err) {
+        // A missing price must never blank the brief — the analysis stands on
+        // its own and the badge simply doesn't render.
+        swallowed("today: quotes", err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [brief]);
 
   const generate = async () => {
     if (generating) return;
@@ -286,7 +309,21 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
                     <div className="pr-opp-rank">{String(i + 1).padStart(2, "0")}</div>
                     <div className="pr-opp-main">
                       <div className="pr-pick-head">
-                        <div className="pr-pick-name">{o.name}{o.ticker && o.ticker !== "—" && <span className="pr-pick-ticker">{o.ticker}</span>}{o.horizon && <span className="pr-opp-horizon">◷ {o.horizon}</span>}</div>
+                        <div className="pr-pick-name">{o.name}{o.ticker && o.ticker !== "—" && <span className="pr-pick-ticker">{o.ticker}</span>}{(() => {
+                          const q = quotes[(o.ticker || "").toUpperCase()];
+                          if (!q) return null;
+                          const up = (q.changePct ?? 0) >= 0;
+                          return (
+                            <span className={`pr-quote${q.live ? " is-live" : ""}`} title={`${q.source}${q.live ? "" : " — delayed"}`}>
+                              {q.price.toLocaleString(undefined, { maximumFractionDigits: q.price < 10 ? 4 : 2 })}
+                              {q.changePct != null && <b className={up ? "is-up" : "is-down"}>{up ? "+" : ""}{q.changePct.toFixed(2)}%</b>}
+                              {/* The label is not decoration: a delayed close
+                                  shown as a live price is the same class of
+                                  error as a fabricated one. */}
+                              <i>{q.live ? "live" : "close"}</i>
+                            </span>
+                          );
+                        })()}{o.horizon && <span className="pr-opp-horizon">◷ {o.horizon}</span>}</div>
                         <span className="pr-pick-class">{o.cls}</span>
                       </div>
                       <div className="pr-pick-why">{o.thesis}</div>
