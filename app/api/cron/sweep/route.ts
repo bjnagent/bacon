@@ -10,6 +10,7 @@ import { generateBrief, briefToRows, briefToDailyRow, splitVoices } from "@/lib/
 import { sendBriefEmail, emailEnabled } from "@/lib/email";
 import { mapClass } from "@/lib/lenses";
 import { orNull } from "@/lib/log";
+import { adviceEnabled } from "@/lib/advice";
 
 // Background sweep: surface fresh opportunities (today's real movers + theme
 // scout) into each user's "fresh finds" feed, and refresh their tracked names —
@@ -101,6 +102,12 @@ export async function GET(req: Request) {
 }
 
 async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: string, moverPicks: MoverPick[], newsSource: string | null, newsFocus: string | null, mw: MarketWide, emailOptIn: boolean, voices: string[]) {
+  // Advice mode is an account entitlement, so the cron has to resolve it the
+  // same way the watch route resolves an address — the settings row carries a
+  // user_id, not an email. One lookup per swept user, and the sweep only ever
+  // runs for accounts with a footprint.
+  const { data: au } = await admin.auth.admin.getUserById(userId).catch(() => ({ data: null }));
+  const advice = adviceEnabled(au?.user?.email ?? null);
   // Claim the user up-front (before the slow AI work) so if this invocation
   // times out mid-run, the user isn't left perpetually "due" and dropped again
   // next run — better to skip a day than loop the same tail forever.
@@ -147,7 +154,7 @@ async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: st
     voices,
     commodities: mw.commodities,
     fx: mw.fx,
-  }, { route: "sweep:brief", userId }).catch(orNull("sweep:brief"));
+  }, { route: "sweep:brief", userId }, advice).catch(orNull("sweep:brief"));
 
   const [themeRes, newsRes, trackResults, brief] = await Promise.all([themeScoutP, newsP, Promise.all(trackP), briefP]);
 

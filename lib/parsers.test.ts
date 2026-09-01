@@ -135,6 +135,53 @@ paraphrased; verify at source`);
 // unrecognised `**class:**` makes `ticker` swallow every field after it. That
 // shipped real rows like "** BTC-USD / IBIT\nclass: Crypto / ETF\nhorizon: weeks"
 // into the instrument column once the model changed its formatting.
+// Advice mode adds entry/stop/size. The labels must be in blockReader's key
+// list or `target` runs straight through `stop` and `size` — the same failure
+// that put whole prompt fragments into the instrument column.
+describe("parseOpportunities in advice mode", () => {
+  const ADVICE = [
+    "@@OPP@@",
+    "name: Nvidia",
+    "ticker: NVDA",
+    "class: Equity",
+    "horizon: months",
+    "thesis: Rack-scale demand is captured by the supplier, not the hyperscaler.",
+    "signals: Peer +12% today; supply headline via Reuters; curve steepening.",
+    "action: BUY — the tape has not repriced the second-order name",
+    "entry: 168-174, the 50-day it reclaimed last week",
+    "target: 210 est., ~22x the FY27 earnings path",
+    "stop: 152, below the prior range low",
+    "size: 3-5% of a growth sleeve — high conviction, high volatility",
+    "confirm: a second quarter of rack-scale bookings",
+    "kill: bookings decelerate or the supply constraint clears",
+  ].join("\n");
+
+  it("reads the advice fields", () => {
+    const o = parseOpportunities(ADVICE).items[0];
+    expect(o.action).toBe("BUY — the tape has not repriced the second-order name");
+    expect(o.entry).toBe("168-174, the 50-day it reclaimed last week");
+    expect(o.stop).toBe("152, below the prior range low");
+    expect(o.size).toBe("3-5% of a growth sleeve — high conviction, high volatility");
+  });
+
+  it("does not let target swallow stop and size", () => {
+    const o = parseOpportunities(ADVICE).items[0];
+    expect(o.target).toBe("210 est., ~22x the FY27 earnings path");
+    expect(o.target).not.toContain("stop:");
+    expect(o.target).not.toContain("size:");
+  });
+
+  // Research mode never emits them, and must still parse cleanly.
+  it("leaves the advice fields empty on a research-mode brief", () => {
+    const research = ADVICE.split("\n").filter((l) => !/^(entry|stop|size):/.test(l)).join("\n");
+    const o = parseOpportunities(research).items[0];
+    expect(o.entry).toBe("");
+    expect(o.stop).toBe("");
+    expect(o.size).toBe("");
+    expect(o.target).toBe("210 est., ~22x the FY27 earnings path");
+  });
+});
+
 describe("blockReader emphasis tolerance", () => {
   const BARE = [
     "@@OPP@@",

@@ -6,6 +6,7 @@ import { recordCalls, horizonToDays, getCalibrationMemo } from "@/lib/calls";
 import { cleanTicker } from "@/lib/market";
 import { parseOpportunities } from "@/lib/parsers";
 import { opportunityBriefPrompt } from "@/lib/prompts";
+import { adviceEnabled } from "@/lib/advice";
 import { askStream } from "@/lib/anthropic";
 import { textStreamResponse } from "@/lib/streamRoute";
 import { SCOUT_PICK_COLUMNS, type ScoutPickRow } from "@/lib/types";
@@ -79,7 +80,7 @@ export async function POST() {
   });
 
   return textStreamResponse(
-    askStream(opportunityBriefPrompt(), [{ role: "user", content: bundle }], true, 1800, 6, { route: "brief", userId: user.id }),
+    askStream(opportunityBriefPrompt(adviceEnabled(user.email)), [{ role: "user", content: bundle }], true, 1800, 6, { route: "brief", userId: user.id }),
     async (full, ok) => {
       if (!ok) return; // stream errored mid-flight — don't persist a truncated brief
       const brief = parseOpportunities(full);
