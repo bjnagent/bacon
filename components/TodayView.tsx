@@ -15,6 +15,7 @@ import BaconMark from "./BaconMark";
 import TVLink from "./TVLink";
 import ActivationChecklist, { type ActivationState } from "./ActivationChecklist";
 import { swallowed } from "@/lib/log";
+import { evaluateTrigger } from "@/lib/triggers";
 
 interface BriefItem { id: string; name: string; ticker: string; cls: string; horizon: string; thesis: string; signals: string; checks: string; action?: string; target?: string; entry?: string; stop?: string; size?: string }
 interface Brief { intro: string | null; caveat: string | null; generatedAt: string | null; items: BriefItem[] }
@@ -328,6 +329,10 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
                       </div>
                       <div className="pr-pick-why">{o.thesis}</div>
                       {(o.action || o.target || o.entry || o.stop || o.size) && (() => {
+                        // Deterministic: has this call's own level actually been
+                        // reached by the current price? No model involved, so it
+                        // is free and can be recomputed on every quote refresh.
+                        const trig = evaluateTrigger(o, quotes[(o.ticker || "").toUpperCase()]?.price);
                         const head = (o.action || "").split(/[—-]/)[0].trim().toLowerCase();
                         // TRIM and HOLD arrive only in advice mode. Without them
                         // a "TRIM" call would render in buy green, which is the
@@ -338,6 +343,10 @@ export default function TodayView({ onAnalyze, onDiscuss }: { onAnalyze: (t: { a
                           : "is-buy";
                         return (
                           <div className={`pr-call ${tone}`}>
+                            {/* Ahead of the action, because a breached stop is
+                                the one thing on this card that changes what you
+                                do about everything else on it. */}
+                            {trig && <span className={`pr-trigger is-${trig.kind}`}>{trig.label}</span>}
                             {o.action && <span className="pr-call-action">{o.action}</span>}
                             {o.target && <span className="pr-call-target">◎ {o.target}</span>}
                             {/* Advice mode only — the levels that make a call
