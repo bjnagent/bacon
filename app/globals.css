@@ -1204,6 +1204,13 @@ body { background: #EBE8E0; color: #1A1712; }
 .pr-quote i{font-style:normal;font-size:9.5px;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted2)}
 .pr-quote.is-live i{color:var(--good)}
 .pr-quote.is-live i::before{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--good);margin-right:4px;vertical-align:middle}
+/* Trigger chip: a level on this call has actually been reached. A breached stop
+   is loud on purpose — it is the one state that changes what to do about the
+   rest of the card. */
+.pr-trigger{font-family:var(--fm);font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;border-radius:3px;padding:2px 7px;border:1px solid transparent}
+.pr-trigger.is-stop{background:var(--bad);color:#fff}
+.pr-trigger.is-target{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good);border-color:var(--good)}
+.pr-trigger.is-entry{background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent2);border-color:var(--accent)}
 .pr-call-target{font-family:var(--fm);font-size:11px;color:var(--muted);letter-spacing:0.02em}
 
 /* Property deep-view dimensions (POLICY / RATES / SUPPLY / SENTIMENT / RENTAL). */
