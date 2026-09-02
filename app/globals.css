@@ -1194,6 +1194,16 @@ body { background: #EBE8E0; color: #1A1712; }
 .pr-call-level b{font-weight:600;color:var(--muted2);letter-spacing:0.08em;margin-right:4px}
 .pr-call-level.is-stop{color:var(--bad)}
 .pr-call-level.is-stop b{color:var(--bad)}
+/* Current price on a brief card. `live` earns the accent dot; a delayed close
+   is deliberately quieter and says "close", because the difference between the
+   two is the difference between acting and guessing. */
+.pr-quote{display:inline-flex;align-items:baseline;gap:5px;margin-left:8px;font-family:var(--fm);font-size:11px;color:var(--ink2);background:var(--sink);border-radius:4px;padding:1px 6px}
+.pr-quote b{font-weight:600}
+.pr-quote b.is-up{color:var(--good)}
+.pr-quote b.is-down{color:var(--bad)}
+.pr-quote i{font-style:normal;font-size:9.5px;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted2)}
+.pr-quote.is-live i{color:var(--good)}
+.pr-quote.is-live i::before{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--good);margin-right:4px;vertical-align:middle}
 .pr-call-target{font-family:var(--fm);font-size:11px;color:var(--muted);letter-spacing:0.02em}
 
 /* Property deep-view dimensions (POLICY / RATES / SUPPLY / SENTIMENT / RENTAL). */
