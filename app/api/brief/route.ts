@@ -72,6 +72,7 @@ export async function POST() {
     themes: (themesRes.data ?? []).map((t) => t.label),
     tracked: (trackedRes.data ?? []).map((t) => t.symbol),
     insiders: marketWide.insiders,
+    odds: marketWide.odds,
     voices: splitVoices((settingsRes.data as { voices?: string } | null)?.voices),
     commodities: marketWide.commodities,
     fx: marketWide.fx,

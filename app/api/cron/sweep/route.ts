@@ -151,6 +151,7 @@ async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: st
     themes: themeLabels,
     tracked: tracked.map((t) => t.symbol),
     insiders: mw.insiders,
+    odds: mw.odds,
     voices,
     commodities: mw.commodities,
     fx: mw.fx,

@@ -176,6 +176,7 @@ Hunt specifically for what is NOT obvious:
 - Convergence: an idea is only worth surfacing when INDEPENDENT signals point the same way (a real mover + a news catalyst + a macro tailwind, or a theme + an under-followed name). Rank by convergence strength.
 - Historical rhymes: use web_search to check how similar setups resolved before, and say so qualitatively ("similar guidance-led moves in this sector have historically taken weeks to fully reprice" — no invented statistics).
 - Early horizon: things coming up (catalysts, decisions, earnings, policy dates) where positioning early is the edge.
+- Priced-in check: if PREDICTION MARKET ODDS are provided, they are real money staked on an outcome and are INDEPENDENT of price and news — a genuine third signal, not an echo of the tape. Use them the way convergence demands: an idea that needs an event the market already prices at 85% is largely priced in, and one that needs an event the market prices at 20% is a bet on the market being wrong, which you must say out loud.
 - Smart-money echoes: if INSIDER FILING CLUSTERS are provided, clustered open-market buying is one independent signal — verify the context with a search before leaning on it. Consider spending one search on notable recent US congressional trading disclosures (public STOCK Act data, e.g. as covered by Capitol Trades) when it could intersect today's signals; attribute anything found.
 - If TRACKED VOICES are provided, spend one search on what those voices have publicly flagged recently. A voice's idea is ONE signal that still needs convergence with the tape — never surface it on the voice's word alone.
 
@@ -214,7 +215,7 @@ function adviceBriefPrompt(): string {
 
 CHAIN DISCIPLINE: never jump from a headline to a call. For each idea trace the chain before committing: (1) is the demand REAL and durable, or narrative? (2) WHO captures it — the supplier, the bottleneck, the toll-taker — rather than the obvious name? (3) WHICH revenue line does it flow into, and is it material? (4) WHAT observable data confirms or kills it next. An idea that fails the chain does not become a smaller position; it does not get written.
 
-Hunt for what is NOT obvious: second-order beneficiaries the tape has not repriced, convergence of INDEPENDENT signals, upcoming catalysts where early positioning is the edge, and clustered insider buying where it is provided. Rank by conviction, highest first.
+Hunt for what is NOT obvious: second-order beneficiaries the tape has not repriced, convergence of INDEPENDENT signals, upcoming catalysts where early positioning is the edge, and clustered insider buying where it is provided. If PREDICTION MARKET ODDS are provided, treat them as a priced-in check: an event already at 85% is in the price and argues for a smaller size, while a thesis that needs a 20% event is a bet against the market that must be stated as such and sized accordingly. Rank by conviction, highest first.
 
 You may say SELL and TRIM. A desk that only ever buys is not calling the market, it is cheerleading it — if the signals say a tracked name is broken or a crowded trade is done, say so.
 
