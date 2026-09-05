@@ -10,6 +10,7 @@ import type { Mover } from "./market";
 import type { MacroIndicator } from "./macro";
 import type { InsiderCluster } from "./insider";
 import type { InstrumentQuote } from "./commodities";
+import type { MarketOdds } from "./polymarket";
 
 export interface SignalBundle {
   movers: Mover[];
@@ -24,6 +25,7 @@ export interface SignalBundle {
   voices?: string[];                // public commentators the investor follows
   commodities?: InstrumentQuote[];  // real commodity levels via FRED
   fx?: InstrumentQuote[];           // real FX rates via FRED
+  odds?: MarketOdds[];              // prediction-market probabilities (Polymarket)
   pulse?: string;                   // community pulse via Grok/X
   calibration?: string;             // the system's own graded track record memo
 }
@@ -44,6 +46,7 @@ export function buildSignalBundle(b: SignalBundle): string {
   if (b.fx?.length) parts.push("REAL FX RATES (via FRED):\n" + b.fx.map((q) => `- ${q.label}: ${q.value}${q.changePct ? ` (${q.changePct} vs prior)` : ""}`).join("\n"));
   if (b.headlines.length) parts.push("CURRENT HEADLINES (paraphrased, attributed):\n" + b.headlines.slice(0, 10).map((n) => `- ${n.head} (${n.source})${n.why ? " — " + n.why : ""}`).join("\n"));
   if (b.macro.length) parts.push("MACRO BACKDROP (real data via FRED):\n" + b.macro.map((m) => `- ${m.label}: ${m.value}${m.unit}${m.change != null ? ` (${m.change >= 0 ? "+" : ""}${m.change.toFixed(2)} vs prior)` : ""}`).join("\n"));
+  if (b.odds?.length) parts.push("PREDICTION MARKET ODDS (real money staked on Polymarket — a market-implied probability, INDEPENDENT of price and news; treat a crowded consensus as already priced):\n" + b.odds.map((o) => `- ${o.topic}: ${o.probability}% — "${o.question}"${o.endsAt ? ` (resolves ${o.endsAt})` : ""}, $${Math.round(o.volume).toLocaleString()} staked`).join("\n"));
   if (b.insiders?.length) parts.push("INSIDER FILING CLUSTERS (real, from SEC EDGAR Form 4 filings over the last few trading days — clustered open-market BUYING is the notable signal; sampled counts, not totals):\n" + b.insiders.map((i) => `- ${i.company} (${i.ticker}): ${i.filings} filings; sampled filings show ${i.buys} open-market buy${i.buys === 1 ? "" : "s"}, ${i.sells} sale${i.sells === 1 ? "" : "s"}`).join("\n"));
   if (b.voices?.length) parts.push("TRACKED VOICES (public commentators the investor follows): " + b.voices.join(", "));
   if (b.pulse) parts.push("COMMUNITY PULSE (live X via Grok — noisy, contrarian at extremes; a HOT name is already crowded):\n" + b.pulse);

@@ -9,6 +9,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getMarketSignals, getSectorPerformance, type MarketSignals, type Mover } from "./market";
 import { getMacroSnapshot, type MacroIndicator } from "./macro";
 import { getCommodityFxSignals, type InstrumentQuote } from "./commodities";
+import { getMarketOdds, type MarketOdds } from "./polymarket";
 import { getInsiderClusters, type InsiderCluster } from "./insider";
 import { communityPulse, grokEnabled } from "./grok";
 
@@ -18,6 +19,7 @@ export interface MarketWide {
   macro: MacroIndicator[];
   commodities: InstrumentQuote[]; fx: InstrumentQuote[];
   insiders: InsiderCluster[];
+  odds?: MarketOdds[];   // prediction-market probabilities (Polymarket)
   // Community pulse via Grok/X (null when XAI_API_KEY unset): prompt-grounding
   // text + per-ticker crowding used to stamp calls for the calibration loop.
   pulse?: { text: string; crowding: Record<string, string> } | null;
@@ -46,12 +48,14 @@ export async function readMarketWide(read: SupabaseClient): Promise<MarketWide |
 export async function fetchMarketWide(insiderDeadlineMs = 8000): Promise<MarketWide> {
   const withDeadline = <T,>(p: Promise<T>, ms: number, fallback: T) =>
     Promise.race([p, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);
-  const [signals, sectors, macro, commodityFx, insiders] = await Promise.all([
+  const [signals, sectors, macro, commodityFx, insiders, odds] = await Promise.all([
     getMarketSignals(8).catch((): MarketSignals => ({ gainers: [], losers: [], mostActive: [] })),
     getSectorPerformance().catch(() => [] as MarketWide["sectors"]),
     getMacroSnapshot().catch(() => [] as MacroIndicator[]),
     getCommodityFxSignals().catch(() => ({ commodities: [] as InstrumentQuote[], fx: [] as InstrumentQuote[] })),
     withDeadline(getInsiderClusters().catch(() => [] as InsiderCluster[]), insiderDeadlineMs, [] as InsiderCluster[]),
+    // Secondary signal: never allowed to delay or fail the snapshot.
+    getMarketOdds().catch(() => [] as MarketOdds[]),
   ]);
   // Community pulse rides on the day's most visible tickers (needs the movers,
   // so it runs after the parallel fan-out). One Grok call per day, shared.
@@ -66,7 +70,7 @@ export async function fetchMarketWide(insiderDeadlineMs = 8000): Promise<MarketW
   }
   return {
     movers: signals.gainers, losers: signals.losers, mostActive: signals.mostActive,
-    sectors, macro, commodities: commodityFx.commodities, fx: commodityFx.fx, insiders, pulse,
+    sectors, macro, commodities: commodityFx.commodities, fx: commodityFx.fx, insiders, odds, pulse,
   };
 }
 
