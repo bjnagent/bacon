@@ -9,8 +9,11 @@ import { readMarketWide, fetchMarketWide, cacheMarketWide, type MarketWide } fro
 import { generateBrief, briefToRows, briefToDailyRow, splitVoices } from "@/lib/brief";
 import { sendBriefEmail, emailEnabled } from "@/lib/email";
 import { mapClass } from "@/lib/lenses";
-import { orNull } from "@/lib/log";
+import { orEmpty, orNull } from "@/lib/log";
 import { adviceEnabled } from "@/lib/advice";
+import { getForecasts } from "@/lib/forecast";
+import { getForecastMemo, recordForecasts } from "@/lib/forecastRecord";
+import { getCachedSeries } from "@/lib/priceCache";
 
 // Background sweep: surface fresh opportunities (today's real movers + theme
 // scout) into each user's "fresh finds" feed, and refresh their tracked names —
@@ -85,6 +88,11 @@ export async function GET(req: Request) {
     }
   } catch { /* market data unavailable → degrade to theme scout only */ }
 
+  // How the mechanical price bands have actually scored against realised closes.
+  // Global, not per-user — a forecast is a statement about a symbol — so it is
+  // resolved once per sweep rather than once per swept account.
+  const forecastRecord = await getForecastMemo(admin).catch(() => "");
+
   // Bounded concurrency + per-user isolation: one user's throw (or slow run) no
   // longer aborts the whole sweep or serializes the rest to the 300s ceiling.
   let swept = 0, failed = 0;
@@ -92,7 +100,7 @@ export async function GET(req: Request) {
   for (let i = 0; i < active.length; i += POOL) {
     const batch = active.slice(i, i + POOL);
     const results = await Promise.all(batch.map((u) =>
-      sweepUser(admin, u.user_id, moverPicks, u.news_source, u.news_focus, mw, !!u.brief_email_enabled, splitVoices(u.voices))
+      sweepUser(admin, u.user_id, moverPicks, u.news_source, u.news_focus, mw, !!u.brief_email_enabled, splitVoices(u.voices), forecastRecord)
         .then(() => true)
         .catch((e) => { console.error("sweepUser failed", u.user_id, e); return false; })
     ));
@@ -101,7 +109,7 @@ export async function GET(req: Request) {
   return NextResponse.json({ ok: true, swept, failed, skipped });
 }
 
-async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: string, moverPicks: MoverPick[], newsSource: string | null, newsFocus: string | null, mw: MarketWide, emailOptIn: boolean, voices: string[]) {
+async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: string, moverPicks: MoverPick[], newsSource: string | null, newsFocus: string | null, mw: MarketWide, emailOptIn: boolean, voices: string[], forecastRecord: string) {
   // Advice mode is an account entitlement, so the cron has to resolve it the
   // same way the watch route resolves an address — the settings row carries a
   // user_id, not an email. One lookup per swept user, and the sweep only ever
@@ -138,6 +146,16 @@ async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: st
       .then((text) => ({ it, upd: parseTrackingUpdate(text) }))
       .catch(() => ({ it, upd: null }))
   );
+  // Mechanical price bands for the names this user actually holds, off the
+  // DB-backed price cache (one fetch per ticker per UTC day, shared across every
+  // user and instance) rather than the in-process one, which is cold on most
+  // serverless invocations. Free — no model runs — and filed to the ledger the
+  // moment it is computed, BEFORE the outcome is known, which is the only order
+  // in which a forecast can honestly be graded later.
+  const forecasts = await getForecasts(tracked.map((t) => t.symbol), 21, (t) => getCachedSeries(admin, t))
+    .catch(orEmpty("sweep:forecasts"));
+  await recordForecasts(forecasts);
+
   // Synthesis runs CONCURRENTLY with the gatherers, reading yesterday's cached
   // headlines — decoupling it from the fresh news fetch keeps the sweep's
   // wall-clock at the slowest single call, not the sum.
@@ -152,6 +170,8 @@ async function sweepUser(admin: ReturnType<typeof createAdminClient>, userId: st
     tracked: tracked.map((t) => t.symbol),
     insiders: mw.insiders,
     odds: mw.odds,
+    forecasts,
+    forecastRecord,
     voices,
     commodities: mw.commodities,
     fx: mw.fx,

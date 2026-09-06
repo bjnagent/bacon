@@ -5,6 +5,7 @@ import { swallowed } from "@/lib/log";
 import { killWatchPrompt } from "@/lib/prompts";
 import { parseKillWatch } from "@/lib/parsers";
 import { gradeCalls } from "@/lib/calls";
+import { gradeForecasts } from "@/lib/forecastRecord";
 import type { StoredBriefItem } from "@/lib/brief";
 import { sendKillAlertEmail, emailEnabled } from "@/lib/email";
 
@@ -31,6 +32,11 @@ export async function GET(req: Request) {
   // Calibration grading rides the daily watch cron: deterministic math against
   // real prices + SPY — no model grades its own homework.
   const grading = await gradeCalls(admin).catch(() => ({ graded: 0, finalized: 0 }));
+  // Same discipline, applied to the mechanical price bands: every forecast whose
+  // horizon has lapsed is scored against the realised close and against the
+  // "no change" benchmark it has to beat. Reported so the run says how much of
+  // the ledger it settled.
+  const { graded: forecastsGraded } = await gradeForecasts(admin).catch(() => ({ graded: 0 }));
 
   // Behaviour-ledger retention. `user_events` gains a row per view and is the
   // highest-volume table in the schema by design, with nothing else pruning it.
@@ -48,7 +54,7 @@ export async function GET(req: Request) {
   } catch { /* housekeeping is best-effort; never fail the watch run over it */ }
 
   const { data: users } = await admin.from("settings").select("user_id,brief_email_enabled").eq("watch_enabled", true);
-  if (!users?.length) return NextResponse.json({ ok: true, watched: 0, alerts: 0, pruned, ...grading });
+  if (!users?.length) return NextResponse.json({ ok: true, watched: 0, alerts: 0, pruned, forecastsGraded, ...grading });
 
   // Per-user kill-condition check. Isolated + returns counts so it can run with
   // bounded concurrency instead of serializing every user's web-search ask()
@@ -121,5 +127,5 @@ export async function GET(req: Request) {
     const res = await Promise.all(users.slice(i, i + POOL).map(watchUser));
     for (const r of res) { watched += r.watched; alertCount += r.alerts; }
   }
-  return NextResponse.json({ ok: true, watched, alerts: alertCount, pruned, ...grading });
+  return NextResponse.json({ ok: true, watched, alerts: alertCount, pruned, forecastsGraded, ...grading });
 }

@@ -7,6 +7,10 @@ import { cleanTicker } from "@/lib/market";
 import { parseOpportunities } from "@/lib/parsers";
 import { opportunityBriefPrompt } from "@/lib/prompts";
 import { adviceEnabled } from "@/lib/advice";
+import { getForecasts } from "@/lib/forecast";
+import { getForecastMemo, recordForecasts } from "@/lib/forecastRecord";
+import { getCachedSeries } from "@/lib/priceCache";
+import { orEmpty } from "@/lib/log";
 import { askStream } from "@/lib/anthropic";
 import { textStreamResponse } from "@/lib/streamRoute";
 import { SCOUT_PICK_COLUMNS, type ScoutPickRow } from "@/lib/types";
@@ -54,14 +58,26 @@ export async function POST() {
   // cron) so Sweep-now doesn't refetch every external provider on a cold
   // instance. On a miss, fetch live with a short insider deadline so the stream's
   // first byte isn't held up. The user-specific parts below stay live and cheap.
-  const [marketWide, calibration, themesRes, trackedRes, newsRes, settingsRes] = await Promise.all([
+  const [marketWide, calibration, forecastRecord, themesRes, trackedRes, newsRes, settingsRes] = await Promise.all([
     readMarketWide(sb).then((cached) => cached ?? fetchMarketWide(2500)),
     getCalibrationMemo(sb),
+    getForecastMemo(sb),
     sb.from("themes").select("label"),
     sb.from("watchlist").select("symbol"),
     sb.from("news_items").select("headline,source,why").order("created_at", { ascending: false }).limit(10),
     sb.from("settings").select("*").eq("user_id", user.id).maybeSingle(),
   ]);
+
+  // Bands for the tracked names. Depends on the watchlist above, so it costs one
+  // extra hop before the stream opens — bounded, since it reads the shared price
+  // cache. Filed to the ledger here too, not only in the nightly sweep: a
+  // forecast the user was shown but that was never written down cannot be
+  // graded, and an ungradeable forecast is the thing this whole layer exists to
+  // prevent.
+  const forecasts = await getForecasts((trackedRes.data ?? []).map((t) => t.symbol), 21, (t) => getCachedSeries(sb, t))
+    .catch(orEmpty("brief:forecasts"));
+  await recordForecasts(forecasts);
+
   const bundle = buildSignalBundle({
     movers: marketWide.movers,
     losers: marketWide.losers,
@@ -73,6 +89,8 @@ export async function POST() {
     tracked: (trackedRes.data ?? []).map((t) => t.symbol),
     insiders: marketWide.insiders,
     odds: marketWide.odds,
+    forecasts,
+    forecastRecord,
     voices: splitVoices((settingsRes.data as { voices?: string } | null)?.voices),
     commodities: marketWide.commodities,
     fx: marketWide.fx,

@@ -11,6 +11,7 @@ import type { MacroIndicator } from "./macro";
 import type { InsiderCluster } from "./insider";
 import type { InstrumentQuote } from "./commodities";
 import type { MarketOdds } from "./polymarket";
+import type { Forecast } from "./forecast";
 
 export interface SignalBundle {
   movers: Mover[];
@@ -26,9 +27,17 @@ export interface SignalBundle {
   commodities?: InstrumentQuote[];  // real commodity levels via FRED
   fx?: InstrumentQuote[];           // real FX rates via FRED
   odds?: MarketOdds[];              // prediction-market probabilities (Polymarket)
+  forecasts?: Forecast[];           // mechanical price bands (lib/forecast.ts)
+  forecastRecord?: string;          // how those bands have actually scored
   pulse?: string;                   // community pulse via Grok/X
   calibration?: string;             // the system's own graded track record memo
 }
+
+// Prices span BTC and a penny stock, so a fixed precision is wrong at one end
+// or the other; scale it instead of rounding a $0.42 name to "$0".
+const px = (n: number): string =>
+  n >= 1000 ? n.toFixed(0) : n >= 1 ? n.toFixed(2) : n.toPrecision(3);
+const signedPct = (n: number): string => `${n >= 0 ? "+" : ""}${n.toFixed(1)}%`;
 
 // Split the comma-separated settings.voices column into clean labels.
 export function splitVoices(raw: unknown): string[] {
@@ -47,6 +56,16 @@ export function buildSignalBundle(b: SignalBundle): string {
   if (b.headlines.length) parts.push("CURRENT HEADLINES (paraphrased, attributed):\n" + b.headlines.slice(0, 10).map((n) => `- ${n.head} (${n.source})${n.why ? " — " + n.why : ""}`).join("\n"));
   if (b.macro.length) parts.push("MACRO BACKDROP (real data via FRED):\n" + b.macro.map((m) => `- ${m.label}: ${m.value}${m.unit}${m.change != null ? ` (${m.change >= 0 ? "+" : ""}${m.change.toFixed(2)} vs prior)` : ""}`).join("\n"));
   if (b.odds?.length) parts.push("PREDICTION MARKET ODDS (real money staked on Polymarket — a market-implied probability, INDEPENDENT of price and news; treat a crowded consensus as already priced):\n" + b.odds.map((o) => `- ${o.topic}: ${o.probability}% — "${o.question}"${o.endsAt ? ` (resolves ${o.endsAt})` : ""}, $${Math.round(o.volume).toLocaleString()} staked`).join("\n"));
+  // The null hypothesis, stated out loud.
+  //
+  // A drift band is not a view and must never be read as one — it is what the
+  // price does if NOTHING happens. Its value is as a yardstick: a target inside
+  // the band forecasts nothing, and one outside it has to name the thing doing
+  // the extra work. Without this, "+40% in three weeks" and "+3% in three
+  // weeks" read identically in a brief, though one is a routine move and the
+  // other is four standard deviations.
+  if (b.forecasts?.length) parts.push("MECHANICAL PRICE BANDS (computed from realised daily returns — a random-walk-with-drift baseline, NOT a view and NOT a recommendation. This is the range the name covers on its own volatility if no catalyst lands. Use it as a yardstick: if your target sits INSIDE the band you are forecasting nothing, and if it sits outside, say explicitly what does the extra work):\n" + b.forecasts.map((f) => `- ${f.symbol}: $${px(f.base)} on ${f.baseDate} → ${f.horizonDays}-session central $${px(f.expected)} (${signedPct((f.expected / f.base - 1) * 100)}), 80% band $${px(f.lo)}–$${px(f.hi)} [drift ${signedPct(f.driftAnnualPct)}/yr, vol ${f.volAnnualPct.toFixed(0)}%/yr]`).join("\n"));
+  if (b.forecastRecord) parts.push(b.forecastRecord);
   if (b.insiders?.length) parts.push("INSIDER FILING CLUSTERS (real, from SEC EDGAR Form 4 filings over the last few trading days — clustered open-market BUYING is the notable signal; sampled counts, not totals):\n" + b.insiders.map((i) => `- ${i.company} (${i.ticker}): ${i.filings} filings; sampled filings show ${i.buys} open-market buy${i.buys === 1 ? "" : "s"}, ${i.sells} sale${i.sells === 1 ? "" : "s"}`).join("\n"));
   if (b.voices?.length) parts.push("TRACKED VOICES (public commentators the investor follows): " + b.voices.join(", "));
   if (b.pulse) parts.push("COMMUNITY PULSE (live X via Grok — noisy, contrarian at extremes; a HOT name is already crowded):\n" + b.pulse);

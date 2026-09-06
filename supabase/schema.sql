@@ -931,3 +931,50 @@ grant execute on function admin_usage_overview(int) to service_role;
 grant execute on function admin_user_activity(int, int) to service_role;
 grant execute on function admin_user_detail(uuid, int) to service_role;
 grant execute on function admin_recent_events(int) to service_role;
+
+-- ---------------------------------------------------------------------------
+-- Forecast ledger. Every quantitative price forecast is written down BEFORE the
+-- outcome is known and graded later against the realised close by arithmetic
+-- alone (lib/forecastRecord.ts) — the same discipline as `calls`, applied to the
+-- numbers rather than the prose.
+--
+-- No user_id, deliberately: a forecast is a statement about a SYMBOL, identical
+-- for every account that sees it, so it is stored once and graded once — the
+-- same reasoning as ticker_series. Read-only to clients; written by the service
+-- role. The app tolerates this table being absent (writes are best-effort and
+-- the memo degrades to empty), so shipping the code before this migration is
+-- safe.
+create table if not exists forecasts (
+  id uuid primary key default gen_random_uuid(),
+  symbol text not null,
+  horizon_days int not null,              -- TRADING days
+  method text not null,                   -- drift | remote — what produced it
+  base numeric not null,                  -- the close it was made from
+  base_date date not null,
+  due_date date not null,                 -- when it becomes gradeable
+  expected numeric not null,
+  lo numeric not null,                    -- 80% band
+  hi numeric not null,
+  drift_annual_pct numeric,
+  vol_annual_pct numeric,
+  forecast_date date not null default (now() at time zone 'utc')::date,
+  created_at timestamptz default now(),
+  -- grading, filled in once the horizon lapses
+  actual numeric,
+  actual_date date,
+  error_pct numeric,                      -- signed: + means the forecast was LOW
+  abs_error_pct numeric,                  -- |actual - expected| / actual
+  naive_error_pct numeric,                -- |actual - base|     / actual  <- the benchmark
+  in_band boolean,
+  graded_at timestamptz
+);
+-- One forecast per symbol/horizon/method/day: a re-run of the sweep updates the
+-- day's forecast instead of stacking duplicates that would each be graded and
+-- would inflate every cohort in the scoreboard.
+create unique index if not exists forecasts_dedup on forecasts (symbol, horizon_days, method, forecast_date);
+-- The grading pass's exact query: ungraded rows whose horizon has lapsed.
+create index if not exists forecasts_due on forecasts (due_date) where graded_at is null;
+create index if not exists forecasts_graded on forecasts (graded_at desc);
+alter table forecasts enable row level security;
+drop policy if exists "read forecasts" on forecasts;
+create policy "read forecasts" on forecasts for select using ((select auth.role()) = 'authenticated');
