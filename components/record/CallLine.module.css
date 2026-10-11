@@ -1,0 +1,87 @@
+/* The list frame is the size container, so rows align as a table on wide
+   screens (or a wide public page) and stack on phones — from one component. */
+.list {
+  container: calls / inline-size;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+  overflow: hidden; box-shadow: var(--shadow-1);
+}
+.item { position: relative; }
+.item + .item::before {
+  content: ""; position: absolute; top: 0; left: var(--s-4); right: 0; height: 1px; background: var(--border);
+}
+.rowStatic, .rowBtn {
+  display: block; width: 100%; text-align: left; color: inherit;
+  padding: 12px var(--s-4); min-height: 60px;
+}
+.rowBtn { transition: background var(--dur-1); }
+.rowBtn:hover { background: var(--surface-2); }
+.rowBtn:active { background: var(--surface-3); }
+.headRow { padding: 10px var(--s-4); border-bottom: 1px solid var(--border); background: var(--surface-2); display: none; }
+
+.line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "call move" "meta spy";
+  column-gap: var(--s-3); row-gap: 4px;
+  align-items: center;
+  width: 100%;
+}
+.withChev {
+  grid-template-columns: minmax(0, 1fr) auto 18px;
+  grid-template-areas: "call move chev" "meta spy chev";
+}
+
+.call { grid-area: call; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.inst { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.result { display: inline-flex; flex-shrink: 0; }
+.name { font-weight: 600; font-size: var(--fs-sm); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.noDir { font-size: var(--fs-xs); color: var(--text-3); white-space: nowrap; }
+
+.meta {
+  grid-area: meta; min-width: 0;
+  font-size: var(--fs-xs); color: var(--text-3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.move { grid-area: move; justify-self: end; font-size: var(--fs-md); white-space: nowrap; }
+.spy { grid-area: spy; justify-self: end; font-size: var(--fs-xs); color: var(--text-3); white-space: nowrap; }
+.openTag { font-size: var(--fs-sm); font-weight: 600; color: var(--text-2); }
+.chev { grid-area: chev; width: 18px; height: 18px; color: var(--text-3); }
+.wideOnly { display: none; }
+.pendingPfx { display: none; }
+.header { display: none; }
+
+@container calls (min-width: 700px) {
+  .headRow { display: block; }
+  .header {
+    display: grid;
+    font-size: var(--fs-xs); font-weight: 600; color: var(--text-3);
+  }
+  .line,
+  .withChev {
+    grid-template-areas: none;
+    grid-template-columns: minmax(0, 1.7fr) 72px minmax(0, 1.5fr) 76px 76px 104px;
+    column-gap: var(--s-4);
+  }
+  .withChev { grid-template-columns: minmax(0, 1.7fr) 72px minmax(0, 1.5fr) 76px 76px 104px 18px; }
+  .call, .meta { display: contents; }
+  .inst { grid-column: 1; grid-row: 1; }
+  .filed { grid-column: 2; grid-row: 1; white-space: nowrap; font-size: var(--fs-sm); color: var(--text-2); }
+  .dot { display: none; }
+  .status { grid-column: 3; grid-row: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); }
+  .header .filed, .header .status { font-size: var(--fs-xs); color: var(--text-3); }
+  .move { grid-area: auto; grid-column: 4; grid-row: 1; }
+  .spy { grid-area: auto; grid-column: 5; grid-row: 1; font-size: var(--fs-sm); color: var(--text-2); }
+  .result { grid-column: 6; grid-row: 1; justify-self: start; }
+  .chev { grid-area: auto; grid-column: 7; grid-row: 1; }
+  .header .move, .header .spy { color: var(--text-3); font-size: var(--fs-xs); }
+  .wideOnly { display: inline; }
+  .pendingPfx { display: inline; }
+  .openTag { display: none; }
+  .move .wideOnly { color: var(--text-3); }
+  /* Labels the column header already gives sighted readers; kept for screen readers. */
+  .pfx {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0, 0, 0, 0); white-space: nowrap;
+  }
+  .rowStatic, .rowBtn { min-height: 52px; padding-top: 10px; padding-bottom: 10px; }
+}

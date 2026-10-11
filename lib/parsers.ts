@@ -214,6 +214,8 @@ export interface NewsItem {
   ticker: string;
   cls: string;
   signal: string;
+  /** constructive | cautious | neutral, or "" from batches written before the field existed. */
+  lean: string;
   when: string;
 }
 
@@ -232,8 +234,8 @@ export function parseNews(text: string): NewsResult {
   const blocks = text.split(/@@ITEM@@/i).slice(1);
   const items = blocks.map((raw) => {
     const b = raw.split(/===\s*NOTE/i)[0];
-    const get = blockReader(b, ["head", "source", "why", "ticker", "class", "signal", "when"]);
-    return { head: get("head"), source: get("source"), why: get("why"), ticker: get("ticker"), cls: get("class"), signal: get("signal"), when: get("when") };
+    const get = blockReader(b, ["head", "source", "why", "ticker", "class", "signal", "lean", "when"]);
+    return { head: get("head"), source: get("source"), why: get("why"), ticker: get("ticker"), cls: get("class"), signal: get("signal"), lean: get("lean").toLowerCase(), when: get("when") };
   }).filter((n) => n.head);
   return { intro, items, note };
 }

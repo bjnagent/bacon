@@ -1,0 +1,59 @@
+.wrap { display: flex; flex-direction: column; gap: var(--s-3); }
+
+/* Kill alerts */
+.kills { display: flex; flex-direction: column; gap: var(--s-2); }
+.killBody { display: flex; flex-direction: column; gap: 4px; }
+.killBody p { color: var(--text); }
+.killBody .killMeta { color: var(--text-2); font-size: var(--fs-xs); }
+.killLink {
+  align-self: flex-start; min-height: 44px; margin: -6px 0 -10px;
+  font-size: var(--fs-sm); font-weight: 600; color: var(--neg);
+}
+.killLink:hover { text-decoration: underline; }
+
+/* Brief scoreboard */
+.score {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--s-3);
+  padding: var(--s-4); background: var(--surface-2); border-radius: var(--r-lg);
+}
+.scoreCell { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.scoreLabel { font-size: var(--fs-xs); color: var(--text-2); font-weight: 600; }
+.scoreValue { font-size: var(--fs-xl); font-weight: 700; letter-spacing: -0.01em; }
+.scoreSub { font-size: var(--fs-xs); color: var(--text-3); }
+
+/* Brief sheet */
+.sheet { display: flex; flex-direction: column; gap: var(--s-4); }
+.intro { color: var(--text-2); font-size: var(--fs-md); line-height: 1.55; }
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-2); }
+.actions > * { min-width: 0; }
+
+.basket {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: var(--s-4); border-radius: var(--r-lg); background: var(--surface-2);
+}
+.basketLabel { font-size: var(--fs-xs); font-weight: 600; color: var(--text-2); }
+.basketValue { font-size: var(--fs-2xl); font-weight: 700; letter-spacing: -0.02em; }
+.basketDelta { font-size: var(--fs-sm); font-weight: 600; }
+.basketBench { font-size: var(--fs-xs); color: var(--text-3); margin-top: 2px; }
+
+.pricing { display: flex; flex-direction: column; gap: var(--s-2); }
+
+.ideas { display: flex; flex-direction: column; gap: var(--s-3); }
+.idea {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: var(--s-4); border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface);
+}
+.ideaHead { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+.ideaName { font-size: var(--fs-md); font-weight: 600; }
+.ideaMeta { font-size: var(--fs-xs); color: var(--text-3); }
+.ideaThesis { font-size: var(--fs-sm); color: var(--text-2); line-height: 1.5; }
+.ideaCall { font-size: var(--fs-sm); line-height: 1.45; }
+.ideaCall strong { font-weight: 600; }
+.ideaOutcome { font-size: var(--fs-sm); line-height: 1.5; padding: var(--s-2) var(--s-3); border-radius: var(--r-sm); background: var(--surface-2); }
+.ideaOutcome span { font-weight: 600; }
+
+.roi { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px var(--s-2); font-size: var(--fs-sm); padding-top: var(--s-2); border-top: 1px solid var(--border); }
+.roiLead { font-weight: 600; }
+.roiBasis { flex-basis: 100%; font-size: var(--fs-xs); color: var(--text-3); }
+
+.method { font-size: var(--fs-xs); color: var(--text-3); line-height: 1.5; }

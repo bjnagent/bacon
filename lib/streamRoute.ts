@@ -21,7 +21,11 @@ export function textStreamResponse(
         }
       } catch (err) {
         ok = false;
-        controller.enqueue(encoder.encode(`\n\n[error: ${err instanceof Error ? err.message : "stream failed"}]`));
+        // The raw provider message (auth failures, model ids, quota text) goes
+        // to the server log, not the client: the browser only needs to know the
+        // stream broke, and apiStream turns this marker into a friendly error.
+        console.error("[stream] upstream failed:", err instanceof Error ? err.message : err);
+        controller.enqueue(encoder.encode("\n\n[error: upstream_failed]"));
       } finally {
         try { await onDone?.(full, ok); } catch { /* persistence is best-effort */ }
         controller.close();

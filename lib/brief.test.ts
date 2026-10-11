@@ -48,3 +48,12 @@ describe("buildSignalBundle — mechanical price bands", () => {
       .toMatch(/drift is 12% worse than no change\./);
   });
 });
+
+describe("house audience", () => {
+  const base = { movers: [], headlines: [], macro: [], themes: ["AI infrastructure"], tracked: ["NVDA"] };
+  it("tells the model the shared house brief has no personal reader", () => {
+    expect(buildSignalBundle({ ...base, audience: "house" })).toMatch(/AUDIENCE: this brief is published to EVERY free member/);
+    expect(buildSignalBundle({ ...base, audience: "personal" })).not.toMatch(/AUDIENCE/);
+    expect(buildSignalBundle(base)).not.toMatch(/AUDIENCE/);
+  });
+});

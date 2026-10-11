@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireUser, isResponse } from "@/lib/api";
 
-// The track record: past daily briefs, newest first. Returns [] until the
-// daily_briefs table exists (schema.sql), so the UI degrades gracefully.
+// The brief history: past daily briefs, newest first, with their stored ROI
+// snapshot and any kill-condition alert. Answers `migrationNeeded` (not an
+// error) until the daily_briefs table exists (schema.sql), so the Record tab
+// can say what to do instead of failing.
 export async function GET() {
-  const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  const auth = await requireUser();
+  if (isResponse(auth)) return auth;
 
-  const { data, error } = await sb
+  const { data, error } = await auth.sb
     .from("daily_briefs")
     .select("id,brief_date,intro,caveat,items,reviewed_at,created_at,roi,kill_alert")
     .order("brief_date", { ascending: false })

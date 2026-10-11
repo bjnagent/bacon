@@ -2,16 +2,20 @@
 
 import { useEffect, useState } from "react";
 import InstallPwa from "./InstallPwa";
+import s from "./marketing/Install.module.css";
 
 type Platform = "ios" | "android";
 
-// Install instructions. On a phone we detect the platform and show only its
-// steps (with a swap link) so the page stays a short scroll; anywhere we can't
-// tell (desktop, unknown UA) both platforms render side by side.
+// Add-to-Home-Screen instructions for the web app. On a phone we detect the
+// platform and show only its steps (with a switch) so the section stays short;
+// anywhere we can't tell (desktop, unknown UA) both render side by side.
 export default function InstallGuide() {
   const [show, setShow] = useState<Platform | null>(null);
 
   useEffect(() => {
+    // The server render can't know the UA, so this runs after hydration —
+    // deferred a tick rather than setting state synchronously in the effect,
+    // which would cascade a second render inside the commit.
     const id = setTimeout(() => {
       const ua = navigator.userAgent;
       if (/iPhone|iPad|iPod/.test(ua)) setShow("ios");
@@ -21,38 +25,38 @@ export default function InstallGuide() {
   }, []);
 
   const ios = (
-    <div className="pr-w-platform">
-      <div className="pr-w-platform-name">iPhone / iPad</div>
-      <ol className="pr-w-steps">
-        <li>Open this page in <b>Safari</b></li>
-        <li>Tap the <b>Share</b> button (the square with an arrow)</li>
-        <li>Scroll down, tap <b>Add to Home Screen</b>, then <b>Add</b></li>
+    <div className={s.platform}>
+      <div className={s.platformName}>iPhone and iPad</div>
+      <ol className={s.steps}>
+        <li><span>Open this page in <b>Safari</b>.</span></li>
+        <li><span>Tap <b>Share</b> (the square with an arrow).</span></li>
+        <li><span>Choose <b>Add to Home Screen</b>, then <b>Add</b>.</span></li>
       </ol>
     </div>
   );
   const android = (
-    <div className="pr-w-platform">
-      <div className="pr-w-platform-name">Android</div>
-      <ol className="pr-w-steps">
-        <li>Open this page in <b>Chrome</b></li>
-        <li>Tap the <b>⋮ menu</b> in the top right</li>
-        <li>Tap <b>Add to Home screen</b>, then <b>Install</b></li>
+    <div className={s.platform}>
+      <div className={s.platformName}>Android</div>
+      <ol className={s.steps}>
+        <li><span>Open this page in <b>Chrome</b>.</span></li>
+        <li><span>Tap the <b>menu</b> (three dots, top right).</span></li>
+        <li><span>Choose <b>Add to Home screen</b>, then <b>Install</b>.</span></li>
       </ol>
     </div>
   );
 
   return (
-    <>
-      <div className={`pr-w-install-grid ${show ? "is-single" : ""}`}>
+    <div>
+      <div className={`${s.grid} ${show ? s.single : ""}`}>
         {show !== "android" && ios}
         {show !== "ios" && android}
       </div>
       {show && (
-        <button className="pr-w-swap" onClick={() => setShow(show === "ios" ? "android" : "ios")}>
-          On {show === "ios" ? "Android" : "iPhone"} instead? Show those steps →
+        <button type="button" className={s.swap} onClick={() => setShow(show === "ios" ? "android" : "ios")}>
+          On {show === "ios" ? "Android" : "iPhone"}? Show those steps
         </button>
       )}
       <InstallPwa />
-    </>
+    </div>
   );
 }

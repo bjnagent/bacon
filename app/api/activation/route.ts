@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireUser, isResponse } from "@/lib/api";
 
 // The three first-actions behind the checklist on Today.
 //
@@ -31,9 +31,9 @@ async function has(p: PromiseLike<{ data: unknown[] | null; error: unknown }>): 
 }
 
 export async function GET() {
-  const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  const auth = await requireUser();
+  if (isResponse(auth)) return auth;
+  const { sb, user } = auth;
 
   const [swept, tracked, analyzed] = await Promise.all([
     has(sb.from("daily_briefs").select("id").limit(1)),

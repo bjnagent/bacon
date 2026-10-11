@@ -4,21 +4,9 @@
 
 import type { Mover } from "./market";
 
-export type ChatKind = "asset" | "tracked" | "radar" | "news" | "news-feed" | "frameworks" | "sizing" | "general";
-
-export interface ChatContext {
-  kind: ChatKind;
-  asset?: string;
-  cls?: string;
-  thesis?: string;
-  update?: string;
-  assets?: string[];
-  headline?: string;
-  ticker?: string;
-  title?: string;
-  sub?: string;
-  notes?: string; // grounding from what the user is viewing (e.g. the lens read)
-}
+import type { ChatContext } from "./chatContext";
+export type { ChatKind, ChatContext } from "./chatContext";
+export { deriveContext, chatStarters } from "./chatContext";
 
 /**
  * The current date, stated to the model.
@@ -406,6 +394,7 @@ why: <one line: why it matters to an investor>
 ticker: <single most-implicated symbol, or —>
 class: <Equity / ETF / FX / Crypto / Commodity / Bond, or —>
 signal: <short tag: Earnings / Guidance / M&A / Macro / Regulatory / Upgrade / Downgrade / Product / Flows / Insider>
+lean: <constructive | cautious | neutral — which way this news points for the implicated asset; neutral when it is mixed or unclear>
 when: <relative recency if known, e.g. "2h", "today", or —>
 @@ITEM@@
 ...
@@ -434,25 +423,3 @@ Principles:
 - Care about decision quality: name the risk side even when bullish, flag position-sizing when conviction is low, and say plainly when you'd walk away.`;
 }
 
-interface DeriveTarget { asset?: string; cls?: string }
-interface DeriveItem { asset: string }
-
-export function deriveContext(view: string, target: DeriveTarget | null, items: DeriveItem[] | null): ChatContext {
-  if (view === "analyze" && target && target.asset) return { kind: "asset", asset: target.asset, cls: target.cls, title: String(target.asset).toUpperCase(), sub: `multi-lens analysis${target.cls ? " · " + target.cls : ""}` };
-  if (view === "news") return { kind: "news-feed", title: "Market headlines", sub: "news discussion" };
-  if (view === "radar" && items && items.length) return { kind: "radar", title: "Your radar", sub: `${items.length} tracked`, assets: items.map((i) => i.asset) };
-  return { kind: "general", title: "Markets & research", sub: "open discussion" };
-}
-
-export function chatStarters(ctx: ChatContext | null): string[] {
-  switch (ctx && ctx.kind) {
-    case "asset": return ["What's the strongest bull and bear case?", "What would break this thesis?", "What should I verify first?", "How do the lenses line up here?"];
-    case "tracked": return ["What's changed recently that matters?", "What's the next catalyst to watch?", "What would make me wrong?", "Give me the bull vs bear in brief."];
-    case "radar": return ["Where might I be over-concentrated?", "Which name has the most event risk soon?", "What themes connect these?", "Which deserves a deeper look first?"];
-    case "news": return ["What does this actually mean for the stock?", "Is this likely already priced in?", "What should I verify before acting?", "Who else does this affect?"];
-    case "news-feed": return ["What's the most important headline right now?", "Anything today worth a deep dive?", "What's been the market reaction?"];
-    case "frameworks": return ["How do I combine these lenses in practice?", "Which lens matters most for FX?", "When lenses disagree, what then?"];
-    case "sizing": return ["How should I size a moderate-conviction idea?", "Why use fractional Kelly?", "How does correlation change my sizing?"];
-    default: return ["What should I be watching in markets now?", "Help me build a research process.", "Explain convergence across the lenses."];
-  }
-}

@@ -1,0 +1,4 @@
+# Native iOS project and its sources: built on a Mac with Xcode, never by Vercel.
+ios/
+ios-web/
+resources/

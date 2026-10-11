@@ -31,6 +31,12 @@ export interface SignalBundle {
   forecastRecord?: string;          // how those bands have actually scored
   pulse?: string;                   // community pulse via Grok/X
   calibration?: string;             // the system's own graded track record memo
+  /**
+   * "house" when the brief is the shared one every free member reads (the
+   * HOUSE_USER_ID account). Its themes and tracked names are the desk's, not the
+   * reader's, so the copy must not address anyone's own watchlist.
+   */
+  audience?: "personal" | "house";
 }
 
 // Prices span BTC and a penny stock, so a fixed precision is wrong at one end
@@ -72,6 +78,7 @@ export function buildSignalBundle(b: SignalBundle): string {
   if (b.calibration) parts.push("YOUR CALIBRATION (measured from your own graded past calls — correct for these biases):\n" + b.calibration);
   if (b.themes.length) parts.push("INVESTOR THEMES: " + b.themes.join("; "));
   if (b.tracked.length) parts.push("ALREADY TRACKED (prefer NEW names over these): " + b.tracked.join(", "));
+  if (b.audience === "house") parts.push("AUDIENCE: this brief is published to EVERY free member of Bacon. They did not choose the themes or names above — those are the desk's own. Write for a general reader: never say \"your watchlist\", \"your themes\", \"names you track\" or similar; if they matter, call them \"the desk's themes\" or \"names on the desk's radar\".");
   parts.push("Piece these signals together into today's opportunity brief.");
   return parts.join("\n\n");
 }

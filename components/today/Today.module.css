@@ -1,0 +1,79 @@
+/* ---------- Screen ---------- */
+.subtitle { font-variant-numeric: tabular-nums; }
+/* Keep the hidden pane out of layout even if a rule elsewhere sets display. */
+.panel[hidden] { display: none !important; }
+@media (max-width: 899px) {
+  /* iOS: the segmented control sits under the large title at full width. */
+  .root :global(.page-actions) { width: 100%; }
+  .root :global(.page-actions .ui-seg) { width: 100%; }
+  .root :global(.page-actions .ui-seg-btn) { flex: 1; }
+}
+
+.pane { display: flex; flex-direction: column; gap: var(--s-5); min-width: 0; }
+@media (min-width: 900px) { .pane { gap: var(--s-6); } }
+
+/* ---------- Refresh control ---------- */
+.refresh { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+.refreshLeft { font-size: var(--fs-xs); color: var(--text-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ---------- House banner ---------- */
+.house {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 4px var(--s-2);
+  padding: 10px var(--s-4); border-radius: var(--r-md);
+  background: var(--surface-2); font-size: var(--fs-sm); color: var(--text-2); line-height: 1.4;
+}
+.house > svg { width: 16px; height: 16px; color: var(--text-3); flex-shrink: 0; }
+.house strong { color: var(--text); font-weight: 600; }
+.houseText { flex: 1 1 auto; min-width: 0; }
+.houseCta {
+  color: var(--accent-text); font-weight: 600; font-size: var(--fs-sm);
+  min-height: 32px; display: inline-flex; align-items: center; text-align: left;
+}
+.houseCta:hover { text-decoration: underline; }
+@media (pointer: coarse) { .houseCta { min-height: 44px; margin: -6px 0; } }
+@media (max-width: 559px) { .houseCta { flex-basis: 100%; padding-left: 24px; } }
+
+.calloutActions { margin-top: var(--s-2); }
+
+/* ---------- Building (streaming) ---------- */
+.building { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3) var(--s-4); }
+.buildingText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; font-size: var(--fs-sm); color: var(--text-2); }
+.buildingText strong { color: var(--text); font-size: var(--fs-md); font-weight: 600; }
+.building :global(.ui-spinner) { color: var(--accent); }
+
+/* ---------- Desk note ---------- */
+.note { padding: var(--s-4); display: flex; flex-direction: column; gap: var(--s-2); }
+@media (min-width: 900px) { .note { padding: var(--s-5); } }
+.noteExample { border-style: dashed; border-color: var(--border-strong); box-shadow: none; }
+.noteHead { display: flex; align-items: center; gap: var(--s-2); }
+.noteTitle { font-size: var(--fs-sm); font-weight: 600; color: var(--text-2); }
+.noteWhen { margin-left: auto; font-size: var(--fs-xs); color: var(--text-3); }
+.noteText {
+  font-family: var(--font-display); font-size: var(--fs-lg); line-height: 1.5; letter-spacing: -0.005em; color: var(--text);
+  max-width: 68ch;
+}
+@media (max-width: 559px) { .noteText { font-size: var(--fs-md); line-height: 1.55; } }
+
+/* ---------- Footnote (the one disclaimer) ---------- */
+.footnote { font-size: var(--fs-xs); color: var(--text-3); line-height: 1.5; max-width: 72ch; }
+
+/* ---------- Example (first run) ---------- */
+.example { display: flex; flex-direction: column; gap: var(--s-4); }
+.exampleIntro { display: flex; flex-direction: column; gap: var(--s-3); }
+.exampleTop { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); }
+.exampleTitle { font-family: var(--font-display); font-size: var(--fs-2xl); font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; }
+.exampleBody { color: var(--text-2); max-width: 62ch; }
+@media (max-width: 559px) {
+  .exampleTitle { font-size: var(--fs-xl); }
+  .exampleIntro :global(.ui-btn) { width: 100%; }
+}
+
+/* ---------- Data check ---------- */
+.dcHead { display: flex; flex-direction: column; gap: 2px; }
+.dcSum { color: var(--text-3); }
+.dcList { display: flex; flex-direction: column; gap: 6px; margin-top: var(--s-2); }
+.dcList li { overflow-wrap: anywhere; }
+.dcList strong { font-variant-numeric: tabular-nums; }
+.dcMore { margin-top: 4px; color: var(--accent-text); font-weight: 600; font-size: var(--fs-sm); min-height: 32px; }
+@media (pointer: coarse) { .dcMore { min-height: 44px; } }
+.dcFoot { margin-top: var(--s-2); font-size: var(--fs-xs); color: var(--text-3); }

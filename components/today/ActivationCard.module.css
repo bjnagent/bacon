@@ -1,0 +1,44 @@
+.card { padding: var(--s-3) var(--s-2) var(--s-3) var(--s-4); display: flex; flex-direction: column; gap: var(--s-2); }
+
+.head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); }
+.headText { display: flex; align-items: baseline; gap: var(--s-2); }
+.title { font-weight: 600; font-size: var(--fs-md); }
+.count { font-size: var(--fs-sm); color: var(--text-3); font-variant-numeric: tabular-nums; }
+
+.progress { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-right: var(--s-2); }
+.seg, .segDone { height: 4px; border-radius: var(--r-pill); background: var(--surface-3); }
+.segDone { background: var(--pos); }
+
+.steps { display: flex; flex-direction: column; margin-right: var(--s-2); }
+.step, .stepDone {
+  display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: center; gap: var(--s-2) var(--s-3);
+  min-height: 52px; padding: var(--s-2) 0;
+}
+.cta { display: inline-flex; }
+@media (max-width: 559px) {
+  /* On a phone the button sits under its text instead of squeezing it into a column. */
+  .cta { grid-column: 2 / -1; justify-self: start; }
+}
+.step + .step, .step + .stepDone, .stepDone + .step, .stepDone + .stepDone { border-top: 1px solid var(--border); }
+
+.mark, .markDone {
+  width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: var(--fs-xs); font-weight: 700; font-variant-numeric: tabular-nums;
+  border: 1.5px solid var(--border-strong); color: var(--text-2);
+}
+.markDone { border-color: transparent; background: var(--pos); color: var(--bg); }
+.markDone svg { width: 14px; height: 14px; stroke-width: 3; }
+
+.body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.label { font-size: var(--fs-md); font-weight: 500; line-height: 1.3; }
+.stepDone .label { color: var(--text-3); }
+.hint { font-size: var(--fs-sm); color: var(--text-3); line-height: 1.4; }
+.status { font-size: var(--fs-sm); color: var(--text-3); flex-shrink: 0; }
+
+.themes { display: flex; flex-direction: column; gap: var(--s-2); padding-top: var(--s-2); border-top: 1px solid var(--border); margin-right: var(--s-2); }
+.chips { padding-bottom: 2px; }
+@media (max-width: 899px) {
+  /* The card's own padding is the edge here, not the screen's. */
+  .themes .chips { margin: 0 calc(-1 * var(--s-4)); padding: 0 var(--s-4) 2px; scroll-padding: 0 var(--s-4); }
+}

@@ -1,0 +1,292 @@
+/* Home and analysis stay mounted; only one is shown. (.page sets display, so
+   the hidden attribute alone wouldn't hide it.) */
+.pane[hidden] {
+  display: none !important;
+}
+
+/* ---------- Home: search ---------- */
+.searchCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+
+.searchForm {
+  display: flex;
+  gap: var(--s-2);
+  align-items: stretch;
+}
+
+.searchField {
+  flex: 1;
+  min-width: 0;
+}
+
+.searchField :global(.ui-input) {
+  min-height: 48px;
+}
+
+.searchControls {
+  display: flex;
+  gap: var(--s-2);
+  flex-shrink: 0;
+}
+
+.select {
+  width: auto;
+  min-width: 0;
+  padding-right: 34px;
+  font-size: 16px;
+  color: var(--text);
+  /* The native picker on iOS; a drawn caret elsewhere (appearance is reset). */
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-3) 50%), linear-gradient(135deg, var(--text-3) 50%, transparent 50%);
+  background-position: calc(100% - 18px) 50%, calc(100% - 13px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.searchControls .select {
+  min-height: 48px;
+  max-width: 200px;
+}
+
+.runBtn {
+  min-height: 48px;
+}
+
+@media (max-width: 699px) {
+  .searchForm {
+    flex-direction: column;
+  }
+  .searchControls .select {
+    flex: 1;
+    max-width: none;
+  }
+}
+
+.allowance {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--border);
+}
+
+.allowanceRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+}
+
+.allowanceLow {
+  color: var(--warn);
+  font-weight: 600;
+}
+
+/* ---------- Home: recent ---------- */
+.leanIcon[data-tone="pos"] { color: var(--pos); }
+.leanIcon[data-tone="neg"] { color: var(--neg); }
+.leanIcon[data-tone="warn"] { color: var(--warn); }
+
+.rowTitle {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  min-width: 0;
+}
+
+.rowSym {
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.rowTyped {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+}
+
+/* ---------- Home: lens legend ---------- */
+.lensLegend {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s-2) var(--s-6);
+}
+
+.lensLegend li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--s-2) 0 var(--s-2) var(--s-4);
+}
+
+.lensLegend li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 13px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--hue);
+}
+
+.lensLegendName {
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+
+.lensLegendBlurb {
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+  line-height: 1.4;
+}
+
+@media (max-width: 559px) {
+  .lensLegend {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+}
+
+/* ---------- Analysis: header ---------- */
+.backRow {
+  margin-bottom: calc(-1 * var(--s-4));
+}
+
+.back {
+  margin-left: -10px;
+  color: var(--accent-text);
+}
+
+.back:hover:not(:disabled) {
+  color: var(--accent-text);
+}
+
+.symbolTitle {
+  overflow-wrap: anywhere;
+}
+
+.statusLine {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.actions {
+  gap: var(--s-1);
+  flex-wrap: nowrap;
+}
+
+.actions > :first-child {
+  margin-right: var(--s-1);
+}
+
+@media (max-width: 559px) {
+  .header {
+    gap: var(--s-3);
+  }
+  .actions {
+    width: 100%;
+  }
+}
+
+.liveDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: live-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* ---------- Analysis: run CTA ---------- */
+.runCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-4);
+}
+
+.runIcon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.runIcon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.runRow {
+  display: flex;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.runRow .select {
+  max-width: 240px;
+}
+
+@media (max-width: 559px) {
+  .runRow > * {
+    flex: 1 1 100%;
+  }
+  .runRow .select {
+    max-width: none;
+  }
+}
+
+.linkBtn {
+  color: var(--accent-text);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.calloutActions {
+  margin-top: var(--s-2);
+  display: flex;
+  gap: var(--s-2);
+}
+
+.tabs {
+  margin-top: var(--s-2);
+  margin-bottom: calc(-1 * var(--s-2));
+}
+
+/* Five tabs overflow a phone, so the control scrolls. Without these the
+   buttons shrink instead, and the global svg max-width squashes the lock
+   icons to nothing. */
+.tabs :global(.ui-seg-btn) {
+  flex-shrink: 0;
+}
+
+.tabs :global(.ui-seg-btn svg) {
+  flex-shrink: 0;
+  max-width: none;
+}
+
+.disclaimer {
+  padding-top: var(--s-2);
+}

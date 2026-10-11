@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  "development" is deliberate and is what ships correctly: Xcode signs local
+	  and archive builds with a development profile (which only permits
+	  "development"), and rewrites this to "production" from the distribution
+	  profile when the archive is exported to App Store Connect / TestFlight.
+	  Hard-coding "production" here makes development-signed builds fail with
+	  "Provisioning profile doesn't match the entitlements file's value for the
+	  aps-environment entitlement". See docs/ios.md → Push notifications.
+	-->
+	<key>aps-environment</key>
+	<string>development</string>
+	<!--
+	  Universal links (applinks) and password AutoFill / iCloud Keychain for the
+	  login form (webcredentials). Both are verified against
+	  https://<host>/.well-known/apple-app-site-association
+	  (app/.well-known/apple-app-site-association/route.ts). Add the custom
+	  domain here when the site moves to one.
+	-->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:bacon-flax.vercel.app</string>
+		<string>webcredentials:bacon-flax.vercel.app</string>
+	</array>
+</dict>
+</plist>

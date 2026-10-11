@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireUser, isResponse, readJson, fail, str } from "@/lib/api";
+import { gate } from "@/lib/entitlements";
 import { askStream } from "@/lib/anthropic";
 import { propertyOutlookPrompt } from "@/lib/prompts";
 import { parseDebate } from "@/lib/parsers";
@@ -16,16 +16,21 @@ export const maxDuration = 300;
 // POST: a web-search-grounded qualitative outlook for one property market,
 // seeded with the REAL index stats (the only numbers the model may assert).
 // Streams; the parsed result is persisted per user+market after the last chunk.
+// Metered (one "update") and needs the property feature; the unit is refunded
+// when the stream fails or yields nothing usable.
 export async function POST(req: Request) {
-  const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  const auth = await requireUser();
+  if (isResponse(auth)) return auth;
+  const { sb, user } = auth;
 
-  let body: { market?: string };
-  try { body = await req.json(); } catch { return NextResponse.json({ error: "Bad request" }, { status: 400 }); }
-  const market = marketByKey(String(body.market || ""));
-  if (!market) return NextResponse.json({ error: "Unknown market" }, { status: 400 });
-  if (!(await withinQuota(sb))) return NextResponse.json({ error: QUOTA_MESSAGE }, { status: 429 });
+  const body = await readJson<{ market?: unknown }>(req);
+  if (!body) return fail(400, "Bad request", { code: "bad_request" });
+  const market = marketByKey(str(body.market, 40));
+  if (!market) return fail(400, "Unknown market", { code: "bad_request" });
+  // Daily abuse cap first (cheap, consumes nothing), then the plan gate.
+  if (!(await withinQuota(sb))) return fail(429, QUOTA_MESSAGE, { code: "quota" });
+  const g = await gate(sb, user, "property-outlook");
+  if (!g.ok) return g.response;
 
   // raceAbort cancels the Grok call when its 12s deadline loses, instead of
   // leaving a 45s X-search running and billed for a discarded result.
@@ -52,9 +57,10 @@ export async function POST(req: Request) {
   return textStreamResponse(
     askStream(propertyOutlookPrompt(market.label, statsLine), [{ role: "user", content: `Write the current deep view for ${market.label} — policy, rates, supply, district development & major projects, sentiment, rentals, 12-mo scenarios, 5/10-yr long run, the rent-vs-mortgage carry math, and your verdict.${pulseCtx}${calCtx}${instrumentMemo}` }], true, 1800, 6, { route: "property", userId: user.id }),
     async (full, ok) => {
-      if (!ok) return; // don't persist a truncated outlook
+      // Don't persist (or charge for) a truncated or unparseable outlook.
+      if (!ok) { await g.refund(); return; }
       const sec = parseDebate(full); // generic ===SECTION=== splitter
-      if (!sec.READ) return;
+      if (!sec.READ) { await g.refund(); return; }
       const bodyJson = {
         read: sec.READ, policy: sec.POLICY || "", rates: sec.RATES || "", supply: sec.SUPPLY || "",
         sentiment: sec.SENTIMENT || "", rental: sec.RENTAL || "", scenarios: sec.SCENARIOS || "",

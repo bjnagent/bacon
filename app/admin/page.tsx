@@ -1,6 +1,9 @@
 import { notFound } from "next/navigation";
 import { requireAdmin, loadOverview, loadUsers } from "@/lib/admin";
 import AdminConsole from "@/components/AdminConsole";
+// The operator console keeps the original dense "instrument" styling: it is an
+// internal tool, and the product design system deliberately dropped that look.
+import "@/app/legacy.css";
 
 // The operator console. Gated server-side: a signed-in non-admin gets a plain
 // 404, so the route's existence isn't advertised. The APIs re-check

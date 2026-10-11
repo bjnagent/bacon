@@ -1,41 +1,53 @@
-// One-shot: rasterize the bacon mark into the PWA icon set (PNG) using headless
-// Chromium. Outputs to public/icons/. Re-run only if the mark changes.
-import { chromium } from "playwright-core";
-import { mkdirSync, writeFileSync } from "node:fs";
+// Rasterize the Bacon mark into the PWA icon set (PNG) for browsers' "Add to
+// Home Screen". Same sources as the iOS app icon (resources/icon.svg,
+// resources/mark.svg — see scripts/gen-ios-assets.mjs), rendered with sharp
+// (already installed as Next.js's image optimizer; no browser needed).
+//
+//   node scripts/gen-icons.mjs [outDir]     (default: public/icons)
+//
+// Re-run only if the mark changes.
+import sharp from "sharp";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
-const stripes = (inset, w) => {
-  const hues = ["#E0A33E", "#38B6C4", "#9B86E0", "#E2685C", "#5FB97E", "#6FA1CE"];
-  const wave = (y) => `M6 ${y} C 16 ${y - 5}, 24 ${y + 5}, 32 ${y} C 40 ${y - 5}, 48 ${y + 5}, 58 ${y}`;
-  return hues.map((h, i) => `<path d="${wave(18 + i * 5.6)}" stroke="${h}" stroke-width="${w}" fill="none" stroke-linecap="round"/>`).join("");
-};
+const root = fileURLToPath(new URL("..", import.meta.url));
+const out = process.argv[2] || `${root}public/icons`;
+mkdirSync(out, { recursive: true });
 
-// tile: rounded dark card (transparent corners) — regular icons.
-// bleed: full-square dark background, mark scaled into the safe zone — maskable/apple.
-function svg(size, { bleed = false, scale = 1 } = {}) {
-  const r = bleed ? 0 : Math.round(size * 0.2);
-  const g = (size / 64) * scale;
-  const off = (size - 64 * g) / 2;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">
-    <rect width="${size}" height="${size}" rx="${r}" fill="#1A1712"/>
-    <g transform="translate(${off},${off}) scale(${g})"><g transform="rotate(-14 32 32)">${stripes(0, 4.2)}</g></g>
-  </svg>`;
+const iconSvg = readFileSync(`${root}resources/icon.svg`);
+const markSvg = readFileSync(`${root}resources/mark.svg`);
+const BG = "#110E0A";
+
+/** Full-bleed square (the platform applies its own mask): apple-touch-icon. */
+async function fullBleed(size) {
+  return sharp(iconSvg, { density: (72 * size) / 1024 }).resize(size, size).flatten({ background: BG }).removeAlpha().png({ compressionLevel: 9 }).toBuffer();
 }
 
-const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
-mkdirSync("public/icons", { recursive: true });
+/** Rounded tile with transparent corners: the regular "any" icons. */
+async function tile(size) {
+  const r = Math.round(size * 0.225);
+  const mask = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><rect width="${size}" height="${size}" rx="${r}" fill="#fff"/></svg>`);
+  return sharp(await fullBleed(size)).ensureAlpha().composite([{ input: mask, blend: "dest-in" }]).png({ compressionLevel: 9 }).toBuffer();
+}
+
+/** Maskable: full-bleed background, the mark kept inside the 80% safe circle. */
+async function maskable(size) {
+  const markPx = Math.round(size * 0.62);
+  const mark = await sharp(markSvg, { density: (72 * markPx) / 64 }).resize(markPx, markPx).png().toBuffer();
+  const bg = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><defs><radialGradient id="g" cx="50%" cy="38%" r="75%"><stop offset="0" stop-color="#2A221A"/><stop offset="1" stop-color="${BG}"/></radialGradient></defs><rect width="${size}" height="${size}" fill="url(#g)"/></svg>`);
+  const left = Math.round((size - markPx) / 2);
+  const top = Math.round((size - markPx) / 2 - markPx * (4 / 64)); // optical centre: the strip sits low in its box
+  return sharp(bg).composite([{ input: mark, left, top }]).flatten({ background: BG }).removeAlpha().png({ compressionLevel: 9 }).toBuffer();
+}
+
 const jobs = [
-  ["icon-192.png", svg(192), 192],
-  ["icon-512.png", svg(512), 512],
-  ["icon-maskable-512.png", svg(512, { bleed: true, scale: 0.66 }), 512],
-  ["apple-touch-icon.png", svg(180, { bleed: true, scale: 0.78 }), 180],
+  ["icon-192.png", () => tile(192)],
+  ["icon-512.png", () => tile(512)],
+  ["icon-maskable-512.png", () => maskable(512)],
+  ["apple-touch-icon.png", () => fullBleed(180)],
 ];
-for (const [file, markup, size] of jobs) {
-  const ctx = await browser.newContext({ viewport: { width: size, height: size }, deviceScaleFactor: 1 });
-  const p = await ctx.newPage();
-  await p.setContent(`<body style="margin:0">${markup}</body>`);
-  const buf = await p.screenshot({ clip: { x: 0, y: 0, width: size, height: size }, omitBackground: true });
-  writeFileSync(`public/icons/${file}`, buf);
-  await ctx.close();
+for (const [file, make] of jobs) {
+  const buf = await make();
+  writeFileSync(`${out}/${file}`, buf);
   console.log(file, buf.length, "bytes");
 }
-await browser.close();

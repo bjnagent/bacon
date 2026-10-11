@@ -1,0 +1,99 @@
+"use client";
+
+import { useEffect, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { X } from "lucide-react";
+
+// Open sheets, innermost last. Only the top one answers Escape and traps Tab:
+// with the paywall opened over chat, Escape must close the paywall, not the
+// chat underneath (stopPropagation can't stop other listeners on document).
+const stack: symbol[] = [];
+
+/**
+ * Bottom sheet on phones, centred dialog (or side panel) on desktop. Escape and
+ * the backdrop close it; focus moves in on open and back out on close; the page
+ * behind stops scrolling while it is up.
+ */
+export function Sheet({ open, onClose, title, children, footer, variant = "dialog", full, labelledBy, initialFocus = "first" }: {
+  open: boolean;
+  onClose: () => void;
+  title?: ReactNode;
+  children: ReactNode;
+  footer?: ReactNode;
+  variant?: "dialog" | "wide" | "side";
+  full?: boolean;
+  labelledBy?: string;
+  /**
+   * What gets focus on open. "first" (default) focuses the first field;
+   * "sheet" focuses the sheet itself, so on iPhone the keyboard doesn't cover
+   * an explanation the user needs to read first (e.g. delete account).
+   */
+  initialFocus?: "first" | "sheet";
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const lastFocus = useRef<Element | null>(null);
+  // Latest onClose without making it an effect dependency: callers pass inline
+  // functions, and re-running the open effect on every render bounced focus
+  // (and the iOS keyboard) on each keystroke.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; });
+
+  useEffect(() => {
+    if (!open) return;
+    const me = Symbol("sheet");
+    stack.push(me);
+    const isTop = () => stack[stack.length - 1] === me;
+    lastFocus.current = document.activeElement;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const id = requestAnimationFrame(() => {
+      // [autofocus] first, explicitly: a combined selector returns whichever
+      // match comes first in the document, not the one marked autofocus.
+      const el = initialFocus === "sheet"
+        ? ref.current
+        : ref.current?.querySelector<HTMLElement>("[autofocus]")
+          ?? ref.current?.querySelector<HTMLElement>("input, textarea, button:not([data-sheet-close])")
+          ?? ref.current;
+      el?.focus({ preventScroll: true });
+    });
+    const onKey = (e: KeyboardEvent) => {
+      if (!isTop()) return;
+      if (e.key === "Escape") { e.stopPropagation(); onCloseRef.current(); return; }
+      if (e.key !== "Tab" || !ref.current) return;
+      const f = ref.current.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), textarea, select, [tabindex]:not([tabindex="-1"])');
+      if (!f.length) return;
+      const first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      const i = stack.indexOf(me);
+      if (i >= 0) stack.splice(i, 1);
+      cancelAnimationFrame(id);
+      document.body.style.overflow = prevOverflow;
+      document.removeEventListener("keydown", onKey);
+      (lastFocus.current as HTMLElement | null)?.focus?.({ preventScroll: true });
+    };
+  }, [open, initialFocus]);
+
+  if (!open || typeof document === "undefined") return null;
+  const cls = ["ui-sheet", variant === "wide" && "is-wide", variant === "side" && "is-side", full && "is-full"].filter(Boolean).join(" ");
+  return createPortal(
+    <>
+      <div className="ui-backdrop" onClick={onClose} aria-hidden="true" />
+      <div ref={ref} className={cls} role="dialog" aria-modal="true" aria-labelledby={labelledBy} aria-label={!labelledBy && typeof title === "string" ? title : undefined} tabIndex={-1}>
+        <div className="ui-sheet-grabber" aria-hidden="true" />
+        {title !== undefined && (
+          <div className="ui-sheet-head">
+            <div className="ui-sheet-title">{title}</div>
+            <button type="button" className="ui-iconbtn" aria-label="Close" data-sheet-close onClick={onClose}><X /></button>
+          </div>
+        )}
+        <div className="ui-sheet-body">{children}</div>
+        {footer && <div className="ui-sheet-foot">{footer}</div>}
+      </div>
+    </>,
+    document.body,
+  );
+}

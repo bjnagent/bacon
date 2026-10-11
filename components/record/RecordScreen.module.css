@@ -1,0 +1,39 @@
+.card {
+  display: flex; flex-direction: column; gap: var(--s-4); min-width: 0;
+  padding: var(--s-5); border-radius: var(--r-lg);
+  background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-1);
+}
+.cardTitle { font-family: var(--font-display); font-size: var(--fs-lg); font-weight: 600; letter-spacing: -0.01em; line-height: 1.3; }
+.cardNote { font-size: var(--fs-xs); color: var(--text-3); line-height: 1.5; }
+
+@media (max-width: 559px) {
+  .card { padding: var(--s-4); }
+}
+
+.emptyCard { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); }
+
+/* Sits in the subtitle so it never squeezes the title column on a phone. */
+.howBtn {
+  display: inline-flex; align-items: center; gap: 5px; vertical-align: baseline;
+  min-height: 44px; margin: -12px 0; padding: 0 2px;
+  color: var(--accent-text); font-weight: 600; font-size: var(--fs-md); white-space: nowrap;
+}
+.howBtn svg { width: 16px; height: 16px; align-self: center; }
+.howBtn:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+.errBody { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-2); }
+
+.quiet { font-size: var(--fs-sm); color: var(--text-2); }
+
+.inlineLink { color: var(--accent-text); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+
+.disclaimer { font-size: var(--fs-xs); color: var(--text-3); text-align: center; padding-top: var(--s-2); }
+
+/* How grading works sheet */
+.how { display: flex; flex-direction: column; gap: var(--s-5); }
+.howLead { font-size: var(--fs-md); color: var(--text-2); line-height: 1.55; }
+.houseLink {
+  display: inline-flex; align-items: center; gap: 6px; align-self: flex-start;
+  min-height: 44px; font-weight: 600; color: var(--accent-text);
+}
+.houseLink svg { width: 16px; height: 16px; }

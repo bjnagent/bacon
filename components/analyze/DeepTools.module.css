@@ -1,0 +1,137 @@
+.ul,
+.ol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding-left: 20px;
+  font-size: var(--fs-md);
+  line-height: 1.5;
+}
+
+.ul { list-style: disc; }
+.ol { list-style: decimal; }
+
+.ul li::marker,
+.ol li::marker {
+  color: var(--text-3);
+}
+
+.ul strong,
+.ol strong {
+  font-weight: 600;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.sideHead {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+
+.sideHead svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.side[data-tone="pos"] .sideHead svg { color: var(--pos); }
+.side[data-tone="neg"] .sideHead svg { color: var(--neg); }
+
+.prose {
+  margin-top: 6px;
+  font-size: var(--fs-md);
+  line-height: 1.55;
+}
+
+.persona {
+  position: relative;
+  overflow: hidden;
+  padding-left: calc(var(--s-4) + 4px);
+}
+
+.persona::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--hue);
+}
+
+.personaHead {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.personaName {
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+
+.rtVerdict {
+  border-left-width: 4px;
+}
+
+.rtVerdict[data-tone="pos"] { border-left-color: var(--pos); }
+.rtVerdict[data-tone="warn"] { border-left-color: var(--warn); }
+.rtVerdict[data-tone="neg"] { border-left-color: var(--neg); }
+
+.rtCall {
+  margin-top: 4px;
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.locked {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-3);
+}
+
+.lockIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+
+.lockIcon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.lockedBody {
+  color: var(--text-2);
+  max-width: 560px;
+}
+
+.working {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+.retry {
+  margin-top: var(--s-2);
+}
+
+.inlineAction {
+  font-weight: 600;
+  color: var(--accent-text);
+  min-height: 32px;
+}
