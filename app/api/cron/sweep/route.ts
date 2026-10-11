@@ -11,7 +11,7 @@ import { generateBrief, briefToRows, briefToDailyRow, splitVoices } from "@/lib/
 import { sendBriefEmail, emailEnabled } from "@/lib/email";
 import { mapClass } from "@/lib/lenses";
 import { orEmpty, orNull, swallowed } from "@/lib/log";
-import { adviceEmails, adviceEnabled } from "@/lib/advice";
+import { adviceEmails, adviceEnabled, isHouseAccount } from "@/lib/advice";
 import { getForecasts } from "@/lib/forecast";
 import { getForecastMemo, recordForecasts } from "@/lib/forecastRecord";
 import { getCachedSeries } from "@/lib/priceCache";
@@ -195,7 +195,8 @@ async function sweepUser(admin: SupabaseClient, s: SettingsRow, acct: CronAccoun
   // Advice mode is an account entitlement keyed by email. The plan lookup
   // already returned it; the per-account fallback only fetches one when an
   // allowlist exists to match it against.
-  const advice = adviceEmails().length ? adviceEnabled(await emailFor(admin, acct)) : false;
+  // Never for the house account: its brief is broadcast to every free member.
+  const advice = !isHouseAccount(userId) && (adviceEmails().length ? adviceEnabled(await emailFor(admin, acct)) : false);
   const voices = splitVoices(s.voices);
 
   const [{ data: themes }, { data: items }, { data: cachedNews }] = await Promise.all([

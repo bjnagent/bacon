@@ -61,13 +61,16 @@ async function get() {
 }
 
 describe("GET /api/brief", () => {
-  it("gives a free member the house brief, levels included", async () => {
+  it("gives a free member the house brief, without advice-mode levels", async () => {
     vi.stubEnv("HOUSE_USER_ID", HOUSE);
     const { status, body } = await get();
     expect(status).toBe(200);
     expect(body.house).toBe(true);
     expect(body.brief.items.map((i) => i.name)).toEqual(["House Co"]);
-    expect(body.brief.items[0]).toMatchObject({ stop: "40", entry: "44–46" });
+    // Entry / stop / size are never broadcast to free members, even when the
+    // house account's stored brief carries them.
+    expect(body.brief.items[0].stop).toBeUndefined();
+    expect(body.brief.items[0].entry).toBeUndefined();
     // Read through the service role, scoped to the house account only.
     expect(adminCalls.every((c) => c.eqs.user_id === HOUSE)).toBe(true);
   });

@@ -30,3 +30,20 @@ export function adviceEnabled(email: string | null | undefined): boolean {
   if (!list.length) return false;
   return !!email && list.includes(email.toLowerCase());
 }
+
+/**
+ * The shared house account (HOUSE_USER_ID). Its brief is the one every Free
+ * member reads, so it is the one account whose output must never be written in
+ * advice mode — whatever allowlist its email happens to be on. A directive
+ * call to yourself is your business; the same call broadcast to every free
+ * member is regulated advice.
+ */
+export function isHouseAccount(userId: string | null | undefined): boolean {
+  const house = (process.env.HOUSE_USER_ID ?? "").trim().toLowerCase();
+  return !!house && !!userId && userId.trim().toLowerCase() === house;
+}
+
+/** Advice mode for one account: the allowlist, and never the house account. */
+export function adviceFor(userId: string | null | undefined, email: string | null | undefined): boolean {
+  return !isHouseAccount(userId) && adviceEnabled(email);
+}

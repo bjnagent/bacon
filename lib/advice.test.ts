@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { adviceEnabled } from "./advice";
+import { adviceEnabled, adviceFor, isHouseAccount } from "./advice";
 
 const set = (env: Record<string, string | undefined>) => {
   for (const [k, v] of Object.entries(env)) {
@@ -7,7 +7,7 @@ const set = (env: Record<string, string | undefined>) => {
     else process.env[k] = v;
   }
 };
-afterEach(() => { set({ ADVICE_EMAILS: undefined, ADMIN_EMAILS: undefined }); vi.restoreAllMocks(); });
+afterEach(() => { set({ ADVICE_EMAILS: undefined, ADMIN_EMAILS: undefined, HOUSE_USER_ID: undefined }); vi.restoreAllMocks(); });
 
 describe("adviceEnabled", () => {
   it("entitles only the listed accounts", () => {
@@ -36,5 +36,28 @@ describe("adviceEnabled", () => {
   it("treats an empty ADVICE_EMAILS as unset rather than as an empty allowlist", () => {
     set({ ADVICE_EMAILS: "   ", ADMIN_EMAILS: "owner@example.com" });
     expect(adviceEnabled("owner@example.com")).toBe(true);
+  });
+});
+
+describe("house account", () => {
+  const HOUSE = "6f1c2a3b-0000-4000-8000-00000000abcd";
+
+  it("is recognised by id, whatever the case or whitespace in the env", () => {
+    set({ HOUSE_USER_ID: ` ${HOUSE.toUpperCase()} ` });
+    expect(isHouseAccount(HOUSE)).toBe(true);
+    expect(isHouseAccount("00000000-0000-4000-8000-000000000001")).toBe(false);
+    expect(isHouseAccount(null)).toBe(false);
+  });
+
+  it("is nobody when HOUSE_USER_ID is unset", () => {
+    expect(isHouseAccount(HOUSE)).toBe(false);
+  });
+
+  it("never gets advice mode, even when its email is on the allowlist", () => {
+    // The house brief is broadcast to every free member: a directive call
+    // there is advice to people who never asked for it.
+    set({ HOUSE_USER_ID: HOUSE, ADVICE_EMAILS: "owner@example.com" });
+    expect(adviceFor(HOUSE, "owner@example.com")).toBe(false);
+    expect(adviceFor("00000000-0000-4000-8000-000000000001", "owner@example.com")).toBe(true);
   });
 });
