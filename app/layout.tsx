@@ -29,6 +29,9 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  // Android Chrome: shrink the layout viewport for the on-screen keyboard so the
+  // chat composer and sheets stay above it (iOS handles this in the native shell).
+  interactiveWidget: "resizes-content",
 };
 
 // Runs before first paint: apply a pinned theme and flag the native shell, so

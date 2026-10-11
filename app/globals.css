@@ -414,7 +414,9 @@ button.ui-row:hover, a.ui-row:hover { background: var(--surface-2); }
   transition: background var(--dur-1), color var(--dur-1), box-shadow var(--dur-1);
 }
 .ui-seg-btn[aria-selected="true"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow-1); }
-.ui-seg-btn svg { width: 15px; height: 15px; }
+.ui-seg-btn svg { width: 15px; height: 15px; flex-shrink: 0; max-width: none; }
+/* An overflowing control scrolls; its buttons must not squash instead. */
+.ui-seg-btn { flex-shrink: 0; }
 .ui-seg--block { display: flex; width: 100%; }
 .ui-seg--block .ui-seg-btn { flex: 1; }
 

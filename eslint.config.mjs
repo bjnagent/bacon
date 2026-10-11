@@ -16,6 +16,8 @@ const eslintConfig = defineConfig([
     // source-of-truth, never imported/built) and one-shot build scripts.
     "reference/**",
     "scripts/**",
+    // The native iOS project (Capacitor template + generated web assets).
+    "ios/**",
   ]),
 ]);
 

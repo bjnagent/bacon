@@ -80,7 +80,7 @@ export default function AlertSettings({ title, voicesOpen, setVoicesOpen }: {
   );
 
   /** A boolean preference row: a switch when the plan includes it, a paywall door when it doesn't. */
-  const toggleRow = (o: { feature?: Feature; icon: ReactNode; title: string; sub: ReactNode; checked: boolean; patch: (v: boolean) => SettingsPatch; what: string }) => {
+  const toggleRow = (o: { feature?: Feature; icon: ReactNode; title: string; sub: ReactNode; checked: boolean; patch: (v: boolean) => SettingsPatch; what: string; before?: (v: boolean) => Promise<boolean> }) => {
     if (o.feature && locked(o.feature)) {
       const f = o.feature;
       return <Row key={o.title} icon={o.icon} title={o.title} sub={o.sub} trailing={lockBadge(f)} onClick={() => unlock(f)} />;
@@ -88,7 +88,10 @@ export default function AlertSettings({ title, voicesOpen, setVoicesOpen }: {
     return (
       <Row
         key={o.title} icon={o.icon} title={o.title} sub={o.sub}
-        trailing={<Switch label={o.title} checked={o.checked} onChange={(v) => void save(o.patch(v), o.what)} />}
+        trailing={<Switch label={o.title} checked={o.checked} onChange={(v) => void (async () => {
+          if (o.before && !(await o.before(v))) return;
+          await save(o.patch(v), o.what);
+        })()} />}
       />
     );
   };
@@ -132,6 +135,21 @@ export default function AlertSettings({ title, voicesOpen, setVoicesOpen }: {
             icon: <Bell />, title: "Push notifications",
             sub: "Your brief, kill-condition alerts and price levels",
             checked: settings.push_enabled, patch: (v) => ({ push_enabled: v }), what: "notifications",
+            // Turning push ON is the moment to ask iOS — never at launch. The
+            // preference only means something once the device is registered.
+            before: async (on) => {
+              if (!on) return true;
+              const { requestPushPermission } = await import("@/lib/client/push");
+              const perm = await requestPushPermission();
+              if (perm === "granted") return true;
+              if (perm === "denied") {
+                toast.error("Notifications are off for Bacon in iOS Settings.", {
+                  label: "Open Settings",
+                  run: () => window.location.assign("app-settings:"),
+                });
+              }
+              return false;
+            },
           })
           : <Row icon={<Bell />} title="Notifications" sub="Alerts come by email here, and as push notifications in the iOS app" />}
         {locked("personal_brief")

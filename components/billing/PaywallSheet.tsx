@@ -48,7 +48,7 @@ export default function PaywallSheet() {
     setBusy(plan);
     track("action", "upgrade-start", `${plan}:${interval}`);
     try {
-      const r = await startUpgrade(plan, interval);
+      const r = await startUpgrade(plan, interval, app.me);
       if (r === "purchased") {
         await app.refreshMe();
         toast(`Welcome to ${PLANS[plan].name}.`);
@@ -65,7 +65,7 @@ export default function PaywallSheet() {
   const restore = async () => {
     setBusy("restore");
     try {
-      const ok = await restorePurchases();
+      const ok = await restorePurchases(app.me);
       await app.refreshMe();
       toast(ok ? "Purchases restored." : "No previous purchases found.", { kind: ok ? "success" : "info" });
       if (ok) close();

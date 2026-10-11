@@ -121,6 +121,9 @@ export default function AccountScreen({ active }: { active: boolean }) {
       // fetch rather than a <form> post so that being offline becomes a toast
       // here instead of a browser error page; the redirect isn't followed
       // (the cookies are already cleared by then) — we navigate ourselves.
+      // Stop this device receiving the account's alerts before the session goes
+      // (the unregister call needs it). Best effort: a no-op on the web.
+      await import("@/lib/client/push").then((m) => m.unregisterPush()).catch(() => {});
       const res = await fetch("/api/auth/signout", { method: "POST", redirect: "manual" });
       if (!res.ok && res.type !== "opaqueredirect") throw new Error(`signout ${res.status}`);
       // Full reload, not the router: nothing of this account may survive in memory.

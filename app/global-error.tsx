@@ -1,7 +1,13 @@
 "use client";
 
+import { useEffect } from "react";
+import { hideSplash } from "@/lib/native";
+
 // Catches errors in the root layout itself (must render its own <html>/<body>).
 export default function GlobalError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  // This replaces the root layout, so nothing else will lift the iOS launch
+  // screen: without this a fatal first-launch error would sit behind it.
+  useEffect(() => { hideSplash(); }, []);
   return (
     <html lang="en">
       <body style={{ margin: 0, background: "#F6F4EF", color: "#1B1712", fontFamily: "system-ui, sans-serif", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>

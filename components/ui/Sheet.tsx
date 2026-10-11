@@ -4,6 +4,11 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
+// Open sheets, innermost last. Only the top one answers Escape and traps Tab:
+// with the paywall opened over chat, Escape must close the paywall, not the
+// chat underneath (stopPropagation can't stop other listeners on document).
+const stack: symbol[] = [];
+
 /**
  * Bottom sheet on phones, centred dialog (or side panel) on desktop. Escape and
  * the backdrop close it; focus moves in on open and back out on close; the page
@@ -35,16 +40,24 @@ export function Sheet({ open, onClose, title, children, footer, variant = "dialo
 
   useEffect(() => {
     if (!open) return;
+    const me = Symbol("sheet");
+    stack.push(me);
+    const isTop = () => stack[stack.length - 1] === me;
     lastFocus.current = document.activeElement;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const id = requestAnimationFrame(() => {
+      // [autofocus] first, explicitly: a combined selector returns whichever
+      // match comes first in the document, not the one marked autofocus.
       const el = initialFocus === "sheet"
         ? ref.current
-        : ref.current?.querySelector<HTMLElement>("[autofocus], input, textarea, button:not([data-sheet-close])") ?? ref.current;
+        : ref.current?.querySelector<HTMLElement>("[autofocus]")
+          ?? ref.current?.querySelector<HTMLElement>("input, textarea, button:not([data-sheet-close])")
+          ?? ref.current;
       el?.focus({ preventScroll: true });
     });
     const onKey = (e: KeyboardEvent) => {
+      if (!isTop()) return;
       if (e.key === "Escape") { e.stopPropagation(); onCloseRef.current(); return; }
       if (e.key !== "Tab" || !ref.current) return;
       const f = ref.current.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), textarea, select, [tabindex]:not([tabindex="-1"])');
@@ -55,6 +68,8 @@ export function Sheet({ open, onClose, title, children, footer, variant = "dialo
     };
     document.addEventListener("keydown", onKey);
     return () => {
+      const i = stack.indexOf(me);
+      if (i >= 0) stack.splice(i, 1);
       cancelAnimationFrame(id);
       document.body.style.overflow = prevOverflow;
       document.removeEventListener("keydown", onKey);

@@ -68,11 +68,11 @@ export default function PlanCard({ me, refreshMe }: { me: MeState; refreshMe: ()
   const restore = async () => {
     setBusy("restore");
     try {
-      const ok = await restorePurchases();
+      const ok = await restorePurchases(me);
       await refreshMe();
       toast(ok ? "Purchases restored." : "No previous purchases found.", { kind: ok ? "success" : "info" });
-    } catch {
-      toast.error("Couldn't reach the App Store — try again.");
+    } catch (err) {
+      toast.error(err instanceof Error && err.message ? err.message : "Couldn't reach the App Store — try again.");
     } finally {
       setBusy(null);
     }
