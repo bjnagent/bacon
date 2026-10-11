@@ -4,7 +4,7 @@ import { gate } from "@/lib/entitlements";
 import { askCheap } from "@/lib/ai";
 import { newsPrompt } from "@/lib/prompts";
 import { parseNews } from "@/lib/parsers";
-import { NEWS_COLUMNS } from "@/lib/types";
+import { NEWS_COLUMNS, NEWS_COLUMNS_LEGACY } from "@/lib/types";
 import { withinQuota, QUOTA_MESSAGE } from "@/lib/quota";
 import { swallowed } from "@/lib/log";
 
@@ -17,7 +17,11 @@ export async function GET() {
   if (isResponse(auth)) return auth;
   const { sb, user } = auth;
 
-  const { data, error } = await sb.from("news_items").select(NEWS_COLUMNS).eq("user_id", user.id).order("created_at", { ascending: false });
+  const read = (cols: string) => sb.from("news_items").select(cols).eq("user_id", user.id).order("created_at", { ascending: false });
+  let { data, error } = await read(NEWS_COLUMNS);
+  // 42703 = undefined column: the `lean` migration hasn't run yet. Serve the
+  // headlines without it rather than failing the whole pane.
+  if (error?.code === "42703") ({ data, error } = await read(NEWS_COLUMNS_LEGACY));
   if (error) {
     swallowed("news: read", error);
     return fail(500, "Couldn't load headlines — please try again.", { code: "read_failed" });
@@ -67,6 +71,7 @@ export async function POST(req: Request) {
       symbol: n.ticker,
       asset_class: n.cls,
       signal: n.signal,
+      lean: n.lean,
       recency: n.when,
     })) });
     return NextResponse.json({ result, remaining: g.remaining }, { headers: { "Cache-Control": "no-store" } });

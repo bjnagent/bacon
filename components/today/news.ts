@@ -5,21 +5,24 @@ import { ago, type Tone } from "./brief";
 /** GET /api/news rows (the shape persisted by replace_news). */
 export interface NewsRow {
   id?: string; headline: string; source: string; why: string; symbol: string;
-  asset_class: string; signal: string; recency: string; created_at?: string;
+  asset_class: string; signal: string; lean?: string | null; recency: string; created_at?: string;
 }
 
 /** POST /api/news → `result.items` (the parser's shape). */
-export interface NewsParsed { head: string; source: string; why: string; ticker: string; cls: string; signal: string; when: string }
+export interface NewsParsed { head: string; source: string; why: string; ticker: string; cls: string; signal: string; lean?: string; when: string }
 
 export interface Headline {
   key: string; head: string; source: string; why: string; ticker: string; cls: string;
   signal: string; when: string; createdAt: string | null;
+  /** Which way it points: the model's explicit lean, else read from the tag. */
+  lean: Lean | null;
 }
 
 export function fromRow(r: NewsRow, i: number): Headline {
   return {
     key: r.id ?? `row-${i}`, head: r.headline, source: r.source, why: r.why, ticker: r.symbol,
     cls: r.asset_class, signal: r.signal, when: r.recency, createdAt: r.created_at ?? null,
+    lean: explicitLean(r.lean) ?? signalLean(r.signal),
   };
 }
 
@@ -27,6 +30,7 @@ export function fromParsed(n: NewsParsed, i: number, createdAt: string): Headlin
   return {
     key: `fresh-${i}-${n.head.slice(0, 24)}`, head: n.head, source: n.source, why: n.why, ticker: n.ticker,
     cls: n.cls, signal: n.signal, when: n.when, createdAt,
+    lean: explicitLean(n.lean) ?? signalLean(n.signal),
   };
 }
 
@@ -49,8 +53,21 @@ export function signalLean(signal: string | undefined | null): Lean | null {
 }
 
 export function leanTone(signal: string | undefined | null): Tone {
-  const l = signalLean(signal);
+  return toneOf(signalLean(signal));
+}
+
+export function toneOf(l: Lean | null): Tone {
   return l === "constructive" ? "pos" : l === "cautious" ? "neg" : "neutral";
+}
+
+/**
+ * The model's own `lean:` line. "neutral" (or anything unrecognised) is null —
+ * and null falls back to the tag, so older batches without the field still
+ * filter on Upgrade/Downgrade.
+ */
+export function explicitLean(v: string | undefined | null): Lean | null {
+  const s = (v ?? "").trim().toLowerCase();
+  return s.startsWith("construct") ? "constructive" : s.startsWith("cautio") ? "cautious" : null;
 }
 
 /** Sentence-case a tag for display ("constructive" → "Constructive", "M&A" stays). */
@@ -70,8 +87,8 @@ export type NewsFilter = "all" | Lean | `tag:${string}`;
 export function newsFilters(items: Headline[]): { id: NewsFilter; label: string; count: number }[] {
   const out: { id: NewsFilter; label: string; count: number }[] = [
     { id: "all", label: "All", count: items.length },
-    { id: "constructive", label: "Constructive", count: items.filter((n) => signalLean(n.signal) === "constructive").length },
-    { id: "cautious", label: "Cautious", count: items.filter((n) => signalLean(n.signal) === "cautious").length },
+    { id: "constructive", label: "Constructive", count: items.filter((n) => n.lean === "constructive").length },
+    { id: "cautious", label: "Cautious", count: items.filter((n) => n.lean === "cautious").length },
   ];
   const tags = new Map<string, number>();
   for (const n of items) {
@@ -85,7 +102,7 @@ export function newsFilters(items: Headline[]): { id: NewsFilter; label: string;
 
 export function matchesFilter(n: Headline, f: NewsFilter): boolean {
   if (f === "all") return true;
-  if (f === "constructive" || f === "cautious") return signalLean(n.signal) === f;
+  if (f === "constructive" || f === "cautious") return n.lean === f;
   return tagLabel(n.signal) === f.slice(4);
 }
 

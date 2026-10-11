@@ -245,6 +245,7 @@ async function sweepUser(admin: SupabaseClient, s: SettingsRow, acct: CronAccoun
     macro: mw.macro,
     themes: themeLabels,
     tracked: tracked.map((t) => t.symbol),
+    audience: userId === houseUserId() ? "house" : "personal",
     insiders: mw.insiders,
     odds: mw.odds,
     forecasts,
@@ -295,7 +296,7 @@ async function sweepUser(admin: SupabaseClient, s: SettingsRow, acct: CronAccoun
   if (newsRes && newsRes.items.length) {
     const { error } = await admin.rpc("replace_news", { p_user: userId, p_rows: newsRes.items.map((n) => ({
       headline: n.head, source: n.source, why: n.why,
-      symbol: n.ticker, asset_class: n.cls, signal: n.signal, recency: n.when,
+      symbol: n.ticker, asset_class: n.cls, signal: n.signal, lean: n.lean, recency: n.when,
     })) });
     if (error) swallowed(`sweep: replace_news ${userId}`, error);
   }

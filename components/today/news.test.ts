@@ -1,8 +1,27 @@
 import { describe, it, expect } from "vitest";
-import { fromParsed, fromRow, matchesFilter, newsFilters, recencyLabel, signalLean, tagLabel, type Headline } from "./news";
+import { explicitLean, fromParsed, fromRow, matchesFilter, newsFilters, recencyLabel, signalLean, tagLabel, type Headline } from "./news";
 
 const h = (signal: string, over: Partial<Headline> = {}): Headline => ({
-  key: signal, head: "h", source: "Reuters", why: "w", ticker: "TSM", cls: "Equity", signal, when: "2h", createdAt: null, ...over,
+  key: signal, head: "h", source: "Reuters", why: "w", ticker: "TSM", cls: "Equity", signal, when: "2h", createdAt: null,
+  lean: signalLean(signal), ...over,
+});
+
+describe("explicit lean", () => {
+  it("prefers the model's lean line over the tag, and treats neutral as none", () => {
+    expect(explicitLean("Constructive")).toBe("constructive");
+    expect(explicitLean("cautious")).toBe("cautious");
+    expect(explicitLean("neutral")).toBeNull();
+    expect(explicitLean(undefined)).toBeNull();
+    const row = { headline: "x", source: "FT", why: "w", symbol: "TSM", asset_class: "Equity", signal: "Earnings", recency: "2h" };
+    expect(fromRow({ ...row, lean: "cautious" }, 0).lean).toBe("cautious");
+    // Older batches (no lean column) still read direction from the tag.
+    expect(fromRow({ ...row, signal: "Upgrade" }, 0).lean).toBe("constructive");
+    expect(fromRow(row, 0).lean).toBeNull();
+  });
+
+  it("filters an Earnings headline by its explicit lean", () => {
+    expect(matchesFilter(h("Earnings", { lean: "constructive" }), "constructive")).toBe(true);
+  });
 });
 
 describe("signalLean", () => {

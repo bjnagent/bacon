@@ -406,6 +406,7 @@ why: <one line: why it matters to an investor>
 ticker: <single most-implicated symbol, or —>
 class: <Equity / ETF / FX / Crypto / Commodity / Bond, or —>
 signal: <short tag: Earnings / Guidance / M&A / Macro / Regulatory / Upgrade / Downgrade / Product / Flows / Insider>
+lean: <constructive | cautious | neutral — which way this news points for the implicated asset; neutral when it is mixed or unclear>
 when: <relative recency if known, e.g. "2h", "today", or —>
 @@ITEM@@
 ...

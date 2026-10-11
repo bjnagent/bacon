@@ -11,7 +11,7 @@ import { invalidate } from "@/lib/clientCache";
 import { mapClass } from "@/lib/lenses";
 import { hasTicker, type Tone } from "./brief";
 import {
-  fromParsed, fromRow, leanTone, matchesFilter, newsFilters, recencyLabel, tagLabel,
+  fromParsed, fromRow, matchesFilter, toneOf, newsFilters, recencyLabel, tagLabel,
   type Headline, type NewsFilter, type NewsParsed, type NewsRow,
 } from "./news";
 import { useNow } from "./useNow";
@@ -189,7 +189,7 @@ export default function HeadlinesPane({ active, onUpdated }: { active: boolean; 
                   <div className={s.meta}>
                     <span className={s.source}>{n.source || "Newswire"}</span>
                     {when && <><span aria-hidden="true">·</span><span>{when}</span></>}
-                    {tag && <span className={s.tag}><Badge tone={badgeTone(leanTone(n.signal))}>{tag}</Badge></span>}
+                    {tag && <span className={s.tag}><Badge tone={badgeTone(toneOf(n.lean))}>{tag}</Badge></span>}
                   </div>
                   <h3 className={s.head}>{n.head}</h3>
                   {n.why && <p className={s.why}><span className={s.whyLabel}>Why it matters</span> {n.why}</p>}

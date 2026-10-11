@@ -367,10 +367,10 @@ begin
     raise exception 'forbidden';
   end if;
   delete from public.news_items where user_id = p_user;
-  insert into public.news_items (user_id, headline, source, why, symbol, asset_class, signal, recency)
-  select p_user, x.headline, x.source, x.why, x.symbol, x.asset_class, x.signal, x.recency
+  insert into public.news_items (user_id, headline, source, why, symbol, asset_class, signal, lean, recency)
+  select p_user, x.headline, x.source, x.why, x.symbol, x.asset_class, x.signal, nullif(left(x.lean, 20), ''), x.recency
   from jsonb_to_recordset(coalesce(p_rows, '[]'::jsonb)) as x(
-    headline text, source text, why text, symbol text, asset_class text, signal text, recency text);
+    headline text, source text, why text, symbol text, asset_class text, signal text, lean text, recency text);
 end $$;
 revoke execute on function public.replace_news(uuid, jsonb) from public, anon;
 grant  execute on function public.replace_news(uuid, jsonb) to authenticated, service_role;
@@ -1117,6 +1117,10 @@ create index if not exists device_tokens_user on device_tokens (user_id);
 alter table device_tokens enable row level security;
 drop policy if exists "own device_tokens" on device_tokens;
 create policy "own device_tokens" on device_tokens for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+
+-- Which way a headline points (constructive | cautious | neutral) — powers the
+-- Headlines filters. replace_news (above) writes it.
+alter table news_items add column if not exists lean text;
 
 -- Preferences the product surfaces in Settings.
 alter table settings add column if not exists push_enabled boolean default true;

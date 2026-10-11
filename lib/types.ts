@@ -48,11 +48,14 @@ export interface NewsItemRow {
   symbol: string;
   asset_class: string;
   signal: string;
+  lean: string | null;
   recency: string;
   created_at: string;
 }
 
-export const NEWS_COLUMNS = "id,headline,source,why,symbol,asset_class,signal,recency,created_at";
+export const NEWS_COLUMNS = "id,headline,source,why,symbol,asset_class,signal,lean,recency,created_at";
+/** Before the `lean` column existed — read path falls back to this until the migration runs. */
+export const NEWS_COLUMNS_LEGACY = "id,headline,source,why,symbol,asset_class,signal,recency,created_at";
 
 // per-user settings (subset)
 export interface SettingsRow {
