@@ -25,6 +25,9 @@ function headline(req: PaywallRequest, current: PlanId): { title: string; body: 
     if (current === "desk") return { title: `You've used this month's ${lbl.many}`, body: `Your allowance resets on ${resets}.` };
     return { title: `You've used this month's ${req.limit ?? ""} ${req.limit === 1 ? lbl.one : lbl.many}`.replace("  ", " "), body: `It resets on ${resets} — or upgrade now for a bigger monthly allowance.` };
   }
+  if (req.reason === "limit" && req.error) {
+    return { title: req.error, body: "Upgrade for a bigger allowance." };
+  }
   return { title: "Get the full desk", body: "Every plan includes the house brief and the public, graded track record. Paid plans build the brief around you." };
 }
 
