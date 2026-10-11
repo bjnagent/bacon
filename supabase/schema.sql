@@ -1055,6 +1055,7 @@ returns void language sql security definer set search_path = '' as $$
     and period_start = date_trunc('month', now() at time zone 'utc')::date;
 $$;
 revoke execute on function public.release_feature(uuid, text) from public, anon, authenticated;
+grant  execute on function public.release_feature(uuid, text) to service_role;
 
 -- Everything the plan gate needs in ONE round trip: the subscription row, the
 -- account's age (for the reverse trial) and this month's usage. Security
