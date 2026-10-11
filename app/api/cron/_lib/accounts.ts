@@ -50,6 +50,25 @@ export function entitled(acct: CronAccount | undefined, feature: Feature, house:
   return hasFeature(acct.plan, feature);
 }
 
+/** How far short of its cadence an account may be and still count as due (capped at half the cadence). */
+export const CADENCE_SLACK_MS = 3 * 60 * 60_000;
+
+/**
+ * Pure: has an account's sweep cadence lapsed?
+ *
+ * Measured with slack, not exactly. The cron fires once a day but never at the
+ * same second (Vercel only promises the hour on some plans), and `claim` stamps
+ * the moment a run reached the account. Compared exactly, a 24h cadence came up
+ * seconds short on the next day's run, so every daily account was swept every
+ * OTHER day — which is what production did for weeks before this.
+ */
+export function isDue(lastSweepAt: string | null, cadenceMs: number, now: number): boolean {
+  if (!lastSweepAt) return true;
+  const last = new Date(lastSweepAt).getTime();
+  if (!Number.isFinite(last)) return true;
+  return now - last >= cadenceMs - Math.min(CADENCE_SLACK_MS, cadenceMs / 2);
+}
+
 /** Bounded-concurrency map. A worker pool, not fixed batches: one slow item never idles the others. */
 export async function mapPool<T, R>(items: readonly T[], size: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> {
   const out = new Array<R>(items.length);
