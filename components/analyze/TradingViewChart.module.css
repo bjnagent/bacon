@@ -1,0 +1,30 @@
+.frame {
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.host {
+  width: 100%;
+  background: var(--surface);
+}
+
+.attrib {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px var(--s-3);
+  border-top: 1px solid var(--border);
+  font-size: var(--fs-xs);
+  color: var(--text-3);
+}
+
+.attrib a {
+  color: var(--text-2);
+  font-weight: 500;
+}
+
+.attrib a:hover {
+  color: var(--accent-text);
+  text-decoration: underline;
+}

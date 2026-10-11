@@ -1,0 +1,40 @@
+.link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: color var(--dur-1), border-color var(--dur-1);
+}
+
+.link svg {
+  width: 14px;
+  height: 14px;
+}
+
+.link:hover {
+  color: var(--text);
+  border-color: var(--text-3);
+}
+
+/* Keep the pill compact in dense rows but give fingers a 44px target. */
+@media (pointer: coarse) {
+  .link::after {
+    content: "";
+    position: absolute;
+    inset: -8px -4px;
+  }
+}
+
+.square {
+  flex-shrink: 0;
+}
