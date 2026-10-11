@@ -48,6 +48,8 @@ export interface AppApi {
 
   watchlist: WatchItem[];
   watchlistLoaded: boolean;
+  /** The last watchlist load failed (so an empty list is not "nothing tracked"). */
+  watchlistError: boolean;
   refreshWatchlist: () => Promise<void>;
   isTracked: (symbol: string) => boolean;
   /** Add to the watchlist; resolves true on success. Handles toasts + paywall. */

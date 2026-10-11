@@ -27,6 +27,11 @@ export function Sheet({ open, onClose, title, children, footer, variant = "dialo
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const lastFocus = useRef<Element | null>(null);
+  // Latest onClose without making it an effect dependency: callers pass inline
+  // functions, and re-running the open effect on every render bounced focus
+  // (and the iOS keyboard) on each keystroke.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; });
 
   useEffect(() => {
     if (!open) return;
@@ -40,7 +45,7 @@ export function Sheet({ open, onClose, title, children, footer, variant = "dialo
       el?.focus({ preventScroll: true });
     });
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { e.stopPropagation(); onClose(); return; }
+      if (e.key === "Escape") { e.stopPropagation(); onCloseRef.current(); return; }
       if (e.key !== "Tab" || !ref.current) return;
       const f = ref.current.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), textarea, select, [tabindex]:not([tabindex="-1"])');
       if (!f.length) return;
@@ -55,7 +60,7 @@ export function Sheet({ open, onClose, title, children, footer, variant = "dialo
       document.removeEventListener("keydown", onKey);
       (lastFocus.current as HTMLElement | null)?.focus?.({ preventScroll: true });
     };
-  }, [open, onClose, initialFocus]);
+  }, [open, initialFocus]);
 
   if (!open || typeof document === "undefined") return null;
   const cls = ["ui-sheet", variant === "wide" && "is-wide", variant === "side" && "is-side", full && "is-full"].filter(Boolean).join(" ");

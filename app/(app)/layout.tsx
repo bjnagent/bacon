@@ -2,6 +2,10 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isAdminEmail } from "@/lib/admin";
 import AppShell from "@/components/app/AppShell";
+import type { Metadata } from "next";
+
+// The signed-in app is private: nothing under it should be indexed.
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 // The signed-in app. One persistent shell owns every screen; the pages under
 // this layout render nothing themselves — the shell reads the URL and shows the

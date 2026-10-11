@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Sunrise, Bookmark, ScanSearch, History, CircleUser, Search, MessageCircle, Crown } from "lucide-react";
 import BaconMark from "@/components/BaconMark";
@@ -69,6 +69,7 @@ function PlanPill({ me, onUpgrade }: { me: MeState | null; onUpgrade: () => void
 
 export default function AppShell({ email, isAdmin }: { email: string; isAdmin: boolean }) {
   const pathname = usePathname() || "/";
+  const router = useRouter();
   const route = useMemo(() => parsePath(pathname), [pathname]);
   const tab = route.tab;
 
@@ -143,6 +144,24 @@ export default function AppShell({ email, isAdmin }: { email: string; isAdmin: b
     }
   }, [refreshMe]);
 
+  // New accounts that never went through onboarding (e.g. a magic-link sign-up
+  // lands straight here) get sent there once. Only during the reverse trial —
+  // accounts that predate onboarding are left alone — and at most once per
+  // device, so a settings write that fails can never trap anyone in a loop.
+  useEffect(() => {
+    if (me?.plan.source !== "trial") return;
+    let seen = false;
+    try { seen = localStorage.getItem("bacon-onboarding-offered") === "1"; } catch { /* storage blocked */ }
+    if (seen) return;
+    let live = true;
+    cachedJson<{ settings?: { onboarded_at?: string | null } }>("/api/settings", 60_000).then((d) => {
+      if (!live || !d?.settings || d.settings.onboarded_at) return;
+      try { localStorage.setItem("bacon-onboarding-offered", "1"); } catch { /* storage blocked: still fine, the server flag ends it */ }
+      router.replace("/onboarding");
+    }).catch(() => {});
+    return () => { live = false; };
+  }, [me, router]);
+
   const can = useCallback((f: Feature) => !me || me.features.includes(f) || me.plan.source === "operator" || me.plan.source === "fallback", [me]);
   const remaining = useCallback((m: Meter) => {
     if (!me || me.plan.source === "operator" || me.plan.source === "fallback") return null;
@@ -152,26 +171,35 @@ export default function AppShell({ email, isAdmin }: { email: string; isAdmin: b
   // ---- watchlist (shared by every screen that can "Track") ---------------
   const [watchlist, setWatchlist] = useState<WatchItem[]>([]);
   const [watchlistLoaded, setWatchlistLoaded] = useState(false);
+  const [watchlistError, setWatchlistError] = useState(false);
+  // Mutations read the CURRENT list through this ref: a caller holding an older
+  // closure (an Undo toast, a sheet) must not decide "already tracked" from a
+  // stale copy.
+  const watchlistRef = useRef<WatchItem[]>([]);
+  useEffect(() => { watchlistRef.current = watchlist; }, [watchlist]);
+  const applyWatchlist = useCallback((d: { items?: WatchItem[] } | null) => {
+    if (d && Array.isArray(d.items)) { setWatchlist(d.items); setWatchlistError(false); }
+    else setWatchlistError(true);
+  }, []);
   const refreshWatchlist = useCallback(async () => {
     invalidate("/api/watchlist");
-    try {
-      const d = await cachedJson<{ items?: WatchItem[] }>("/api/watchlist", 30_000);
-      if (Array.isArray(d.items)) setWatchlist(d.items);
-    } catch { /* ignore */ } finally { setWatchlistLoaded(true); }
-  }, []);
+    try { applyWatchlist(await cachedJson<{ items?: WatchItem[] }>("/api/watchlist", 30_000)); }
+    catch { setWatchlistError(true); }
+    finally { setWatchlistLoaded(true); }
+  }, [applyWatchlist]);
   useEffect(() => {
     let live = true;
     cachedJson<{ items?: WatchItem[] }>("/api/watchlist", 30_000)
-      .then((d) => { if (live && Array.isArray(d.items)) setWatchlist(d.items); })
-      .catch(() => {})
+      .then((d) => { if (live) applyWatchlist(d); })
+      .catch(() => { if (live) setWatchlistError(true); })
       .finally(() => { if (live) setWatchlistLoaded(true); });
     return () => { live = false; };
-  }, []);
+  }, [applyWatchlist]);
   const isTracked = useCallback((s: string) => watchlist.some((w) => w.symbol.toUpperCase() === s.trim().toUpperCase()), [watchlist]);
   const trackSymbol = useCallback(async (symbol: string, assetClass?: string) => {
     const sym = symbol.trim().toUpperCase();
     if (!sym) return false;
-    if (watchlist.some((w) => w.symbol === sym)) return true;
+    if (watchlistRef.current.some((w) => w.symbol === sym)) return true;
     const optimistic: WatchItem = { id: `tmp-${sym}`, symbol: sym, asset_class: mapClass(assetClass) };
     setWatchlist((w) => [...w, optimistic]);
     try {
@@ -188,10 +216,10 @@ export default function AppShell({ email, isAdmin }: { email: string; isAdmin: b
       if (!(err instanceof ApiError && err.isUpgrade)) toast.error(err instanceof Error ? err.message : "Couldn't add that — try again.");
       return false;
     }
-  }, [watchlist, navigate]);
+  }, [navigate]);
   const untrackSymbol = useCallback(async (symbol: string) => {
     const sym = symbol.trim().toUpperCase();
-    const item = watchlist.find((w) => w.symbol === sym);
+    const item = watchlistRef.current.find((w) => w.symbol === sym);
     if (!item) return true;
     setWatchlist((w) => w.filter((x) => x.id !== item.id));
     try {
@@ -203,7 +231,7 @@ export default function AppShell({ email, isAdmin }: { email: string; isAdmin: b
       toast.error("Couldn't remove that — try again.");
       return false;
     }
-  }, [watchlist]);
+  }, []);
 
   // ---- analyze / chat / search -----------------------------------------
   const [analyzeRequest, setAnalyzeRequest] = useState<AnalyzeRequest | null>(null);
@@ -249,7 +277,7 @@ export default function AppShell({ email, isAdmin }: { email: string; isAdmin: b
   const api: AppApi = {
     route, navigate, openAnalyze, analyzeRequest, openChat, openSearch,
     email, isAdmin, me, refreshMe, can, remaining,
-    watchlist, watchlistLoaded, refreshWatchlist, isTracked, trackSymbol, untrackSymbol,
+    watchlist, watchlistLoaded, watchlistError, refreshWatchlist, isTracked, trackSymbol, untrackSymbol,
   };
 
   const paletteActions: PaletteAction[] = [

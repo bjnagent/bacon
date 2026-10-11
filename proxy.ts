@@ -34,6 +34,7 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/api/") ||
     pathname.startsWith("/.well-known/") ||
     pathname === "/robots.txt" ||
+    pathname === "/sitemap.xml" ||
     pathname === "/manifest.webmanifest" ||
     pathname === "/sw.js" ||
     pathname === "/offline" ||
@@ -64,7 +65,9 @@ export async function proxy(request: NextRequest) {
   const signedIn = !!data?.claims?.sub;
   const isPublic = PUBLIC_PAGES.has(pathname) || PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));
   if (!signedIn && !pathname.startsWith("/login") && !pathname.startsWith("/api/auth") && !isPublic) {
-    const url = new URL("/login", request.url);
+    // A signed-out visit to the root is someone arriving at the product, not a
+    // session that lapsed: show them what Bacon is, not a login form.
+    const url = new URL(pathname === "/" ? "/welcome" : "/login", request.url);
     // Bring them back to where they were going (a deep link from an email or a
     // notification) once they've signed in.
     if (pathname !== "/") url.searchParams.set("next", pathname + request.nextUrl.search);

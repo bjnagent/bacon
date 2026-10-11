@@ -89,7 +89,7 @@ const T = EMPTY ? {} : {
       ["META", "Buy", 7.9, 3.3, true],
     ].map(([instrument, action, actual, bench, hit], i) => ({
       id: id(), user_id: USER_ID, source: "brief", instrument, action, conviction: 3 + (i % 2), target_text: "est. +10%",
-      target_base: 10, target_kind: "pct", horizon_date: iso(-(30 - i) * day).slice(0, 10), crowded: i % 3 === 0 ? "hot" : "quiet",
+      target_base: 10, target_kind: "pct", horizon_date: iso((10 + i) * day).slice(0, 10), crowded: i % 3 === 0 ? "hot" : "quiet",
       created_at: iso((45 + i * 3) * day), call_date: iso((45 + i * 3) * day).slice(0, 10), actual_pct: actual, bench_pct: bench,
       direction_hit: hit, target_err_pct: Math.abs(actual - 10), graded_at: iso((14 + i) * day),
     })),
@@ -103,7 +103,10 @@ const T = EMPTY ? {} : {
   daily_briefs: [1, 2, 3, 4, 5].map((d) => ({
     id: id(), user_id: USER_ID, brief_date: iso(d * day).slice(0, 10), intro: "The desk's read for the day.", caveat: null,
     items: [{ name: "Example Co", ticker: ["NVDA", "AMD", "CCJ", "GLD", "META"][d - 1], cls: "Equity / Stock", horizon: "1–3 months", thesis: "Illustrative thesis.", signals: "Two signals agreed.", checks: "Confirm / kill lines." }],
-    reviewed_at: null, roi: null, kill_alert: null, created_at: iso(d * day),
+    reviewed_at: null,
+    roi: d === 2 ? { asOf: iso(day).slice(0, 10), count: 1, invested: 10000, value: 10420, roiPct: 4.2, spyPct: 1.1, alphaPct: 3.1 } : null,
+    kill_alert: d === 1 ? { at: iso(6 * hr), note: "Re-checked overnight.", items: [{ name: "Example Co", ticker: "NVDA", why: "Illustrative: the kill condition named in the brief was met." }] } : null,
+    created_at: iso(d * day),
   })),
   analyses: [],
   chat_messages: [],
@@ -188,6 +191,13 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === "POST") {
       const list = (Array.isArray(body) ? body : [body]).filter(Boolean).map((r) => ({ id: id(), created_at: iso(), ...r }));
+      // Mirror production's unique indexes so duplicate handling can be exercised.
+      const UNIQUE = { watchlist: (r) => `${r.user_id}|${r.symbol}`, themes: (r) => `${r.user_id}|${String(r.label).toLowerCase()}` };
+      const key = UNIQUE[table];
+      const upsert = /resolution=merge-duplicates/.test(req.headers.prefer || "");
+      if (key && !upsert && list.some((r) => rows.some((x) => key(x) === key(r)))) {
+        return send(res, 409, { code: "23505", message: "duplicate key value violates unique constraint", details: "", hint: null });
+      }
       rows.push(...list);
       return send(res, 201, single ? list[0] : list);
     }
