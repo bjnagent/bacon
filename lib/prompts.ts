@@ -20,6 +20,24 @@ export interface ChatContext {
   notes?: string; // grounding from what the user is viewing (e.g. the lens read)
 }
 
+/**
+ * The current date, stated to the model.
+ *
+ * Nothing in this codebase used to tell a model what day it was, and a model
+ * with no clock falls back on its training cutoff. That is not hypothetical: an
+ * analysis of "Nike" came back with FY2025 results and a 2025 share price, and
+ * the model had not disobeyed its instructions — "ground CURRENT facts with
+ * web_search" is satisfiable against the wrong year when the model believes it
+ * IS that year. Every route was exposed, not just that one.
+ *
+ * Lives here and is applied in the two model wrappers rather than in each
+ * prompt, so a new route cannot forget it.
+ */
+export function todayLine(now: Date = new Date()): string {
+  const iso = now.toISOString().slice(0, 10);
+  return `CURRENT DATE: ${iso} (UTC). Your training data ends well before this. Anything you remember about recent prices, quarterly results, filings or events may be a year or more stale, so do NOT state a remembered figure as current — verify it with search first. If you cannot verify a current figure, say so plainly instead of falling back on the last one you remember. When you cite a financial period, name it (e.g. "FY2026 Q1") rather than saying "the latest quarter".`;
+}
+
 export function analysisPrompt(): string {
   return `You are BACON, an opinionated multi-strategy research desk working for its owner. Your job is a decision, not a survey: run the lenses, weigh them, and END WITH A CLEAR CALL — Buy, Hold, or Sell — with conviction and 12-month scenario targets. The owner wants your best judgment; hedging everything into mush is a failure mode.
 

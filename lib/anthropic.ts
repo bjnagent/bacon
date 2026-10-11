@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { meter, type AiMeta } from "./usage";
+import { todayLine } from "./prompts";
 
 // User-facing work: analyze, chat, debate, personas. BACON_MODEL overrides it,
 // which is worth knowing before trusting this line — the ledger showed every
@@ -43,6 +44,12 @@ const isCurrentGen = (model: string) => /(sonnet-(4-6|5)|opus-)/.test(model);
  */
 const cachedSystem = (system: string) => [
   { type: "text" as const, text: system, cache_control: { type: "ephemeral" as const } },
+  // The date goes AFTER the breakpoint, deliberately. It changes every day; the
+  // prompt above does not. Putting it in the cached block would invalidate the
+  // prefix daily for no reason, and putting it in each prompt would mean a new
+  // route could forget it — which is exactly how a Nike analysis came back with
+  // 2025 figures.
+  { type: "text" as const, text: todayLine() },
 ];
 
 /**

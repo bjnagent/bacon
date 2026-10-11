@@ -5,6 +5,7 @@
 // figures — only cite what search returns") still holds on this path.
 
 import { meter, type AiMeta } from "./usage";
+import { todayLine } from "./prompts";
 
 const GEMINI_MODEL = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
 const ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
@@ -31,7 +32,10 @@ export async function askGemini(
   if (!key) throw new Error("GEMINI_API_KEY not set");
 
   const body = {
-    system_instruction: { parts: [{ text: system }] },
+    // Second part carries the current date — same reason as the Claude path:
+    // Google Search grounding does not tell the model what year it is, so
+    // without this it reports remembered figures as current.
+    system_instruction: { parts: [{ text: system }, { text: todayLine() }] },
     contents: messages.map((m) => ({
       role: m.role === "assistant" ? "model" : "user",
       parts: [{ text: m.content }],

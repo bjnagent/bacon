@@ -1,8 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   annualSeries, latestInstant, sumLatestInstant, assembleFundamentals, deriveValuation, formatFundamentals,
-  type XbrlPoint,
-} from "./fundamentals";
+  type XbrlPoint, nameKey } from "./fundamentals";
 
 // Revenue: two full fiscal years + one quarter that must be excluded.
 const REVENUE: XbrlPoint[] = [
@@ -143,5 +142,34 @@ describe("formatFundamentals", () => {
     const empty = assembleFundamentals("Z", "1", { eps: EPS });
     // eps-only still assembles (has a flow figure), but with no price/valuation the block is small — sanity check non-empty.
     expect(empty).not.toBeNull();
+  });
+});
+
+describe("nameKey", () => {
+  // Both sides of the comparison go through this: the SEC's legal title and
+  // whatever the user typed. They have to land on the same string.
+  it("reduces a legal title and a typed name to the same key", () => {
+    expect(nameKey("NIKE, Inc.")).toBe(nameKey("Nike"));
+    expect(nameKey("Apple Inc.")).toBe(nameKey("apple"));
+    expect(nameKey("Alphabet Inc. Class A")).toBe(nameKey("Alphabet"));
+    expect(nameKey("Coca-Cola Co")).toBe(nameKey("Coca Cola"));
+    expect(nameKey("Berkshire Hathaway Inc")).toBe("berkshire hathaway");
+  });
+
+  // Suffixes are stripped from the END only. A leading "Co" is part of the
+  // name, and eating it would map a real company onto the wrong key.
+  it("only strips legal suffixes at the end", () => {
+    expect(nameKey("Co Diagnostics Inc")).toBe("co diagnostics");
+    expect(nameKey("Group 1 Automotive Inc")).toBe("group 1 automotive");
+  });
+
+  it("handles ampersands and punctuation", () => {
+    expect(nameKey("Procter & Gamble Co")).toBe("procter and gamble");
+    expect(nameKey("  NIKE,   INC.  ")).toBe("nike");
+  });
+
+  it("has nothing to say about an empty name", () => {
+    expect(nameKey("")).toBe("");
+    expect(nameKey("  ")).toBe("");
   });
 });

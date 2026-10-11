@@ -245,23 +245,80 @@ async function secJson<T>(url: string, signal?: AbortSignal): Promise<T | null> 
   } catch { return null; }
 }
 
-// ticker → zero-padded 10-digit CIK, from SEC's master mapping (cached ~24h).
-let tickerMap: { at: number; map: Map<string, string> } | null = null;
+// SEC's master mapping (cached ~24h), indexed three ways: ticker -> CIK, the
+// set of tickers that actually exist, and company NAME -> ticker.
+//
+// The last two are new, and they exist because "Nike" is not a ticker. The
+// syntactic extractor turns it into "NIKE", which is symbol-SHAPED and resolves
+// to nothing — so the price fetch and the filings fetch both returned null, both
+// context blocks silently vanished from the prompt, and the model filled the gap
+// from memory with year-old figures. A guess that resolves to nothing is the
+// same class of bug as one that resolves to the wrong company; the fix for both
+// is to check candidates against the real universe of listed symbols.
+interface SecIndex { at: number; cik: Map<string, string>; byName: Map<string, string> }
+let secIndex: SecIndex | null = null;
 const MAP_TTL_MS = 24 * 60 * 60 * 1000;
+
+// Legal suffixes a person never types. Stripped from the END only: a leading
+// "Co" is part of the name ("Co Diagnostics"), a trailing one is not
+// ("Coca-Cola Co"). Applied repeatedly, so "Alphabet Inc. Class A" reduces the
+// same way "Alphabet" does.
+const TRAILING_NOISE = /\s+(the|inc|incorporated|corp|corporation|co|company|companies|plc|ltd|limited|holding|holdings|group|sa|nv|ag|se|lp|llc|trust|adr|ads|class\s+[a-c])$/;
+
+/** Company name -> lookup key. Both sides of the comparison go through this. */
+export function nameKey(raw: string): string {
+  let k = String(raw).toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+  for (;;) {
+    const next = k.replace(TRAILING_NOISE, "").trim();
+    if (next === k) return k;
+    k = next;
+  }
+}
+
+async function loadSecIndex(signal?: AbortSignal): Promise<SecIndex | null> {
+  if (secIndex && Date.now() - secIndex.at <= MAP_TTL_MS) return secIndex;
+  const data = await secJson<Record<string, { cik_str: number; ticker: string; title?: string }>>("https://www.sec.gov/files/company_tickers.json", signal);
+  if (!data) return secIndex;   // a stale index beats no index
+  const cik = new Map<string, string>();
+  const byName = new Map<string, string>();
+  const ambiguous = new Set<string>();
+  for (const row of Object.values(data)) {
+    if (!row?.ticker || row.cik_str == null) continue;
+    const t = String(row.ticker).toUpperCase();
+    cik.set(t, String(row.cik_str).padStart(10, "0"));
+    const k = row.title ? nameKey(String(row.title)) : "";
+    if (!k) continue;
+    const prior = byName.get(k);
+    // Two different companies reducing to the same name is not something to
+    // pick a winner for — an ambiguous name resolves to nothing, and the
+    // caller says so, rather than silently analysing the wrong issuer.
+    if (prior && prior !== t) { ambiguous.add(k); continue; }
+    byName.set(k, t);
+  }
+  for (const k of ambiguous) byName.delete(k);
+  secIndex = { at: Date.now(), cik, byName };
+  return secIndex;
+}
 
 export async function cikForTicker(rawTicker: string, signal?: AbortSignal): Promise<string | null> {
   const t = rawTicker.trim().toUpperCase();
   if (!t) return null;
-  if (!tickerMap || Date.now() - tickerMap.at > MAP_TTL_MS) {
-    const data = await secJson<Record<string, { cik_str: number; ticker: string }>>("https://www.sec.gov/files/company_tickers.json", signal);
-    if (!data) return tickerMap?.map.get(t) ?? tickerMap?.map.get(t.replace(/\./g, "-")) ?? null;
-    const map = new Map<string, string>();
-    for (const row of Object.values(data)) {
-      if (row?.ticker && row.cik_str != null) map.set(String(row.ticker).toUpperCase(), String(row.cik_str).padStart(10, "0"));
-    }
-    tickerMap = { at: Date.now(), map };
-  }
-  return tickerMap.map.get(t) ?? tickerMap.map.get(t.replace(/\./g, "-")) ?? null;
+  const idx = await loadSecIndex(signal);
+  if (!idx) return null;
+  return idx.cik.get(t) ?? idx.cik.get(t.replace(/\./g, "-")) ?? null;
+}
+
+/** Does the SEC actually list this symbol? Rejects name-shaped guesses like "NIKE". */
+export async function isKnownTicker(rawTicker: string, signal?: AbortSignal): Promise<boolean> {
+  return (await cikForTicker(rawTicker, signal)) != null;
+}
+
+/** "Nike" -> "NKE". Null when the name is not a US-listed company, or is ambiguous. */
+export async function tickerForName(rawName: string, signal?: AbortSignal): Promise<string | null> {
+  const k = nameKey(rawName || "");
+  if (!k) return null;
+  const idx = await loadSecIndex(signal);
+  return idx?.byName.get(k) ?? null;
 }
 
 // Pull one us-gaap (or dei) concept's observations, trying tag fallbacks in order.
