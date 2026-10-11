@@ -9,7 +9,7 @@ import { X } from "lucide-react";
  * the backdrop close it; focus moves in on open and back out on close; the page
  * behind stops scrolling while it is up.
  */
-export function Sheet({ open, onClose, title, children, footer, variant = "dialog", full, labelledBy }: {
+export function Sheet({ open, onClose, title, children, footer, variant = "dialog", full, labelledBy, initialFocus = "first" }: {
   open: boolean;
   onClose: () => void;
   title?: ReactNode;
@@ -18,6 +18,12 @@ export function Sheet({ open, onClose, title, children, footer, variant = "dialo
   variant?: "dialog" | "wide" | "side";
   full?: boolean;
   labelledBy?: string;
+  /**
+   * What gets focus on open. "first" (default) focuses the first field;
+   * "sheet" focuses the sheet itself, so on iPhone the keyboard doesn't cover
+   * an explanation the user needs to read first (e.g. delete account).
+   */
+  initialFocus?: "first" | "sheet";
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const lastFocus = useRef<Element | null>(null);
@@ -28,7 +34,9 @@ export function Sheet({ open, onClose, title, children, footer, variant = "dialo
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const id = requestAnimationFrame(() => {
-      const el = ref.current?.querySelector<HTMLElement>("[autofocus], input, textarea, button:not([data-sheet-close])") ?? ref.current;
+      const el = initialFocus === "sheet"
+        ? ref.current
+        : ref.current?.querySelector<HTMLElement>("[autofocus], input, textarea, button:not([data-sheet-close])") ?? ref.current;
       el?.focus({ preventScroll: true });
     });
     const onKey = (e: KeyboardEvent) => {
@@ -47,7 +55,7 @@ export function Sheet({ open, onClose, title, children, footer, variant = "dialo
       document.removeEventListener("keydown", onKey);
       (lastFocus.current as HTMLElement | null)?.focus?.({ preventScroll: true });
     };
-  }, [open, onClose]);
+  }, [open, onClose, initialFocus]);
 
   if (!open || typeof document === "undefined") return null;
   const cls = ["ui-sheet", variant === "wide" && "is-wide", variant === "side" && "is-side", full && "is-full"].filter(Boolean).join(" ");

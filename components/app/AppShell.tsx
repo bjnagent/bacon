@@ -16,6 +16,7 @@ import AccountScreen from "@/components/screens/AccountScreen";
 import { Toaster, toast } from "@/components/ui";
 import { AppCtx, type AppApi, type AnalyzeRequest, type MeState, type WatchItem } from "./AppContext";
 import OfflineBanner from "./OfflineBanner";
+import NativeBridge from "./NativeBridge";
 import { parsePath, paths, TABS, type TabId } from "@/lib/client/routes";
 import { apiFetch, ApiError } from "@/lib/client/api";
 import { openPaywall } from "@/lib/client/paywall";
@@ -120,7 +121,9 @@ export default function AppShell({ email, isAdmin }: { email: string; isAdmin: b
   const [me, setMe] = useState<MeState | null>(null);
   const refreshMe = useCallback(async () => {
     invalidate("/api/me");
-    try { setMe(await cachedJson<MeState>("/api/me", 60_000)); } catch { /* keep last */ }
+    // cachedJson doesn't throw on an error status, so check the shape: an
+    // `{ error }` body must never become `me`.
+    try { const d = await cachedJson<MeState>("/api/me", 60_000); if (d && "plan" in d) setMe(d); } catch { /* keep last */ }
   }, []);
   useEffect(() => {
     let live = true;
@@ -335,6 +338,7 @@ export default function AppShell({ email, isAdmin }: { email: string; isAdmin: b
         <ChatSheet open={chatOpen} context={chatContext} onClose={closeChat} />
         <PaywallSheet />
         <Toaster />
+        <NativeBridge />
       </div>
     </AppCtx.Provider>
   );

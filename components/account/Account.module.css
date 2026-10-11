@@ -1,0 +1,91 @@
+/* Account tab. Tokens only; primitives come from app/globals.css. */
+
+/* Two columns once the content area is wide enough to hold a readable
+   settings list beside the plan card; one column on phones and narrow
+   desktop windows. A container query, so the sidebar's width is accounted for. */
+.layout { container-type: inline-size; }
+.grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); align-items: start; }
+.col { display: flex; flex-direction: column; gap: var(--s-6); min-width: 0; }
+@container (min-width: 820px) {
+  .grid { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: var(--s-8); }
+}
+@media (max-width: 899px) {
+  .col { gap: var(--s-5); }
+  .grid { gap: var(--s-5); }
+}
+
+/* Deep links scroll a group under the blurred mobile top bar, not behind it. */
+.group { scroll-margin-top: calc(var(--safe-top) + 60px); }
+@media (min-width: 900px) { .group { scroll-margin-top: var(--s-6); } }
+
+/* List titles are real headings for screen readers, styled as the list's caption. */
+.groupTitle { font: inherit; letter-spacing: inherit; color: inherit; margin: 0; }
+
+/* ---------- Profile ---------- */
+.profile { display: flex; align-items: center; gap: var(--s-4); }
+.avatar {
+  width: 56px; height: 56px; border-radius: 50%; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--accent-soft); color: var(--accent-text);
+  font-family: var(--font-display); font-size: 24px; font-weight: 700; text-transform: uppercase;
+}
+.profileText { min-width: 0; flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.email {
+  max-width: 100%; font-size: var(--fs-lg); font-weight: 600; line-height: 1.25;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ---------- Plan & usage ---------- */
+.plan { display: flex; flex-direction: column; gap: var(--s-4); }
+.planHead { display: flex; flex-direction: column; gap: 2px; }
+.planName { font-family: var(--font-display); font-size: var(--fs-2xl); font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
+.status { font-size: var(--fs-sm); color: var(--text-2); }
+.status.warn { color: var(--warn); font-weight: 600; }
+.status.neg { color: var(--neg); font-weight: 600; }
+
+.meters { display: flex; flex-direction: column; gap: var(--s-3); padding-top: var(--s-4); border-top: 1px solid var(--border); }
+.meter { display: flex; flex-direction: column; gap: 6px; }
+.meterTop { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); font-size: var(--fs-sm); }
+.meterLabel { color: var(--text); font-variant-numeric: tabular-nums; min-width: 0; }
+.meterLeft { color: var(--text-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.meterLeft.low { color: var(--warn); font-weight: 600; }
+.meterLeft.out { color: var(--neg); font-weight: 600; }
+.resets { font-size: var(--fs-xs); color: var(--text-3); }
+.unmetered { padding-top: var(--s-4); border-top: 1px solid var(--border); font-size: var(--fs-sm); color: var(--text-2); }
+.unmetered strong { color: var(--text); font-weight: 600; }
+
+.adds { font-size: var(--fs-sm); color: var(--text-2); }
+.note { font-size: var(--fs-sm); color: var(--text-3); }
+
+.actions { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+/* Phones: full-width buttons, stacked — easier to hit, no awkward wrap. */
+@media (max-width: 559px) {
+  .actions { flex-direction: column; }
+  .actions > * { width: 100%; }
+}
+
+.planSkel { display: flex; flex-direction: column; gap: var(--s-3); }
+
+/* ---------- Rows ---------- */
+.lock { display: inline-flex; align-items: center; gap: 4px; }
+.lock svg { width: 12px; height: 12px; }
+.rowValue { max-width: 42vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+@media (min-width: 900px) { .rowValue { max-width: 220px; } }
+
+/* Theme picker sits inside a row, under its label on phones. */
+.themeRow { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; padding: 10px var(--s-4); min-height: 52px; }
+.themeLabel { display: flex; align-items: center; gap: var(--s-3); font-weight: 500; }
+
+/* ---------- Sheets ---------- */
+.form { display: flex; flex-direction: column; gap: var(--s-4); }
+.pw { position: relative; display: flex; align-items: center; }
+.pw input { padding-right: 52px; }
+.eye { position: absolute; right: 3px; }
+.fieldErr { font-size: var(--fs-sm); color: var(--neg); }
+.sheetIntro { color: var(--text-2); font-size: var(--fs-md); }
+.voicesBox { font-family: inherit; }
+
+.erased { display: flex; flex-direction: column; gap: 6px; padding-left: 1.2em; list-style: disc; color: var(--text-2); font-size: var(--fs-sm); }
+
+/* ---------- Footer ---------- */
+.footer { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: var(--s-2) 0 var(--s-4); text-align: center; }
