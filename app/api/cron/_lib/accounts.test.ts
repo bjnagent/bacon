@@ -11,7 +11,7 @@ vi.mock("@/lib/entitlements", async (importOriginal) => {
 
 import { resolvePlan, type PlanState } from "@/lib/entitlements";
 import {
-  accountFromRow, briefPushBody, emailFor, entitled, hasFeature, houseUserId, killPushMessage, loadCronAccounts, mapPool,
+  accountFromRow, briefPushBody, emailFor, entitled, hasFeature, houseUserId, isDue, killPushMessage, loadCronAccounts, mapPool,
   type CronAccount,
 } from "./accounts";
 
@@ -86,6 +86,35 @@ describe("houseUserId", () => {
     expect(houseUserId({ HOUSE_USER_ID: ` ${HOUSE.toUpperCase()} ` })).toBe(HOUSE);
     expect(houseUserId({ HOUSE_USER_ID: "not-a-uuid" })).toBeNull();
     expect(houseUserId({})).toBeNull();
+  });
+});
+
+describe("isDue — sweep cadence", () => {
+  const t = NOW.getTime();
+  const H = 3_600_000;
+
+  it("a daily account is due on the next daily run even when that run starts a little earlier", () => {
+    // Swept at 13:00:27 yesterday; today's cron reached it at 13:00:05.
+    expect(isDue(iso(t - DAY + 22_000), DAY, t)).toBe(true);
+    // Vercel may fire anywhere in the hour: 13:55 yesterday, 13:02 today.
+    expect(isDue(iso(t - DAY + 53 * 60_000), DAY, t)).toBe(true);
+  });
+
+  it("is not due twice in one day (a manual re-run after the nightly one sweeps nobody)", () => {
+    expect(isDue(iso(t - 2 * H), DAY, t)).toBe(false);
+    expect(isDue(iso(t - 20 * H), DAY, t)).toBe(false);
+  });
+
+  it("never-swept or unreadable timestamps are due", () => {
+    expect(isDue(null, DAY, t)).toBe(true);
+    expect(isDue("not a date", DAY, t)).toBe(true);
+  });
+
+  it("caps the slack at half the cadence for short cadences, and keeps longer ones honest", () => {
+    expect(isDue(iso(t - 2 * H), 4 * H, t)).toBe(true);
+    expect(isDue(iso(t - 1 * H), 4 * H, t)).toBe(false);
+    expect(isDue(iso(t - 6 * DAY), 7 * DAY, t)).toBe(false);
+    expect(isDue(iso(t - 7 * DAY + 10 * 60_000), 7 * DAY, t)).toBe(true);
   });
 });
 

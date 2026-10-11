@@ -17,7 +17,7 @@ import { getForecastMemo, recordForecasts } from "@/lib/forecastRecord";
 import { getCachedSeries } from "@/lib/priceCache";
 import { notifyUser } from "@/lib/push";
 import {
-  briefPushBody, emailFor, entitled, hasFeature, houseUserId, loadCronAccounts, mapPool, type CronAccount,
+  briefPushBody, emailFor, entitled, hasFeature, houseUserId, isDue, loadCronAccounts, mapPool, type CronAccount,
 } from "../_lib/accounts";
 
 // Background sweep: surface fresh opportunities (today's real movers + theme
@@ -83,7 +83,7 @@ export async function GET(req: Request) {
 
   const now = Date.now();
   const due = settings
-    .filter((u) => !u.last_sweep_at || now - new Date(u.last_sweep_at).getTime() >= cadenceMs(u))
+    .filter((u) => isDue(u.last_sweep_at, cadenceMs(u), now))
     // Oldest-served first, so a mid-run timeout doesn't drop the SAME tail every
     // night — the users waiting longest get processed first each run.
     .sort((a, b) => (String(a.last_sweep_at ?? "") < String(b.last_sweep_at ?? "") ? -1 : 1));
