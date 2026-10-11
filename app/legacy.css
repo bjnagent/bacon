@@ -3,8 +3,8 @@
    The Bacon design system below is scoped to .pr-app, so the
    document chrome needs its own minimal reset + paper backdrop.
    ============================================================ */
-html, body { margin: 0; padding: 0; }
-body { background: #EBE8E0; color: #1A1712; }
+/* No document-level rules here: this sheet is only for the operator console
+   (and screens mid-migration), and must never override the app theme. */
 
 /* ============================================================
    Bacon — "Daylight Instrument" design system.
@@ -1051,7 +1051,6 @@ body { background: #EBE8E0; color: #1A1712; }
    every screen. Same spectrum, same grid texture.
    ============================================================ */
 @media (prefers-color-scheme:dark){
-  body{background:#181109;color:#F1E7D6}
   .pr-app{
     --paper:#181109; --paper2:#211910; --card:#2A2014; --sink:#372B1B;
     /* muted2 lightened so small dark-mode labels clear AA on --card (was 3.87). */
