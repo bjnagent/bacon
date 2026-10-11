@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireUser, isResponse, badRequest } from "@/lib/api";
 import { getQuotes } from "@/lib/quotes";
 
 // Current prices for a set of symbols. Crypto is real-time; equities are the
@@ -8,20 +8,28 @@ import { getQuotes } from "@/lib/quotes";
 export const maxDuration = 30;
 
 const MAX_SYMBOLS = 25;
+// Tickers, pairs and exchange-suffixed symbols (BRK.B, BTC-USD, EUR/USD, ^VIX).
+// Anything else never reaches a provider.
+const SYMBOL_RE = /^[A-Za-z0-9.^=/:-]{1,24}$/;
 
 export async function GET(req: Request) {
   // Authenticated: this proxies third-party providers, and an open endpoint
   // would let anyone spend bacon's rate limits with them.
-  const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireUser();
+  if (isResponse(auth)) return auth;
 
   const raw = new URL(req.url).searchParams.get("symbols") ?? "";
-  const symbols = raw.split(",").map((s) => s.trim()).filter(Boolean).slice(0, MAX_SYMBOLS);
-  if (!symbols.length) return NextResponse.json({ quotes: {} });
+  const parts = raw.split(",").map((s) => s.trim()).filter(Boolean);
+  if (!parts.length) return NextResponse.json({ quotes: {} });
+  const symbols = parts.filter((s) => SYMBOL_RE.test(s)).slice(0, MAX_SYMBOLS);
+  if (!symbols.length) return badRequest("No valid symbols in the request.");
 
-  const quotes = await getQuotes(symbols);
-  // Short cache: long enough to absorb a burst of card renders, short enough
-  // that a "live" crypto price is still live.
-  return NextResponse.json({ quotes }, { headers: { "Cache-Control": "private, max-age=15" } });
+  let quotes: Awaited<ReturnType<typeof getQuotes>> = {};
+  try { quotes = await getQuotes(symbols); } catch { /* no prices beats a 500: cards render without the chip */ }
+  // Cache by what the answer contains. A delayed close doesn't change for
+  // hours, so a minute is safe; a real-time crypto price labelled "live" must
+  // still be live when it's shown, so a response carrying one is held only
+  // briefly (the server's own crypto cache is 20s).
+  const anyLive = Object.values(quotes).some((q) => q?.live);
+  return NextResponse.json({ quotes }, { headers: { "Cache-Control": anyLive ? "private, max-age=15" : "private, max-age=60" } });
 }

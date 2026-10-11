@@ -308,7 +308,7 @@ a { color: inherit; text-decoration: none; }
 @media (max-width: 559px) { .grid-2, .grid-3 { grid-template-columns: minmax(0, 1fr); } }
 
 /* Horizontal scroller that bleeds to the screen edge on mobile. */
-.hscroll { display: flex; gap: var(--s-2); overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity; }
+.hscroll { position: relative; display: flex; gap: var(--s-2); overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity; }
 .hscroll::-webkit-scrollbar { display: none; }
 .hscroll > * { flex-shrink: 0; scroll-snap-align: start; }
 @media (max-width: 899px) {

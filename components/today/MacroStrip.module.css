@@ -1,0 +1,25 @@
+.wrap { display: flex; flex-direction: column; gap: var(--s-2); min-width: 0; }
+.head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); }
+
+/* Positioned so the absolutely-positioned screen-reader labels inside a tile
+   are clipped by the scroller; otherwise they escape it and widen the page. */
+.strip { padding-bottom: 2px; position: relative; }
+
+.tile {
+  position: relative;
+  display: flex; flex-direction: column; gap: 2px;
+  min-width: 112px; padding: 10px 12px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md);
+}
+.label { font-size: var(--fs-xs); color: var(--text-2); font-weight: 500; white-space: nowrap; }
+.value {
+  font-family: var(--font-display); font-size: var(--fs-lg); font-weight: 600; letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums; color: var(--text); line-height: 1.25; white-space: nowrap;
+}
+.unit { font-size: var(--fs-sm); color: var(--text-2); margin-left: 1px; font-weight: 500; }
+.meta { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* Neutral on purpose — see MacroStrip.tsx. */
+.change { display: inline-flex; align-items: center; gap: 1px; color: var(--text-2); font-weight: 600; }
+.change svg { width: 12px; height: 12px; }
+
+.skel { width: 112px; height: 70px; border-radius: var(--r-md); flex-shrink: 0; }

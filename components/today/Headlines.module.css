@@ -1,0 +1,63 @@
+.pane { display: flex; flex-direction: column; gap: var(--s-5); min-width: 0; }
+
+.toolbar { display: flex; align-items: flex-start; gap: var(--s-1); flex-shrink: 0; }
+.refresh { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.left { font-size: var(--fs-xs); color: var(--text-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.filters { padding-bottom: 2px; }
+.count { margin-left: 2px; font-size: var(--fs-xs); opacity: 0.7; font-variant-numeric: tabular-nums; }
+
+.calloutActions { margin-top: var(--s-2); }
+
+.scanning {
+  display: flex; align-items: center; gap: var(--s-3);
+  padding: var(--s-3) var(--s-4); border-radius: var(--r-md); background: var(--surface-2);
+  font-size: var(--fs-sm); color: var(--text-2);
+}
+.scanning :global(.ui-spinner) { color: var(--accent); width: 16px; height: 16px; }
+
+.intro { font-size: var(--fs-sm); color: var(--text-2); max-width: 72ch; }
+
+.filteredEmpty {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap;
+  padding: var(--s-3) var(--s-4); border-radius: var(--r-md); background: var(--surface-2);
+  font-size: var(--fs-sm); color: var(--text-2);
+}
+
+.list { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-3); }
+@media (min-width: 1100px) { .list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.card { padding: var(--s-4); display: flex; flex-direction: column; gap: var(--s-2); min-width: 0; }
+.meta { display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm); color: var(--text-3); min-height: 22px; }
+.source { font-weight: 600; color: var(--text-2); }
+.tag { margin-left: auto; }
+.head { font-size: var(--fs-lg); font-weight: 600; line-height: 1.35; letter-spacing: -0.005em; overflow-wrap: anywhere; }
+.why { font-size: var(--fs-sm); color: var(--text-2); line-height: 1.5; }
+.whyLabel { font-weight: 600; color: var(--text); }
+
+.actions { display: flex; align-items: center; gap: var(--s-1); margin-top: auto; padding-top: var(--s-2); }
+.spacer { flex: 1; }
+.tickerBtn {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 8px 0 4px;
+  border-radius: var(--r-sm); color: var(--accent-text); font-size: var(--fs-sm); font-weight: 600;
+  transition: background var(--dur-1);
+}
+.tickerBtn:hover { background: var(--accent-soft); }
+.tickerBtn svg { width: 16px; height: 16px; }
+@media (pointer: coarse) { .tickerBtn { min-height: 44px; } }
+.macro { font-size: var(--fs-sm); color: var(--text-3); }
+
+.footnote { font-size: var(--fs-xs); color: var(--text-3); line-height: 1.5; max-width: 72ch; }
+
+.opts { display: flex; flex-direction: column; gap: var(--s-5); }
+
+/* TVLink renders its own <a>; give it the icon-button shape. */
+.tv :global(a) {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; padding: 0; border: 0; border-radius: var(--r-pill);
+  background: transparent; color: var(--text-2);
+  transition: background var(--dur-1), color var(--dur-1);
+}
+.tv :global(a:hover) { background: var(--surface-2); color: var(--text); border: 0; }
+.tv :global(a svg) { width: 20px; height: 20px; }
+@media (pointer: coarse) { .tv :global(a) { width: 44px; height: 44px; } }

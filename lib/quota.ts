@@ -25,4 +25,4 @@ export async function withinQuota(sb: SupabaseClient, dailyLimit = DEFAULT_DAILY
   }
 }
 
-export const QUOTA_MESSAGE = "Daily usage limit reached — it resets tomorrow. (This cap keeps costs sane; a Pro tier will lift it.)";
+export const QUOTA_MESSAGE = "You've hit today's safety limit on AI requests — it resets at midnight UTC.";

@@ -1,10 +1,10 @@
-// The example brief shown to an account that has never swept.
+// The example brief shown to an account that has no brief at all yet (neither
+// its own nor, on the free plan, the house brief).
 //
-// A new user lands on Today with nothing: the nightly cron hasn't run for them
-// (auto-sweep defaults off) so their only route to the product's point is a
-// cold 30-second wait staring at a bouncing logo. This shows them the shape of
-// a brief first, so the wait is a choice made by someone who already knows what
-// they're waiting for.
+// A new user can land on Today before the nightly run has reached them, and
+// their only route to the product's point is a 30-second wait for the first
+// brief to be written. This shows them the shape of a brief first, so the wait
+// is a choice made by someone who already knows what they're waiting for.
 //
 // The companies here are DELIBERATELY generic — "a grid-equipment maker", not a
 // ticker. This is a financial product: a fabricated thesis attached to a real
