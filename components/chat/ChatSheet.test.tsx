@@ -6,7 +6,7 @@ import ChatSheet from "./ChatSheet";
 import { AppCtx, type AppApi } from "@/components/app/AppContext";
 import { apiFetch, apiStream, ApiError } from "@/lib/client/api";
 import { openPaywall } from "@/lib/client/paywall";
-import type { ChatContext } from "@/lib/prompts";
+import type { ChatContext } from "@/lib/chatContext";
 
 vi.mock("@/lib/client/api", async (orig) => {
   const real = await orig<typeof import("@/lib/client/api")>();

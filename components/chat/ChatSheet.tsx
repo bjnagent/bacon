@@ -12,7 +12,7 @@ import { ArrowDown, SquarePen } from "lucide-react";
 import { Sheet, IconButton } from "@/components/ui";
 import { useApp } from "@/components/app/AppContext";
 import { openPaywall } from "@/lib/client/paywall";
-import { chatStarters, type ChatContext } from "@/lib/prompts";
+import { chatStarters, type ChatContext } from "@/lib/chatContext";
 import { Composer } from "./Composer";
 import { Conversation, Intro } from "./Conversation";
 import { contextLabel } from "./protocol";

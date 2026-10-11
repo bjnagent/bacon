@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { apiFetch, apiStream, ApiError } from "@/lib/client/api";
 import type { PaywallRequest } from "@/lib/client/paywall";
-import type { ChatContext } from "@/lib/prompts";
+import type { ChatContext } from "@/lib/chatContext";
 import { METER_LABEL } from "@/lib/plans";
 import { haptic } from "@/lib/native";
 import { ago, MAX_CHARS, normalizeHistory, sameContext, stripErrorMarker, uuid, type Role, type WireMessage } from "./protocol";

@@ -4,7 +4,7 @@ import { memo, useEffect, useState } from "react";
 import { Check, ChevronRight, CircleAlert, Clock, Copy, Crown, History, RotateCcw, WifiOff } from "lucide-react";
 import BaconMark from "@/components/BaconMark";
 import { Button, Callout } from "@/components/ui";
-import type { ChatContext } from "@/lib/prompts";
+import type { ChatContext } from "@/lib/chatContext";
 import { Markdown } from "./Markdown";
 import { contextLabel, introTitle } from "./protocol";
 import type { ChatError, Saved, Turn } from "./useChat";

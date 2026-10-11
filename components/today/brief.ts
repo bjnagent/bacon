@@ -6,7 +6,7 @@
 
 import { parseOpportunities } from "@/lib/parsers";
 import type { Trigger } from "@/lib/triggers";
-import type { ChatContext } from "@/lib/prompts";
+import type { ChatContext } from "@/lib/chatContext";
 import { mapClass } from "@/lib/lenses";
 
 export interface BriefItem {

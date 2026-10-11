@@ -3,17 +3,13 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { Sunrise, Bookmark, ScanSearch, History, CircleUser, Search, MessageCircle, Crown } from "lucide-react";
 import BaconMark from "@/components/BaconMark";
-import CommandPalette, { type PaletteAction } from "@/components/CommandPalette";
-import ChatSheet from "@/components/chat/ChatSheet";
+import type { PaletteAction } from "@/components/CommandPalette";
 import PaywallSheet from "@/components/billing/PaywallSheet";
 import TodayScreen from "@/components/screens/TodayScreen";
-import WatchlistScreen from "@/components/screens/WatchlistScreen";
-import AnalyzeScreen from "@/components/screens/AnalyzeScreen";
-import RecordScreen from "@/components/screens/RecordScreen";
-import AccountScreen from "@/components/screens/AccountScreen";
-import { Toaster, toast } from "@/components/ui";
+import { Toaster, toast, SkeletonCard } from "@/components/ui";
 import { AppCtx, type AppApi, type AnalyzeRequest, type MeState, type WatchItem } from "./AppContext";
 import OfflineBanner from "./OfflineBanner";
 import NativeBridge from "./NativeBridge";
@@ -21,11 +17,22 @@ import { parsePath, paths, TABS, type TabId } from "@/lib/client/routes";
 import { apiFetch, ApiError } from "@/lib/client/api";
 import { openPaywall } from "@/lib/client/paywall";
 import { cachedJson, invalidate } from "@/lib/clientCache";
-import { deriveContext, type ChatContext } from "@/lib/prompts";
+import { deriveContext, type ChatContext } from "@/lib/chatContext";
 import { splitSymCls, mapClass } from "@/lib/lenses";
 import { track } from "@/lib/track";
 import { haptic, hideSplash } from "@/lib/native";
 import type { Feature, Meter } from "@/lib/plans";
+
+// Code-split: only the screen you land on (and Today, the default) is in the
+// first download; the others load when first opened and then stay mounted.
+// Search and chat load on first use — most sessions open neither.
+const screenFallback = () => <div className="page" aria-busy="true"><SkeletonCard lines={4} /><SkeletonCard lines={3} /></div>;
+const WatchlistScreen = dynamic(() => import("@/components/screens/WatchlistScreen"), { loading: screenFallback });
+const AnalyzeScreen = dynamic(() => import("@/components/screens/AnalyzeScreen"), { loading: screenFallback });
+const RecordScreen = dynamic(() => import("@/components/screens/RecordScreen"), { loading: screenFallback });
+const AccountScreen = dynamic(() => import("@/components/screens/AccountScreen"), { loading: screenFallback });
+const CommandPalette = dynamic(() => import("@/components/CommandPalette"));
+const ChatSheet = dynamic(() => import("@/components/chat/ChatSheet"));
 
 const TAB_ICON: Record<TabId, React.ComponentType<{ size?: number; strokeWidth?: number }>> = {
   today: Sunrise,
@@ -244,6 +251,8 @@ export default function AppShell({ email, isAdmin }: { email: string; isAdmin: b
   }, [navigate]);
 
   const [chatOpen, setChatOpen] = useState(false);
+  // Mounted from first open onwards (so a conversation survives closing).
+  const [chatUsed, setChatUsed] = useState(false);
   const [chatContext, setChatContext] = useState<ChatContext | null>(null);
   const openChat = useCallback((ctx?: ChatContext | null) => {
     track("action", "discuss", ctx?.asset ?? undefined);
@@ -252,23 +261,26 @@ export default function AppShell({ email, isAdmin }: { email: string; isAdmin: b
       const view = route.tab === "analyze" ? "analyze" : route.tab === "today" && route.sub === "news" ? "news" : route.tab === "watchlist" ? "radar" : "general";
       setChatContext(deriveContext(view, route.symbol ? { asset: route.symbol } : null, watchlist.map((w) => ({ asset: w.symbol }))));
     }
+    setChatUsed(true);
     setChatOpen(true);
   }, [route, watchlist]);
   const closeChat = useCallback(() => setChatOpen(false), []);
 
   const [searchOpen, setSearchOpen] = useState(false);
-  const openSearch = useCallback(() => setSearchOpen(true), []);
+  const [searchUsed, setSearchUsed] = useState(false);
+
+  const openSearch = useCallback(() => { setSearchUsed(true); setSearchOpen(true); }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.key === "k" || e.key === "K") && (e.metaKey || e.ctrlKey)) { e.preventDefault(); setSearchOpen(true); return; }
+      if ((e.key === "k" || e.key === "K") && (e.metaKey || e.ctrlKey)) { e.preventDefault(); openSearch(); return; }
       const t = e.target as HTMLElement;
       const typing = /^(input|textarea|select)$/i.test(t.tagName || "") || t.isContentEditable;
-      if (!typing && e.key === "/") { e.preventDefault(); setSearchOpen(true); }
+      if (!typing && e.key === "/") { e.preventDefault(); openSearch(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [openSearch]);
 
   // ---- lifecycle ---------------------------------------------------------
   useEffect(() => { hideSplash(); }, []);
@@ -357,13 +369,13 @@ export default function AppShell({ email, isAdmin }: { email: string; isAdmin: b
           })}
         </nav>
 
-        <CommandPalette
+        {searchUsed && <CommandPalette
           open={searchOpen}
           onClose={() => setSearchOpen(false)}
           actions={paletteActions}
           onAnalyze={(q) => { const { sym, cls } = splitSymCls(q); openAnalyze({ asset: sym, cls, run: true }); }}
-        />
-        <ChatSheet open={chatOpen} context={chatContext} onClose={closeChat} />
+        />}
+        {chatUsed && <ChatSheet open={chatOpen} context={chatContext} onClose={closeChat} />}
         <PaywallSheet />
         <Toaster />
         <NativeBridge />

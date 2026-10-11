@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext } from "react";
-import type { ChatContext } from "@/lib/prompts";
+import type { ChatContext } from "@/lib/chatContext";
 import type { Feature, Meter } from "@/lib/plans";
 import type { PlanState } from "@/lib/entitlements";
 import type { AppRoute } from "@/lib/client/routes";
