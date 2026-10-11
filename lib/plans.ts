@@ -65,20 +65,29 @@ export const FEATURE_LABEL: Record<Feature, string> = {
   property: "Property tracker",
 };
 
+// Allowances are sized against the measured unit costs at the bottom of this
+// file so that a TYPICAL member (a quarter of every allowance) leaves a gross
+// margin above ~65% after the channel fee, and a member who uses EVERYTHING
+// still roughly covers their compute on a monthly plan. See
+// docs/pricing-and-unit-economics.md before changing any number here.
+const FREE_LIMITS: Record<Meter, number> = { analysis: 3, deep: 0, chat: 10, sweep: 0, update: 3 };
+const PRO_LIMITS: Record<Meter, number> = { analysis: 25, deep: 15, chat: 80, sweep: 20, update: 40 };
+const DESK_LIMITS: Record<Meter, number> = { analysis: 80, deep: 50, chat: 250, sweep: 40, update: 100 };
+
 export const PLANS: Record<PlanId, Plan> = {
   free: {
     id: "free",
     name: "Free",
     tagline: "See how the desk thinks.",
     price: { monthly: 0, annual: 0 },
-    limits: { analysis: 3, deep: 0, chat: 15, sweep: 0, update: 5 },
+    limits: FREE_LIMITS,
     watchlistMax: 5,
     themesMax: 3,
     features: ["house_brief"],
     highlights: [
       "The daily house brief",
-      "3 eight-lens deep dives a month",
-      "15 chat messages a month",
+      `${FREE_LIMITS.analysis} eight-lens deep dives a month`,
+      `${FREE_LIMITS.chat} chat messages a month`,
       "Track up to 5 names",
       "The public, graded track record",
     ],
@@ -88,16 +97,16 @@ export const PLANS: Record<PlanId, Plan> = {
     name: "Pro",
     tagline: "Your own overnight research desk.",
     price: { monthly: 19.99, annual: 179.99 },
-    limits: { analysis: 30, deep: 20, chat: 100, sweep: 30, update: 60 },
+    limits: PRO_LIMITS,
     watchlistMax: 30,
     themesMax: 10,
     features: ["house_brief", "personal_brief", "kill_watch", "email_brief", "push_alerts", "debate", "personas", "property"],
     highlights: [
       "A brief built from your watchlist & themes, every morning",
-      "30 deep dives + 20 pressure tests a month",
+      `${PRO_LIMITS.analysis} deep dives + ${PRO_LIMITS.deep} pressure tests a month`,
       "Bull vs Bear and investor takes",
       "Kill-condition watch with push alerts",
-      "100 chat messages a month",
+      `${PRO_LIMITS.chat} chat messages a month`,
       "Track up to 30 names + SG/AU property",
     ],
   },
@@ -106,16 +115,16 @@ export const PLANS: Record<PlanId, Plan> = {
     name: "Desk",
     tagline: "For the investor who runs a process.",
     price: { monthly: 49.99, annual: 449.99 },
-    limits: { analysis: 100, deep: 60, chat: 300, sweep: 60, update: 150 },
+    limits: DESK_LIMITS,
     watchlistMax: 100,
     themesMax: 25,
     features: ["house_brief", "personal_brief", "kill_watch", "email_brief", "push_alerts", "debate", "personas", "redteam", "chain", "property"],
     highlights: [
       "Everything in Pro",
-      "100 deep dives + 60 pressure tests a month",
+      `${DESK_LIMITS.analysis} deep dives + ${DESK_LIMITS.deep} pressure tests a month`,
       "Red team and chain map on every idea",
-      "Up to 2 on-demand briefs a day",
-      "300 chat messages a month",
+      `${DESK_LIMITS.sweep} on-demand briefs a month`,
+      `${DESK_LIMITS.chat} chat messages a month`,
       "Track up to 100 names",
     ],
   },
@@ -125,6 +134,21 @@ export const PLAN_ORDER: PlanId[] = ["free", "pro", "desk"];
 
 /** Length of the no-card "reverse trial" every new account gets on Pro. */
 export const TRIAL_DAYS = 7;
+
+/**
+ * Allowances DURING the reverse trial. Pro's features, but not a whole month of
+ * Pro's compute in seven days: the trial exists to show the personalised brief
+ * and a few deep dives, and an uncapped trial is the cheapest way for one
+ * person to cost us a month of a paying member's usage with throwaway signups.
+ */
+export const TRIAL_LIMITS: Record<Meter, number> = { analysis: 8, deep: 4, chat: 25, sweep: 4, update: 10 };
+
+/** Effective allowances for a plan, honouring the trial caps. */
+export function limitsFor(plan: PlanId, trialing: boolean): Record<Meter, number> {
+  if (!trialing) return PLANS[plan].limits;
+  const base = PLANS[plan].limits;
+  return Object.fromEntries((Object.keys(base) as Meter[]).map((m) => [m, Math.min(base[m], TRIAL_LIMITS[m])])) as Record<Meter, number>;
+}
 
 /** Which meter (if any) an AI route draws down, and which feature it needs. */
 export const ROUTE_GATES: Record<string, { meter: Meter; feature?: Feature }> = {
@@ -204,6 +228,12 @@ export const UNIT_COST_USD: Record<Meter, number> = {
 
 /** Fixed cost of one personalised nightly sweep (brief + scouts + news + watch). */
 export const NIGHTLY_SWEEP_USD = 0.07;
+
+/** Worst-case AI cost of one reverse trial (every trial allowance + a week of nightly sweeps). */
+export function trialCostAtCap(): number {
+  const metered = (Object.keys(TRIAL_LIMITS) as Meter[]).reduce((s, m) => s + TRIAL_LIMITS[m] * UNIT_COST_USD[m], 0);
+  return Math.round((metered + NIGHTLY_SWEEP_USD * TRIAL_DAYS) * 100) / 100;
+}
 
 /** Monthly AI cost of a plan if every allowance is used in full. */
 export function costAtCap(plan: PlanId): number {

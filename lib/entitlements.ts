@@ -12,7 +12,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import {
-  PLANS, ROUTE_GATES, TRIAL_DAYS, cheapestPlanWith, isPlanId, nextPlanFor, periodResetsAt, planHas,
+  ROUTE_GATES, TRIAL_DAYS, cheapestPlanWith, isPlanId, limitsFor, nextPlanFor, periodResetsAt, planHas,
   type Feature, type Meter, type PlanId,
 } from "./plans";
 import { isAdminEmail } from "./admin";
@@ -164,7 +164,7 @@ export async function gate(
   if (feature && !planHas(state.plan, feature)) {
     return { ok: false, response: upgradeResponse({ reason: "feature", feature, plan: state.plan, suggested: cheapestPlanWith(feature) }) };
   }
-  const limit = PLANS[state.plan].limits[meter];
+  const limit = limitsFor(state.plan, state.source === "trial")[meter];
   const over = () => upgradeResponse({ reason: "limit", meter, plan: state.plan, suggested: nextPlanFor(meter, state.plan), limit, resetsAt: state.resetsAt });
   if (limit <= 0) return { ok: false, response: over() };
 

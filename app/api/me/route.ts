@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireUser, isResponse } from "@/lib/api";
 import { getPlanState } from "@/lib/entitlements";
-import { PLANS } from "@/lib/plans";
+import { PLANS, limitsFor } from "@/lib/plans";
 
 // The signed-in account's plan, allowances and this month's usage — everything
 // the client needs to label a button "3 left" or open the right paywall. No
@@ -18,7 +18,7 @@ export async function GET() {
     {
       user: auth.user,
       plan: state,
-      limits: plan.limits,
+      limits: limitsFor(state.plan, state.source === "trial"),
       features: plan.features,
       watchlistMax: plan.watchlistMax,
       themesMax: plan.themesMax,

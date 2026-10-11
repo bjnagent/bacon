@@ -15,6 +15,7 @@ import RecordScreen from "@/components/screens/RecordScreen";
 import AccountScreen from "@/components/screens/AccountScreen";
 import { Toaster, toast } from "@/components/ui";
 import { AppCtx, type AppApi, type AnalyzeRequest, type MeState, type WatchItem } from "./AppContext";
+import OfflineBanner from "./OfflineBanner";
 import { parsePath, paths, TABS, type TabId } from "@/lib/client/routes";
 import { apiFetch, ApiError } from "@/lib/client/api";
 import { openPaywall } from "@/lib/client/paywall";
@@ -303,6 +304,7 @@ export default function AppShell({ email, isAdmin }: { email: string; isAdmin: b
             </div>
           </header>
 
+          <OfflineBanner />
           <main className="app-content" id="main">
             {pane("today", <TodayScreen active={tab === "today"} />)}
             {pane("watchlist", <WatchlistScreen active={tab === "watchlist"} />)}

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
-  PLANS, PLAN_ORDER, ROUTE_GATES, annualSavingPct, cheapestPlanWith, costAtCap, costAtUtilisation,
-  netRevenue, nextPlanFor, periodResetsAt, periodStart, planHas,
+  PLANS, PLAN_ORDER, ROUTE_GATES, TRIAL_LIMITS, annualMonthly, annualSavingPct, cheapestPlanWith, costAtCap,
+  costAtUtilisation, limitsFor, netRevenue, nextPlanFor, periodResetsAt, periodStart, planHas, trialCostAtCap,
 } from "./plans";
 
 describe("plan catalog", () => {
@@ -54,14 +54,36 @@ describe("unit economics", () => {
     expect(costAtCap("free")).toBeLessThan(2);
   });
 
-  it("keeps a typical (25% utilisation) paid member above 55% gross margin on every channel", () => {
+  const margin = (cost: number, net: number) => 1 - cost / net;
+
+  it("keeps a typical (25% utilisation) monthly member above 65% gross margin on every channel we plan for", () => {
     for (const plan of ["pro", "desk"] as const) {
       const cost = costAtUtilisation(plan, 0.25);
       for (const ch of ["web", "app_store_small_business"] as const) {
-        const net = netRevenue(PLANS[plan].price.monthly, ch);
-        expect(1 - cost / net).toBeGreaterThan(0.55);
+        expect(margin(cost, netRevenue(PLANS[plan].price.monthly, ch))).toBeGreaterThan(0.65);
       }
     }
+  });
+
+  it("keeps a typical annual member above 50% even through the App Store", () => {
+    for (const plan of ["pro", "desk"] as const) {
+      const net = netRevenue(PLANS[plan].price.annual, "app_store_small_business") / 12;
+      expect(margin(costAtUtilisation(plan, 0.25), net)).toBeGreaterThan(0.5);
+    }
+    expect(annualMonthly("pro")).toBeLessThan(PLANS.pro.price.monthly);
+  });
+
+  it("covers a member who uses every allowance on a monthly web plan", () => {
+    for (const plan of ["pro", "desk"] as const) {
+      expect(costAtCap(plan)).toBeLessThan(netRevenue(PLANS[plan].price.monthly, "web"));
+    }
+  });
+
+  it("caps the reverse trial well below a month of Pro", () => {
+    expect(trialCostAtCap()).toBeLessThan(costAtCap("pro") / 2);
+    const t = limitsFor("pro", true);
+    for (const m of Object.keys(TRIAL_LIMITS) as (keyof typeof TRIAL_LIMITS)[]) expect(t[m]).toBeLessThanOrEqual(PLANS.pro.limits[m]);
+    expect(limitsFor("pro", false)).toEqual(PLANS.pro.limits);
   });
 
   it("applies channel fees", () => {
