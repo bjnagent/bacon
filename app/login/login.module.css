@@ -1,0 +1,78 @@
+/* Sign-in, sign-up, magic link and password reset.
+   Phones get a chrome-free, native-feeling column; from 560px the form sits
+   on a card. Inputs are 17px (iOS body size): at 16px+ Safari never zooms on
+   focus. */
+
+.wrap { width: min(440px, 100%); display: flex; flex-direction: column; gap: var(--s-5); }
+
+.brand {
+  display: inline-flex; align-items: center; gap: 10px; align-self: center;
+  font-family: var(--font-display); font-weight: 700; font-size: var(--fs-xl); letter-spacing: -0.01em;
+  min-height: 44px; padding: 0 var(--s-2); border-radius: var(--r-md);
+}
+
+.head { text-align: center; display: flex; flex-direction: column; gap: 6px; }
+.head h1 { font-family: var(--font-display); font-size: var(--fs-3xl); line-height: 1.1; font-weight: 700; letter-spacing: -0.025em; }
+.head p { color: var(--text-2); font-size: var(--fs-md); }
+
+.card { display: flex; flex-direction: column; gap: var(--s-4); }
+@media (min-width: 560px) {
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-xl);
+    box-shadow: var(--shadow-2); padding: var(--s-6);
+  }
+}
+
+/* The sign-in / create-account switch is the first thing a thumb reaches for. */
+.card :global(.ui-seg-btn) { min-height: 40px; font-size: var(--fs-md); }
+
+.form { display: flex; flex-direction: column; gap: var(--s-4); }
+
+.input { min-height: 52px; font-size: 17px; scroll-margin: 96px 0 160px; }
+
+.labelRow { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-2); }
+.textLink {
+  color: var(--accent-text); font-size: var(--fs-sm); font-weight: 600;
+  min-height: 32px; display: inline-flex; align-items: center;
+}
+.textLink:hover { text-decoration: underline; }
+@media (pointer: coarse) { .textLink { min-height: 44px; margin: -6px 0; } }
+
+.pw { position: relative; }
+.pw .input { padding-right: 52px; }
+.reveal {
+  position: absolute; top: 50%; right: 4px; transform: translateY(-50%);
+  width: 44px; height: 44px; border-radius: var(--r-md);
+  display: inline-flex; align-items: center; justify-content: center; color: var(--text-3);
+}
+.reveal:hover { color: var(--text); }
+.reveal svg { width: 20px; height: 20px; }
+
+.fieldError { color: var(--neg); font-size: var(--fs-sm); line-height: 1.4; }
+
+.or { display: flex; align-items: center; gap: var(--s-3); color: var(--text-3); font-size: var(--fs-sm); }
+.or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+
+.trial {
+  display: flex; align-items: center; justify-content: center; gap: 8px; text-align: center;
+  font-size: var(--fs-sm); color: var(--text-2);
+}
+.trial svg { width: 16px; height: 16px; color: var(--accent-text); flex-shrink: 0; }
+
+.back { align-self: center; }
+
+.legal { text-align: center; font-size: var(--fs-xs); color: var(--text-3); line-height: 1.5; }
+.legal a { color: var(--text-2); text-decoration: underline; text-underline-offset: 2px; }
+.legal a:hover { color: var(--text); }
+
+/* "Check your email" */
+.sent { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--s-3); padding: var(--s-2) 0; }
+.sentIcon {
+  width: 56px; height: 56px; border-radius: 18px; display: flex; align-items: center; justify-content: center;
+  background: var(--accent-soft); color: var(--accent-text);
+}
+.sentIcon svg { width: 26px; height: 26px; }
+.sent h2 { font-family: var(--font-display); font-size: var(--fs-xl); font-weight: 700; letter-spacing: -0.01em; }
+.sent p { color: var(--text-2); }
+.sent strong { color: var(--text); font-weight: 600; word-break: break-all; }
+.sentActions { display: flex; flex-direction: column; gap: var(--s-2); width: 100%; margin-top: var(--s-2); }

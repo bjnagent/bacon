@@ -1,0 +1,23 @@
+/* Add-to-Home-Screen instructions (components/InstallGuide + InstallPwa). */
+
+.grid { display: grid; gap: var(--s-3); grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 640px) { .grid:not(.single) { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.platform { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--s-4) var(--s-5); }
+.platformName { font-weight: 600; margin-bottom: var(--s-3); }
+
+.steps { display: flex; flex-direction: column; gap: var(--s-3); counter-reset: step; }
+.steps li { display: flex; gap: var(--s-3); align-items: flex-start; color: var(--text-2); font-size: var(--fs-md); line-height: 1.45; counter-increment: step; }
+.steps li::before {
+  content: counter(step); flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; margin-top: -1px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--surface-2); color: var(--text); font-size: 12px; font-weight: 700;
+}
+.steps b { color: var(--text); font-weight: 600; }
+
+.swap { margin-top: var(--s-3); color: var(--accent-text); font-weight: 600; font-size: var(--fs-sm); min-height: 44px; }
+.swap:hover { text-decoration: underline; }
+
+.actions { margin-top: var(--s-3); }
+.installed { display: inline-flex; align-items: center; gap: 8px; color: var(--pos); font-weight: 600; font-size: var(--fs-sm); }
+.installed svg { width: 16px; height: 16px; }

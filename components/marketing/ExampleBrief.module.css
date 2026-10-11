@@ -1,0 +1,52 @@
+/* A static picture of the product: reads as an app card, stays honest about
+   being an example. */
+
+.brief {
+  margin: 0; display: flex; flex-direction: column; gap: var(--s-3);
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-xl);
+  box-shadow: var(--shadow-3); padding: var(--s-5);
+}
+@media (max-width: 599px) { .brief { padding: var(--s-4); border-radius: var(--r-lg); box-shadow: var(--shadow-2); } }
+
+.top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s-3); }
+.titles { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.title { font-family: var(--font-display); font-weight: 700; font-size: var(--fs-lg); letter-spacing: -0.01em; }
+.meta { font-size: var(--fs-xs); color: var(--text-3); }
+.intro { font-size: var(--fs-sm); color: var(--text-2); line-height: 1.5; }
+
+.ideas { display: flex; flex-direction: column; gap: var(--s-2); }
+.idea {
+  display: flex; flex-direction: column; gap: 8px; padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-md); background: var(--surface-2);
+}
+.ideaHead { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
+.rank {
+  width: 22px; height: 22px; border-radius: 7px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--text); color: var(--bg); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.name { font-weight: 600; font-size: var(--fs-md); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.horizon { margin-left: auto; flex-shrink: 0; font-size: var(--fs-xs); color: var(--text-3); white-space: nowrap; }
+
+.thesis {
+  font-size: var(--fs-sm); color: var(--text-2); line-height: 1.5;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+.signals { display: flex; flex-wrap: wrap; gap: 6px; }
+.signals li {
+  font-size: 12px; font-weight: 500; color: var(--pos); background: var(--pos-soft);
+  padding: 2px 8px; border-radius: var(--r-pill); line-height: 18px;
+}
+
+.kill { font-size: var(--fs-xs); color: var(--text-2); line-height: 1.45; }
+.kill span { font-weight: 700; color: var(--neg); margin-right: 2px; }
+
+.caption { font-size: var(--fs-xs); color: var(--text-3); line-height: 1.45; }
+
+/* Phones: the card follows the hero copy, so keep it to two ideas — enough to
+   show the shape without a screen and a half of scrolling. */
+@media (max-width: 599px) {
+  .idea:nth-child(n + 3) { display: none; }
+  .thesis { -webkit-line-clamp: 4; }
+}

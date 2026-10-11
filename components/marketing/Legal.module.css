@@ -1,0 +1,74 @@
+/* Legal documents: long-form reading, comfortable measure (~70ch), sticky
+   contents on desktop, a collapsible one on phones. */
+
+.wrap {
+  width: 100%; max-width: calc(1120px + 2 * var(--s-6)); margin: 0 auto;
+  padding: var(--s-6) calc(var(--s-4) + var(--safe-right)) 0 calc(var(--s-4) + var(--safe-left));
+}
+@media (min-width: 600px) { .wrap { padding: var(--s-8) var(--s-6) 0; } }
+
+.docs { display: inline-flex; gap: 2px; padding: 3px; background: var(--surface-2); border-radius: var(--r-md); max-width: 100%; overflow-x: auto; }
+.doc {
+  min-height: 36px; padding: 0 14px; border-radius: 9px; display: inline-flex; align-items: center;
+  font-size: var(--fs-sm); font-weight: 600; color: var(--text-2); white-space: nowrap;
+}
+.doc:hover { color: var(--text); }
+.doc[aria-current="page"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow-1); }
+@media (pointer: coarse) { .doc { min-height: 40px; } }
+
+.head { margin: var(--s-8) 0 var(--s-8); display: flex; flex-direction: column; gap: var(--s-2); }
+.title { font-family: var(--font-display); font-weight: 700; font-size: clamp(34px, 6vw, 52px); letter-spacing: -0.035em; line-height: 1.05; }
+.updated { color: var(--text-3); font-size: var(--fs-sm); }
+
+.grid { display: grid; gap: var(--s-10); grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1000px) { .grid { grid-template-columns: 240px minmax(0, 720px); gap: 64px; } }
+
+.tocSide { display: none; }
+@media (min-width: 1000px) {
+  .tocSide { display: block; position: sticky; top: calc(60px + var(--safe-top) + var(--s-6)); align-self: start; max-height: calc(100dvh - 120px); overflow-y: auto; }
+}
+.tocHead { font-size: var(--fs-xs); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); margin-bottom: var(--s-3); }
+.tocList { display: flex; flex-direction: column; gap: 2px; }
+.tocList a { display: flex; gap: 8px; padding: 5px 0; color: var(--text-2); font-size: var(--fs-sm); line-height: 1.4; }
+.tocList a:hover { color: var(--text); }
+.tocNum { color: var(--text-3); font-variant-numeric: tabular-nums; min-width: 1.6em; }
+
+.tocInline { border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); margin-bottom: var(--s-8); }
+.tocInline > summary {
+  list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between;
+  min-height: 52px; padding: 0 var(--s-4); font-weight: 600;
+}
+.tocInline > summary::-webkit-details-marker { display: none; }
+.tocInline > summary svg { color: var(--text-3); transition: transform var(--dur-2) var(--ease); }
+.tocInline[open] > summary svg { transform: rotate(180deg); }
+.tocInline .tocList { padding: 0 var(--s-4) var(--s-4); }
+@media (min-width: 1000px) { .tocInline { display: none; } }
+
+.body { min-width: 0; font-size: var(--fs-md); line-height: 1.7; color: var(--text-2); }
+@media (min-width: 600px) { .body { font-size: 16px; } }
+
+.summary {
+  padding: var(--s-5); border-radius: var(--r-lg); background: var(--surface-2); color: var(--text);
+  margin-bottom: var(--s-8); display: flex; flex-direction: column; gap: var(--s-2);
+}
+.summaryHead { font-weight: 700; }
+.summary ul { list-style: disc; padding-left: 1.2em; display: flex; flex-direction: column; gap: 4px; }
+
+.section { scroll-margin-top: calc(60px + var(--safe-top) + var(--s-4)); padding-top: var(--s-2); margin-bottom: var(--s-8); display: flex; flex-direction: column; gap: var(--s-3); }
+.section h2 { font-family: var(--font-display); font-size: var(--fs-xl); font-weight: 700; color: var(--text); letter-spacing: -0.01em; line-height: 1.3; }
+.secNum { color: var(--text-3); }
+.section h3 { font-size: var(--fs-md); font-weight: 600; color: var(--text); margin-top: var(--s-2); }
+.section ul, .section ol { padding-left: 1.3em; display: flex; flex-direction: column; gap: 6px; }
+.section ul { list-style: disc; }
+.section ol { list-style: decimal; }
+.section strong { color: var(--text); font-weight: 600; }
+.section a, .contact a { color: var(--accent-text); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
+
+/* Processor table: a definition list that reads well at 393px. */
+.processors { display: flex; flex-direction: column; border-top: 1px solid var(--border); }
+.processor { display: grid; gap: 2px var(--s-4); padding: var(--s-3) 0; border-bottom: 1px solid var(--border); }
+@media (min-width: 600px) { .processor { grid-template-columns: 150px minmax(0, 1fr); } }
+.processor dt { font-weight: 600; color: var(--text); }
+.processor dd { margin: 0; }
+
+.contact { margin-top: var(--s-10); padding-top: var(--s-5); border-top: 1px solid var(--border); color: var(--text-2); }

@@ -1,0 +1,151 @@
+/* Landing page. Shared section type lives in components/marketing/Marketing.module.css. */
+
+.deleted {
+  max-width: 1120px; margin: var(--s-4) auto 0; width: calc(100% - 2 * var(--s-4));
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-3);
+  padding: var(--s-3) var(--s-3) var(--s-3) var(--s-4); border-radius: var(--r-md);
+  background: var(--surface-2); color: var(--text-2); font-size: var(--fs-sm);
+}
+.deleted strong { color: var(--text); font-weight: 600; }
+
+/* ---------- Hero ---------- */
+.hero { padding: var(--s-10) 0 var(--s-8); }
+@media (min-width: 1000px) { .hero { padding: 88px 0 var(--s-12); } }
+.heroGrid { display: grid; gap: var(--s-10); align-items: center; }
+@media (min-width: 1000px) { .heroGrid { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 56px; } }
+.heroCopy { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-5); }
+
+.pill {
+  display: inline-flex; align-items: center; min-height: 30px; padding: 4px 12px; border-radius: var(--r-pill);
+  background: var(--surface); border: 1px solid var(--border-strong); color: var(--text-2);
+  font-size: var(--fs-sm); font-weight: 500; line-height: 1.3;
+}
+
+.h1 {
+  font-family: var(--font-display); font-weight: 700;
+  font-size: clamp(42px, 8.4vw, 72px); line-height: 1.0; letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+.heroLede { color: var(--text-2); font-size: var(--fs-lg); line-height: 1.55; max-width: 34em; text-wrap: pretty; }
+@media (min-width: 1000px) { .heroLede { font-size: 19px; } }
+
+.ctas { display: flex; flex-wrap: wrap; gap: var(--s-3); }
+.ctas :global(.ui-btn) svg { width: 18px; height: 18px; }
+@media (max-width: 479px) { .ctas { width: 100%; } .ctas > * { flex: 1 1 100%; } }
+
+.proof { display: flex; flex-wrap: wrap; gap: 6px var(--s-5); color: var(--text-2); font-size: var(--fs-sm); }
+.proof li { display: inline-flex; align-items: center; gap: 6px; }
+.proof svg { width: 16px; height: 16px; color: var(--pos); }
+
+.heroArt { min-width: 0; }
+
+/* ---------- How it works ---------- */
+.steps { display: grid; gap: var(--s-3); grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 900px) { .steps { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-4); } }
+.step {
+  display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-6);
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-xl);
+}
+@media (max-width: 599px) { .step { padding: var(--s-5); } }
+.step h3 { font-family: var(--font-display); font-size: var(--fs-xl); font-weight: 700; letter-spacing: -0.015em; line-height: 1.2; }
+.step p { color: var(--text-2); line-height: 1.6; }
+.stepIcon {
+  width: 44px; height: 44px; border-radius: 14px; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--surface-2); color: var(--text);
+}
+.stepIcon svg { width: 22px; height: 22px; }
+.stepNum { font-size: var(--fs-xs); font-weight: 600; color: var(--text-3); margin-bottom: -6px; }
+.stepLink { display: inline-flex; align-items: center; gap: 6px; color: var(--accent-text); font-weight: 600; min-height: 44px; margin-top: auto; }
+.stepLink svg { width: 16px; height: 16px; transition: transform var(--dur-1); }
+.stepLink:hover svg { transform: translateX(2px); }
+
+.lenses { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; padding-top: var(--s-1); }
+.lenses li {
+  display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px;
+  border-radius: var(--r-pill); background: var(--surface-2); font-size: 12px; font-weight: 500; color: var(--text-2);
+}
+.lensDot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* ---------- Pillars ---------- */
+.band { background: var(--surface-2); }
+.pillars { display: grid; gap: var(--s-8); grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 900px) { .pillars { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-10); } }
+.pillar { display: flex; flex-direction: column; gap: var(--s-3); }
+.pillar h3 { font-family: var(--font-display); font-size: var(--fs-2xl); font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
+.pillar p { color: var(--text-2); line-height: 1.6; }
+.pillarIcon {
+  width: 44px; height: 44px; border-radius: 14px; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--surface); color: var(--text); box-shadow: var(--shadow-1);
+}
+.pillarIcon svg { width: 22px; height: 22px; }
+
+/* ---------- The receipt (inverted card: ink becomes the surface) ---------- */
+.receipt {
+  display: flex; flex-direction: column; gap: var(--s-6); align-items: flex-start;
+  padding: var(--s-8) var(--s-6); border-radius: var(--r-xl);
+  background: var(--text); color: var(--bg);
+}
+@media (min-width: 900px) {
+  .receipt { flex-direction: row; align-items: flex-end; justify-content: space-between; padding: 56px; gap: var(--s-10); }
+}
+/* In dark mode an inverted (cream) slab glares on a dark page — keep it a
+   raised dark surface there, with the button carrying the contrast instead. */
+@media (prefers-color-scheme: dark) {
+  :global(:root:not([data-theme="light"])) .receipt { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+  :global(:root:not([data-theme="light"])) .receipt .receiptBtn { --btn-bg: var(--text); --btn-fg: var(--bg); }
+}
+:global(:root[data-theme="dark"]) .receipt { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+:global(:root[data-theme="dark"]) .receipt .receiptBtn { --btn-bg: var(--text); --btn-fg: var(--bg); }
+.receiptCopy { display: flex; flex-direction: column; gap: var(--s-3); max-width: 640px; }
+.receiptCopy p:last-child { opacity: 0.78; font-size: var(--fs-lg); line-height: 1.55; }
+.receiptEyebrow { font-size: var(--fs-sm); font-weight: 600; opacity: 0.7; }
+/* Two classes so this beats .ui-btn's own variable defaults regardless of
+   stylesheet order. */
+.receipt .receiptBtn { --btn-bg: var(--bg); --btn-fg: var(--text); --btn-bd: transparent; flex-shrink: 0; }
+.receipt .receiptBtn:hover { border-color: transparent; opacity: 0.92; }
+.receiptBtn svg { width: 18px; height: 18px; }
+
+/* ---------- Pricing teaser ---------- */
+.plans { display: grid; gap: var(--s-3); grid-template-columns: minmax(0, 1fr); max-width: 1040px; margin: 0 auto; }
+@media (min-width: 900px) { .plans { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-4); } }
+.plan {
+  display: flex; flex-direction: column; gap: var(--s-2); padding: var(--s-6);
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-xl);
+}
+.planFeatured { border: 2px solid var(--accent); padding: calc(var(--s-6) - 1px); }
+.planHead { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); }
+.planHead h3 { font-family: var(--font-display); font-size: var(--fs-xl); font-weight: 700; }
+.planTag { color: var(--text-2); font-size: var(--fs-sm); }
+.planPrice { display: flex; align-items: baseline; gap: 4px; margin-top: var(--s-2); }
+.planPrice span { font-family: var(--font-display); font-size: 36px; font-weight: 700; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.planPrice small { color: var(--text-3); font-size: var(--fs-sm); }
+.planNote { color: var(--text-3); font-size: var(--fs-xs); margin-top: -4px; }
+.planList { display: flex; flex-direction: column; gap: 8px; margin-top: var(--s-3); font-size: var(--fs-sm); color: var(--text-2); }
+.planList li { display: flex; gap: 8px; align-items: flex-start; }
+.planList svg { width: 16px; height: 16px; color: var(--pos); flex-shrink: 0; margin-top: 2px; }
+.plansMore { display: flex; justify-content: center; margin-top: var(--s-5); }
+
+/* ---------- Phone ---------- */
+.phone { display: grid; gap: var(--s-6); align-items: start; }
+@media (min-width: 900px) { .phone { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: var(--s-10); } }
+.phoneCopy { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-4); }
+.phoneCopy :global(.ui-btn) svg { width: 18px; height: 18px; }
+.h3 { font-family: var(--font-display); font-size: var(--fs-3xl); font-weight: 700; letter-spacing: -0.025em; line-height: 1.1; }
+
+.install { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-xl); }
+.install > summary {
+  list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: var(--s-3);
+  min-height: 60px; padding: var(--s-4) var(--s-5); font-weight: 600;
+}
+.install > summary::-webkit-details-marker { display: none; }
+.install > summary svg { width: 18px; height: 18px; color: var(--text-3); transition: transform var(--dur-2) var(--ease); flex-shrink: 0; }
+.install[open] > summary svg { transform: rotate(90deg); }
+.installBody { padding: 0 var(--s-5) var(--s-5); }
+
+/* ---------- FAQ extras ---------- */
+.faqList { display: flex; flex-direction: column; gap: 4px; padding-left: 1.1em; list-style: disc; }
+
+/* ---------- Final CTA ---------- */
+.final { padding-bottom: var(--s-4); }
+.finalInner { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--s-4); }
+.finalInner .ctas { justify-content: center; }
