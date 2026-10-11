@@ -1,0 +1,19 @@
+.steps { display: flex; flex-direction: column; gap: var(--s-4); }
+.step { display: flex; gap: var(--s-3); align-items: flex-start; }
+.icon {
+  width: 32px; height: 32px; flex-shrink: 0; border-radius: var(--r-sm);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--accent-soft); color: var(--accent-text);
+}
+.icon svg { width: 17px; height: 17px; }
+.text { min-width: 0; }
+.title { font-size: var(--fs-md); font-weight: 600; line-height: 1.35; }
+.body { margin-top: 2px; font-size: var(--fs-sm); color: var(--text-2); line-height: 1.5; }
+/* Two columns where there is room (the public page's method section). */
+@media (min-width: 760px) {
+  .columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-6) var(--s-8); }
+  .columns .icon { width: 40px; height: 40px; border-radius: var(--r-md); }
+  .columns .icon svg { width: 20px; height: 20px; }
+  .columns .title { font-size: var(--fs-lg); }
+  .columns .body { font-size: var(--fs-md); }
+}

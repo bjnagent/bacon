@@ -206,7 +206,9 @@ export interface GradedCall {
   actual_pct: number | null; bench_pct: number | null; direction_hit: boolean | null; target_err_pct: number | null;
 }
 
-const MIN_N = 8; // below this, a cohort is noise — keep it out of the memo
+/** Below this many graded calls a cohort is noise — kept out of the memo. */
+export const CALIBRATION_MIN_N = 8;
+const MIN_N = CALIBRATION_MIN_N;
 
 export function buildCalibrationMemo(calls: GradedCall[]): string {
   const rated = calls.filter((c) => c.direction_hit != null);

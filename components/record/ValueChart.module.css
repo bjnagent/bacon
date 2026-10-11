@@ -1,0 +1,54 @@
+.fig { display: flex; flex-direction: column; gap: var(--s-3); margin: 0; min-width: 0; }
+
+.head { display: flex; flex-direction: column; gap: var(--s-2); }
+.legend { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-3); }
+.key { display: flex; gap: 10px; align-items: flex-start; min-width: 0; }
+.keyText { display: flex; flex-direction: column; min-width: 0; }
+.keyLabel { font-size: var(--fs-sm); font-weight: 600; color: var(--text-2); }
+.keyValue { font-size: var(--fs-2xl); font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; color: var(--text); }
+.keyDelta { font-size: var(--fs-sm); font-weight: 600; }
+.staked { font-size: var(--fs-xs); color: var(--text-3); }
+
+/* Line keys mirror the marks: solid accent for the calls, dashed ink for SPY. */
+.swatch { flex-shrink: 0; width: 18px; height: 0; margin-top: 9px; }
+.swatchCalls { border-top: 2px solid var(--accent); }
+.swatchSpy { border-top: 2px dashed var(--text-3); }
+
+.plot {
+  position: relative; width: 100%; min-width: 0;
+  /* Horizontal drags scrub the readout; vertical ones still scroll the page. */
+  touch-action: pan-y;
+  border-radius: var(--r-sm);
+  -webkit-user-select: none; user-select: none;
+}
+.plot:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.svg { display: block; overflow: visible; }
+
+.grid { stroke: var(--border); stroke-width: 1; shape-rendering: crispEdges; }
+.zero { stroke: var(--border-strong); stroke-width: 1; shape-rendering: crispEdges; }
+.yLabel, .xLabel { fill: var(--text-3); font-size: 11px; font-variant-numeric: tabular-nums; font-family: var(--font-body); }
+
+.area { fill: var(--accent); opacity: 0.1; }
+.callsLine { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.spyLine { fill: none; stroke: var(--text-3); stroke-width: 2; stroke-dasharray: 5 4; stroke-linejoin: round; stroke-linecap: round; }
+.callsDot { fill: var(--accent); stroke: var(--surface); stroke-width: 2; }
+.spyDot { fill: var(--text-3); stroke: var(--surface); stroke-width: 2; }
+.crosshair { stroke: var(--text-3); stroke-width: 1; shape-rendering: crispEdges; }
+
+.tip {
+  position: absolute; top: 0; transform: translateX(-50%);
+  min-width: 160px; max-width: 184px; pointer-events: none;
+  padding: 8px 10px; border-radius: var(--r-sm);
+  background: var(--bg-elev); border: 1px solid var(--border-strong); box-shadow: var(--shadow-2);
+  font-size: var(--fs-xs); color: var(--text-2); line-height: 1.35;
+}
+.tipDate { font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.tipRow { display: flex; align-items: center; gap: 6px; }
+.tipRow strong { color: var(--text); font-size: var(--fs-sm); font-weight: 700; }
+.tipKey { width: 12px; height: 0; flex-shrink: 0; }
+.tipName { color: var(--text-3); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tipFoot { margin-top: 4px; color: var(--text-3); }
+
+@media (max-width: 559px) {
+  .keyValue { font-size: var(--fs-xl); }
+}

@@ -1,30 +1,41 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireUser, isResponse, readJson, fail, badRequest, str } from "@/lib/api";
+import { gate } from "@/lib/entitlements";
+import { withinQuota, QUOTA_MESSAGE } from "@/lib/quota";
 import { ask } from "@/lib/anthropic";
 import { briefReviewPrompt } from "@/lib/prompts";
 import { parseBriefReview } from "@/lib/parsers";
 import { communityPulse } from "@/lib/grok";
 import type { StoredBriefItem } from "@/lib/brief";
-import { orNull } from "@/lib/log";
+import { orNull, swallowed } from "@/lib/log";
 
 export const maxDuration = 300;
 
 // "How did it age?" — web-search-grounded review of a past brief. Writes each
 // item's outcome + verdict back onto the stored brief (the track record).
+//
+// A model call, so it is metered: it draws one unit of the monthly "update"
+// allowance (route gate "track-update"), refunded if the review fails.
 export async function POST(req: Request) {
-  const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  const auth = await requireUser();
+  if (isResponse(auth)) return auth;
+  const { sb, user } = auth;
 
-  let body: { id?: string };
-  try { body = await req.json(); } catch { return NextResponse.json({ error: "Bad request" }, { status: 400 }); }
-  const id = String(body.id || "").trim().slice(0, 64);
-  if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  const body = await readJson<{ id?: unknown }>(req);
+  if (!body) return badRequest();
+  const id = str(body.id, 64);
+  if (!id) return badRequest("Missing id");
 
   const { data: row, error } = await sb.from("daily_briefs").select("id,brief_date,items").eq("id", id).maybeSingle();
-  if (error || !row) return NextResponse.json({ error: "Brief not found" }, { status: 404 });
+  if (error || !row) return fail(404, "Brief not found", { code: "not_found" });
   const items = (row.items ?? []) as StoredBriefItem[];
-  if (!items.length) return NextResponse.json({ error: "Brief has no items" }, { status: 400 });
+  if (!items.length) return badRequest("This brief has no ideas to review");
+
+  // The daily abuse cap first, so a runaway loop is stopped before it costs a
+  // unit of the monthly allowance.
+  if (!(await withinQuota(sb))) return fail(429, QUOTA_MESSAGE, { code: "quota" });
+  const g = await gate(sb, user, "track-update");
+  if (!g.ok) return g.response;
 
   try {
     const listing = items.map((o, i) => `${i + 1}. ${o.name} (${o.ticker || "—"}) — horizon ${o.horizon || "?"} — thesis: ${o.thesis}${o.action ? ` — call: ${o.action}${o.target ? ` / ${o.target}` : ""}` : ""} — kill: ${o.checks}`).join("\n");
@@ -44,6 +55,9 @@ export async function POST(req: Request) {
     await sb.from("daily_briefs").update({ items: reviewed, reviewed_at }).eq("id", id);
     return NextResponse.json({ items: reviewed, reviewed_at, note: review.note });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : "Review failed" }, { status: 500 });
+    await g.refund();
+    // The provider's message stays in the server log; the client gets a sentence.
+    swallowed("brief-review", err);
+    return fail(502, "The review didn't finish — please try again.", { code: "review_failed" });
   }
 }

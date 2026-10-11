@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireUser, isResponse, readJson, fail, badRequest, str } from "@/lib/api";
 import { computeRoi, cleanTicker, type RoiPoint } from "@/lib/market";
 import { getCachedSeries } from "@/lib/priceCache";
 import { resolveInstrument, priceInstrumentRoi, formatLevel, type Instrument } from "@/lib/commodities";
@@ -11,6 +11,9 @@ export const maxDuration = 60;
 // at today's. Live (not stored) — "today" moves — and grounded entirely in real
 // prices: US equities via keyless sources (Stooq/Yahoo, Alpha Vantage fallback),
 // commodities/FX via FRED. Skips items with no resolvable instrument.
+//
+// Not metered: no model is involved, only price lookups (rate-limited at the
+// provider, which is handled below).
 const INVESTED = 10_000;
 
 // Commodity/FX rows carry preformatted level strings (e.g. "78.20 $/bbl") so the
@@ -19,17 +22,17 @@ type Priced = { name: string; quoteKind?: "commodity" | "fx"; entryQuote?: strin
 type RoiResult = Priced | { name: string; ticker: string; skipped: string };
 
 export async function POST(req: Request) {
-  const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  const auth = await requireUser();
+  if (isResponse(auth)) return auth;
+  const { sb } = auth;
 
-  let body: { id?: string };
-  try { body = await req.json(); } catch { return NextResponse.json({ error: "Bad request" }, { status: 400 }); }
-  const id = String(body.id || "").trim().slice(0, 64);
-  if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  const body = await readJson<{ id?: unknown }>(req);
+  if (!body) return badRequest();
+  const id = str(body.id, 64);
+  if (!id) return badRequest("Missing id");
 
   const { data: row, error } = await sb.from("daily_briefs").select("id,brief_date,items").eq("id", id).maybeSingle();
-  if (error || !row) return NextResponse.json({ error: "Brief not found" }, { status: 404 });
+  if (error || !row) return fail(404, "Brief not found", { code: "not_found" });
   const items = (row.items ?? []) as StoredBriefItem[];
   const since = String(row.brief_date);
 
