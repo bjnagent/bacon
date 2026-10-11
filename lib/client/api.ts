@@ -135,7 +135,9 @@ export function useApi<T>(url: string | null, ttlMs = 30_000): ApiState<T> {
   const [error, setError] = useState<ApiError | null>(null);
   const [loading, setLoading] = useState<boolean>(!!url);
   const live = useRef(true);
-  useEffect(() => () => { live.current = false; }, []);
+  // Set on mount as well as cleared on unmount: Strict Mode's simulated
+  // unmount/remount would otherwise leave this false and drop every result.
+  useEffect(() => { live.current = true; return () => { live.current = false; }; }, []);
 
   const load = useCallback(async (fresh: boolean) => {
     if (!url) return;
