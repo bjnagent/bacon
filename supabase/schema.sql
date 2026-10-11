@@ -1122,3 +1122,62 @@ create policy "own device_tokens" on device_tokens for all using ((select auth.u
 alter table settings add column if not exists push_enabled boolean default true;
 alter table settings add column if not exists timezone text;
 alter table settings add column if not exists onboarded_at timestamptz;
+
+-- ===========================================================================
+-- billing: webhooks
+--
+-- Idempotent; run after the v1 block above. Needed before the billing webhooks
+-- (/api/billing/webhook, /api/billing/revenuecat) will process anything — they
+-- answer 500 (so the provider retries later) until `billing_events` exists.
+-- ===========================================================================
+
+-- Idempotency ledger for provider webhooks. Each delivery's event id is
+-- inserted BEFORE it is processed; a conflict means it was already handled, so
+-- a provider's retry or replay can never apply an event twice. Service role
+-- only: RLS on, no policies. Pruned after 90 days by /api/cron/watch (both
+-- providers stop retrying within days).
+create table if not exists billing_events (
+  id text primary key,                         -- Stripe evt_… / RevenueCat event uuid
+  provider text not null,                      -- stripe | revenuecat
+  type text not null,
+  received_at timestamptz not null default now()
+);
+create index if not exists billing_events_received on billing_events (received_at);
+alter table billing_events enable row level security;
+
+-- The account's Stripe customer, kept even while another channel (App Store,
+-- a manual comp) owns the plan on the row — so the billing portal and account
+-- deletion can always reach someone's Stripe subscriptions.
+alter table subscriptions add column if not exists stripe_customer_id text;
+create index if not exists subscriptions_stripe_customer on subscriptions (stripe_customer_id) where stripe_customer_id is not null;
+
+-- Everything the nightly crons need to resolve a plan, for exactly the
+-- candidate accounts, in one round trip: email (operator allowlist), account
+-- age (reverse trial) and the subscription row. Security definer because it
+-- reads auth.users, which only `postgres` can SELECT; EXECUTE is revoked from
+-- every client role by name and granted to service_role alone, and the
+-- search_path is pinned — same containment as the admin RPCs. The alternative,
+-- paging auth.admin.listUsers, would read every account of every app sharing
+-- this auth schema each night.
+create or replace function public.cron_accounts(p_ids uuid[])
+returns table (
+  user_id uuid,
+  email text,
+  created_at timestamptz,
+  plan text,
+  status text,
+  provider text,
+  current_period_end timestamptz,
+  cancel_at_period_end boolean,
+  billing_interval text
+)
+language sql stable security definer set search_path = '' as $$
+  select u.id, u.email::text, p.created_at,
+         s.plan, s.status, s.provider, s.current_period_end, s.cancel_at_period_end, s.billing_interval
+  from auth.users u
+  left join public.profiles p on p.id = u.id
+  left join public.subscriptions s on s.user_id = u.id
+  where u.id = any(p_ids);
+$$;
+revoke execute on function public.cron_accounts(uuid[]) from public, anon, authenticated;
+grant  execute on function public.cron_accounts(uuid[]) to service_role;
