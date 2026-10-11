@@ -1,143 +1,131 @@
-# Bacon — Investment Research Tool
+# Bacon
 
-> **Status:** an automated opportunity cockpit. The nightly sweep pieces together the day's market signals — real movers, sector rotation, macro, news, SEC insider-buy clusters, tracked voices — into a ranked morning brief, with Analyze (eight-lens deep dives), a self-grading track record, Radar, News, and a context-aware Discuss chat on top of the self-hosting layer (server routes, Supabase auth, daily background sweep, embedded live charts). Extras: persona lenses, password/account auth, PWA install, error pages, a health diagnostic, and a Vitest suite with CI.
+**Your overnight research desk.** Every night Bacon reads the market's real
+signals — movers, sector rotation, macro, filings, headlines, prediction-market
+odds, the crowd — and hands you a short, ranked brief of the ideas where
+independent signals agree. Each idea states the condition that would confirm it
+and the one that would kill it. Any asset can be deep-dived through eight
+professional lenses, and every call Bacon files is graded against real prices and
+the S&P 500 — in public.
 
-An **automated opportunity cockpit**: every day the system pieces together real market signals — movers, headlines, the macro backdrop, your themes — and surfaces under-the-radar, coming-up-on-the-horizon opportunities on its own. You open it to *see what it found*, not to search. Deep-dives run through eight independent professional lenses (Fundamental, Valuation, Technical, Trend-health, Factor, Macro/Regulatory, Smart Money/Signals, Risk); conviction comes from **convergence** across independent signals, never a single indicator.
+Web app (Next.js on Vercel) + iOS app (Capacitor shell with native push, haptics
+and in-app purchase). Research, not investment advice.
 
-**Visual identity:** "Daylight Instrument" — warm bone/graph-paper canvas, near-black ink, safety-orange accent, six lens hues as channel colours.
+## The product
+
+| Tab | What it does |
+|---|---|
+| **Today** | The morning brief (personal on Pro/Desk, the shared house brief on Free), macro strip, idea cards with live/delayed quotes, confirm/kill lines, a data check on unsourced figures. **Headlines**: paraphrased, attributed news with lean filters. |
+| **Watchlist** | Names Bacon re-reads every night (lean, latest update, what to watch, your thesis/conviction), fresh finds from your themes, and the SG/AU **property** tracker. |
+| **Analyze** | Eight-lens deep dive on any stock, ETF, FX pair, crypto or commodity, with a convergence verdict; Bull vs Bear, investor takes, red team, chain map. Saved history; a shared 6-hour cache makes popular names free. |
+| **Track record** | Hit rate, alpha vs SPY, $10K-per-call chart, calibration memo, every call (wins, misses, open), brief history with kill alerts. |
+| **Account** | Plan & usage, alerts (daily brief, kill watch, email, push), voices, appearance, security, legal, sign out, delete account. |
+
+Plus: ⌘K search, a context-aware chat sheet, onboarding, and public pages —
+`/welcome`, `/pricing`, `/record` (the house scorecard), `/legal/*`.
+
+## Plans
+
+Defined once in [`lib/plans.ts`](lib/plans.ts) — the pricing page, paywall,
+server gate and cost model all read it.
+
+| | Free | Pro | Desk |
+|---|---|---|---|
+| Price | $0 | $19.99/mo · $179.99/yr | $49.99/mo · $449.99/yr |
+| Brief | Shared house brief | Personal, nightly | Personal, nightly |
+| Deep dives / pressure tests / chat per month | 3 / – / 10 | 25 / 15 / 80 | 80 / 50 / 250 |
+
+Every new account gets a 7-day Pro trial with no card (capped allowances).
+Allowances are metered atomically in Postgres and refunded when work fails.
+The unit economics behind every number — measured from the production cost
+ledger — are in [`docs/pricing-and-unit-economics.md`](docs/pricing-and-unit-economics.md).
 
 ## Stack
 
 | Layer | Choice |
 |---|---|
-| Framework | Next.js 16 (App Router, TypeScript, Turbopack) |
-| Styling | Custom CSS design system (`pr-*` classes), ported **verbatim** from the reference artifact into `app/globals.css` |
-| Auth + DB | Supabase (Postgres, Auth, RLS) via `@supabase/ssr` |
-| AI | Anthropic Messages API + `web_search` server tool, **server-side only** (`@anthropic-ai/sdk`) |
-| Icons | `lucide-react` |
-| Charts | Embedded TradingView Advanced Chart (`TradingViewChart`) inside Analyze; `TVLink` deep-links as fallback |
-| Navigation | Object + command-driven: **Discover** (Radar + News) and **Analyze** destinations, a **⌘K command palette**, Account in a user menu |
-| Hosting | Vercel + Vercel Cron (daily background sweep) |
-| Data | Alpha Vantage (movers) · FRED (macro) — the only real-number sources; the model never fabricates figures |
-| Tests / CI | Vitest (parsers, helpers, financial math) · GitHub Actions (lint + test + build) |
+| App | Next.js 16 (App Router), React 19, TypeScript |
+| UI | Own design system: tokens + primitives in `app/globals.css`, React kit in `components/ui`, CSS Modules per feature. See [`docs/design-system.md`](docs/design-system.md). |
+| Data | Supabase (Postgres + Auth + RLS). Schema in [`supabase/schema.sql`](supabase/schema.sql). |
+| AI | Anthropic (Sonnet for user-facing work, Haiku for bulk), Gemini as the cheap tier for background refreshes, Grok for community pulse — all server-side, every call metered to `ai_events`. |
+| Real data | Alpha Vantage / Stooq / Yahoo (prices), FRED (macro, commodities, FX), SEC EDGAR (fundamentals, insider filings), Polymarket (odds), data.gov.sg / ABS / BIS (property). |
+| Billing | Stripe (web) and the App Store via RevenueCat (iOS), one `subscriptions` table. |
+| iOS | Capacitor 8 shell loading the deployed app; APNs push, StoreKit, universal links. See [`docs/ios.md`](docs/ios.md). |
+| Hosting | Vercel, functions pinned to `sin1` (next to the Supabase database), daily crons. |
 
-## What works today
+### How the app is put together
 
-- **Auth:** Supabase **email + password** (sign in / create account) with **magic-link** as a fallback → session → protected app shell. Session refresh + route protection in `proxy.ts` (Next 16's renamed middleware). Password sign-up is instant when "Confirm email" is off in Supabase. An **Account** tab (`/api/account/password`) lets the user change their password — handy for setting one after a magic-link-only signup.
-- **Shell:** the full "Bacon look" — left rail nav, status bar, eight-lens spectrum, bacon-rasher logo.
-- **Radar (Phase 2 slice, home view):** a Scout + Tracking dashboard. **Tracking** lists your names with qualitative monitoring updates (`/api/track-update`) and editable thesis / conviction / note — all persisted to `watchlist`. **Scout** runs `/api/scout` on your saved `themes` to surface timely candidates; track a pick or jump straight into its lenses.
-- **Analyze (Phase 2 slice):** run any asset through the eight-lens cockpit. Calls `/api/analyze` → live web search → parsed briefing with per-lens stances, a convergence gauge, summary + bottom line. **Bull vs Bear** runs `/api/debate`. **Save to radar** persists to `watchlist`.
-- **Background Sweep (auto-scout):** a daily Vercel Cron (`/api/cron/sweep`) that, per user who's enabled it, surfaces a **"fresh finds"** feed — **today's real top movers** (via a market-data provider, the one place real numbers are allowed) enriched with a qualitative "why it's moving / verify" read, plus theme-scout matches — and refreshes tracked names. Toggle it on the Radar; new finds are waiting when you return. No fabricated prices: the % move is attributed to the provider, the rest is grounded by web search.
-- **Today's brief (the cockpit centerpiece):** the nightly sweep now ends with a **synthesis pass** — one AI read across all of the day's signals (real movers, headlines, macro, themes, your tracked names) hunting second-order beneficiaries and convergent setups, each with horizon, converged signals, confirm/kill lines, and one-tap Track / Run lenses. `GET/POST /api/brief`; on-demand "Sweep now" from the Today tab. Stored in `scout_picks` (`kind='opportunity'`/`'brief-intro'`) — zero migration.
-- **Navigation:** an object + command-driven shell — **⌘K / "/" command palette** (type a ticker → analyze, or run a command), **Discover** (Radar + News) and **Analyze** as the two destinations, and **Account** in a user menu. Boot animation plays once per session.
-- **Live prices:** embedded **TradingView Advanced Chart** inside the Analyze readout (real-time prices from a real provider, attribution kept). The constraint stands: the *AI* never fabricates prices.
-- **Macro backdrop (real data):** the Radar home opens with a strip of live macro indicators — Fed funds, 10Y/2Y, the 10Y–2Y curve, CPI YoY, unemployment, VIX — from **FRED** (`/api/macro`, cached). The same snapshot is fed into the Analyze **Macro lens** so it reasons against real rates/inflation, not guesses. Real numbers, attributed; neutral direction arrows (no buy/sell signal).
-- **Health:** `/api/health` probes Anthropic server-side and returns `{ ok, model }`.
-- **News:** paraphrased, attributed business headlines as signals (`/api/news` → `news_items`) — one-tap deep-dive, track, or discuss. Copyright rule enforced in the prompt (never an outlet's exact words).
-- **Discuss (chat):** a context-aware **streaming** chat panel (FAB on every view; `/api/chat` → `chat_messages`) that reasons through the lenses, steelmans both sides, and flags what to verify — grounded in live search, never advice.
+- **One shell, real URLs.** `app/(app)/layout.tsx` renders `components/app/AppShell`,
+  which owns every signed-in screen. Each screen has a URL (`/`, `/news`,
+  `/watchlist`, `/property`, `/analyze/NVDA`, `/track-record`, `/account`) for
+  deep links from email, push and sharing; navigation uses the History API and
+  visited screens stay mounted, so switching is instant and nothing refetches.
+- **One API contract.** Routes use `lib/api.ts` (`requireUser` with local JWT
+  verification, `readJson`, `fail`) and answer errors as `{ error, code }`.
+  Paid work goes through `gate()` in `lib/entitlements.ts`; a `402
+  upgrade_required` opens the paywall automatically on the client
+  (`lib/client/api.ts`).
+- **Honesty is mechanical.** The model never supplies a current price or figure:
+  real data is fetched, labelled with its source and staleness, and gaps are
+  stated to the model out loud. `lib/verify.ts` flags unsourced figures in front
+  of the user.
 
 ## Setup
 
-### 1. Clone and install
-
 ```bash
-git clone <your-repo-url> bacon
-cd bacon
 npm install
-```
-
-### 2. Create Supabase project
-
-1. Go to [supabase.com](https://supabase.com) → New project.
-2. Note your **Project Ref** (Settings → API).
-3. Run the schema: open the SQL editor and paste the contents of [`supabase/schema.sql`](supabase/schema.sql). This creates all tables, enables RLS, and adds a trigger that auto-creates `profiles` + `settings` on signup.
-4. Enable **Email** auth under Authentication → Providers.
-
-### 3. Configure environment
-
-```bash
-cp .env.example .env.local
-# Fill in all values — see .env.example for descriptions
-```
-
-Required:
-
-```bash
-# Anthropic (server-only)
-ANTHROPIC_API_KEY=sk-ant-...
-BACON_MODEL=claude-sonnet-4-6          # current Sonnet; matches the artifact
-
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
-SUPABASE_SERVICE_ROLE_KEY=eyJ...       # SERVER ONLY — never expose
-
-# Market data — real movers for the background sweep (free key at
-# alphavantage.co/support). Optional: without it the sweep still runs the
-# qualitative theme scout.
-MARKET_DATA_API_KEY=...
-
-# Macro backdrop — FRED (free key at fredaccount.stlouisfed.org/apikeys).
-# Optional: the macro strip hides itself if unset.
-FRED_API_KEY=...
-
-# App
-NEXT_PUBLIC_SITE_URL=http://localhost:3000   # set to the Vercel URL in prod
-CRON_SECRET=<random>                   # openssl rand -hex 32; protects /api/cron/*
-```
-
-> **Never commit `.env.local`.** It's in `.gitignore`.
-
-### 4. Run locally
-
-```bash
+cp .env.example .env.local   # every variable is documented in the file
 npm run dev
 ```
 
-Visit `http://localhost:3000` → redirects to magic-link login → sends email → click link → authenticated home. Go to **Analyze**, enter a ticker (e.g. `NVDA`), and run.
+1. **Supabase.** Create a project, then run [`supabase/schema.sql`](supabase/schema.sql)
+   in the SQL editor (idempotent — re-run it after every pull that changes it).
+   For an existing deployment moving to paid plans, also run
+   [`supabase/migrations/2026-10-founding-members.sql`](supabase/migrations/2026-10-founding-members.sql)
+   **once** (90 days of Pro for every existing account).
+2. **Auth.** Enable Email. Add `<SITE>/api/auth/callback**` to the redirect
+   allow-list. Point the email templates at the confirm route:
+   `{{ .SiteURL }}/api/auth/confirm?token_hash={{ .TokenHash }}&type=<signup|recovery|email>`.
+3. **Keys.** At minimum `ANTHROPIC_API_KEY`, the Supabase URL/anon/service-role
+   keys, `NEXT_PUBLIC_SITE_URL` and `CRON_SECRET`. Market-data, FRED, Gemini,
+   xAI, Resend, Stripe, RevenueCat and APNs keys each switch on their feature
+   and degrade gracefully when absent.
+4. **Billing.** Stripe: products/prices for Pro and Desk (monthly + yearly),
+   customer portal, and a webhook to `/api/billing/webhook`. App Store: the four
+   subscription products, RevenueCat entitlements `pro` / `desk`, and a
+   RevenueCat webhook to `/api/billing/revenuecat`. Exact event lists and
+   variables are in `.env.example` → Billing.
+5. **iOS.** Everything native lives in `ios/` and is built on a Mac — follow
+   [`docs/ios.md`](docs/ios.md).
 
-## Project layout
+### Developing without a Supabase project
 
-```
-app/
-├─ page.tsx              ← auth check → renders <AppShell/>
-├─ login/page.tsx        ← magic-link auth (server client + server action)
-├─ layout.tsx            ← root layout
-├─ globals.css           ← design system (verbatim port) + base reset + login styles
-└─ api/
-   ├─ health/route.ts        ← Anthropic probe
-   ├─ analyze/route.ts       ← eight-lens briefing  (auth → prompt → ask → parse)
-   ├─ debate/route.ts        ← bull-vs-bear debate
-   ├─ scout/route.ts         ← theme-based idea scout
-   ├─ track-update/route.ts  ← per-name monitoring update (persists to watchlist)
-   ├─ themes/route.ts        ← scout themes CRUD
-   ├─ watchlist/route.ts     ← list + add tracked names (RLS-scoped)
-   ├─ watchlist/[id]/route.ts← edit (thesis/conviction/note) + delete
-   └─ auth/                  ← Supabase auth callback + signout
-
-components/
-├─ AppShell.tsx          ← rail nav + status bar + view switching (client)
-├─ RadarView.tsx         ← Scout + Tracking dashboard (client)
-├─ AnalyzeView.tsx       ← eight-lens cockpit + Bull/Bear (client)
-├─ ConvictionRadar.tsx   ← SVG convergence gauge
-├─ BaconMark.tsx · Spectrum.tsx · TVLink.tsx
-
-lib/
-├─ anthropic.ts          ← server-side Anthropic wrapper + web_search (lazy client)
-├─ prompts.ts            ← prompt builders (ported verbatim from the artifact)
-├─ parsers.ts            ← response parsers (ported verbatim, typed)
-├─ lenses.ts             ← LENSES, STANCES, ASSET_CLASSES, FRAMEWORKS + helpers
-├─ types.ts              ← shared DB row shapes (WatchRow, ThemeRow)
-└─ supabase/             ← client / server / admin (service-role) clients
-
-proxy.ts                 ← session refresh + route protection (was middleware.ts)
-reference/bacon-artifact.jsx  ← the single-file source-of-truth app (Phase 2 ports from this)
-scripts/build-globals.mjs     ← one-shot: regenerates globals.css from the artifact's CSS
-supabase/schema.sql      ← full schema + RLS + signup trigger
-vercel.json              ← cron schedule (route lands in a later slice)
+```bash
+node scripts/mock-supabase.mjs        # fixture-backed Auth + PostgREST on :54321
+NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=mock npm run dev
+node scripts/shoot.mjs shots / /watchlist /analyze   # signed-in screenshots (VIEWPORT, THEME, FULL)
 ```
 
-> `app/globals.css` is generated from the artifact's `const CSS` by `node scripts/build-globals.mjs` (font `@import` hoisted, base reset + login styles appended). Don't hand-edit the ported block.
+`MOCK_PLAN=free|pro|desk|trial` and `MOCK_EMPTY=1` switch the account the mock
+serves. Fixtures are illustrative dev data, not market facts.
+
+### Checks
+
+```bash
+npm run lint && npx tsc --noEmit && npm test && npm run build
+```
+
+CI runs the same on every push and pull request.
+
+## Background jobs (`vercel.json`)
+
+| Cron | When (UTC) | What |
+|---|---|---|
+| `/api/cron/warm-prices` | 11:00 | Caches the day's market snapshot and price series once for everyone. |
+| `/api/cron/sweep` | 13:00 | Builds the nightly brief for accounts whose plan includes it (Pro, Desk, trial) **plus the house account**; refreshes their news and tracked names; sends the email / push. Bounded concurrency, per-user isolation, atomic claim. |
+| `/api/cron/watch` | 22:00 | Grades every account's calls (whatever the plan); re-checks kill conditions for plans with the kill watch and pushes alerts. |
+
+All require `Authorization: Bearer $CRON_SECRET` (Vercel sends it).
 
 ## The house record (public `/record`)
 
@@ -148,22 +136,18 @@ before the calibration memo says anything. So the product's strongest claim —
 prospect forever.
 
 The **house account** fixes that: one designated account sweeps daily through
-exactly the same code path as everyone else, and its graded calls are published
-at `/record` with no login.
+exactly the same code path as everyone else, its brief is the one Free members
+read, and its graded calls are published at `/record` with no login.
 
 1. Create a dedicated account (not your personal one — its calls become public).
-2. Sign in as it once and flip **Auto-sweep daily** on the Radar. The cron only
-   touches users who've opted in.
-3. Copy its `auth.users.id` into **`HOUSE_USER_ID`** in your environment.
-
-Grading needs no extra wiring: `/api/cron/sweep` already grades every user's
-calls, including the house account's.
+2. Sign in as it once.
+3. Copy its `auth.users.id` into **`HOUSE_USER_ID`**. The sweep always runs it,
+   and `/api/cron/watch` grades its calls with everyone else's.
 
 What the page shows, and why it's structured this way:
 
-- **Every priced call, wins and misses.** `summarise()` has no outcome filter and
-  the loader passes it everything, so a flattering subset can't be selected —
-  by accident or otherwise.
+- **Every priced call, wins and misses.** There is no outcome filter, so a
+  flattering subset can't be selected — by accident or otherwise.
 - **Open calls are labelled open.** A call is priced at 30 days but only settles
   when its horizon lands; hiding the in-flight ones would let the record be timed.
 - **Alpha is computed on the benchmarked subset only**, both sides — averaging
@@ -177,66 +161,20 @@ never falls back to another account.
 
 ## Non-negotiable constraints
 
-1. **No fabricated data.** Bacon never invents prices, quotes, or figures. All AI features run on live web search of the public record and stay qualitative.
-2. **Not financial advice.** Never "buy/sell," never guarantee outcomes.
-3. **News copyright.** Headlines are paraphrased and attributed to the outlet. Never reproduce exact headlines.
-4. **TradingView attribution.** Chart links/widgets always carry visible attribution to `https://www.tradingview.com`.
-5. **Server-only secrets.** `ANTHROPIC_API_KEY` and `SUPABASE_SERVICE_ROLE_KEY` never reach the browser — all AI calls go through `app/api/*`.
+1. **No fabricated data.** Bacon never invents prices, quotes or figures. Current
+   facts come from real providers (labelled with source and staleness) or live
+   search; forward numbers are labelled estimates.
+2. **Research, not advice.** Plans sell research. The directive "advice mode"
+   (entry / stop / size) is an operator allowlist (`ADVICE_EMAILS`) and is not
+   for sale — it would need regulatory licensing.
+3. **News copyright.** Headlines are paraphrased in Bacon's words and attributed.
+4. **TradingView attribution** wherever its charts or links appear.
+5. **Secrets stay server-side.** AI, service-role, billing and APNs keys never
+   reach the browser; neither do the system prompts.
 
-## Phase 2 TODO
+## Docs
 
-Feature port from [`reference/bacon-artifact.jsx`](reference/bacon-artifact.jsx) (now committed). Suggested order:
-
-- [x] `lib/lenses.ts`, `lib/prompts.ts`, `lib/parsers.ts` — constants + prompt builders + parsers, ported verbatim
-- [x] **Analyze** — eight-lens cockpit + convergence gauge + Bull/Bear (`/api/analyze`, `/api/debate`, `AnalyzeView`) + save-to-watchlist
-- [x] **Radar** — watchlist CRUD + per-name tracking updates + Scout with persisted themes (`/api/watchlist`, `/api/track-update`, `/api/scout`, `/api/themes`, `RadarView`).
-- [x] **Background sweeps** — daily `/api/cron/sweep` (service-role): real top movers (`lib/market.ts`) + theme scout → `scout_picks` "fresh finds" feed, plus tracked-name refresh; per-user opt-in via `settings`. Auto-sweep toggle on the Radar.
-- [x] **News** — paraphrase + attribute (`/api/news`, `news_items`, `NewsView`)
-- [x] **Discuss** — streaming chat (`/api/chat`, `chat_messages`, `ChatPanel`)
-- [x] **TradingView widgets** — embedded Advanced Chart on a **Markets** tab + inside Analyze (`TradingViewChart`); attribution kept; `TVLink` fallback retained
-- [x] **Real data layer** — Alpha Vantage movers (`lib/market.ts`) + FRED macro (`lib/macro.ts`, `/api/macro`, `MacroBackdrop`). _Next connectors (own code, public APIs):_ World Bank / IMF macro, sector movers, crypto movers.
-- [ ] **News** auto-refresh into the sweep (paraphrased headlines → `news_items`)
-- [x] **Command line + boot screen** — terminal-style command bar (type a ticker / `RADAR`/`NEWS`/`MARKETS`/…), `/` + 1–7 + `?` shortcuts, boot animation
-- [x] **Persona lenses** — Buffett/Graham/Lynch/Burry "Investor takes" on Analyze
-- [x] **Signal breadth** — SEC EDGAR insider-buy clusters (`lib/insider.ts`, tested), tracked-voices check, congressional-trade directive → fed into the daily brief
-- [x] **Tests + CI** — Vitest suite + GitHub Actions
-
-Open ideas (need a decision/key): more data connectors (World Bank/IMF, sector & crypto movers), sub-daily sweep (Vercel Pro), custom SMTP for reliable auth emails.
-
-Full spec: [`BACON_BUILD.md`](BACON_BUILD.md).
-
-## Deploy
-
-```bash
-# 1. Push to GitHub.
-# 2. vercel.com → New Project → Import the repo.
-# 3. Add every variable from .env.example in Vercel project settings
-#    (set NEXT_PUBLIC_SITE_URL to the Vercel URL).
-# 4. In Supabase Auth → URL Configuration, add the Vercel URL +
-#    <vercel-url>/api/auth/callback as a redirect URL.
-# 5. Deploy. Verify: login works, the shell renders, /api/health returns ok,
-#    and Analyze returns a briefing.
-```
-
-## Background sweep — operating it
-
-1. **Re-run `supabase/schema.sql`** once (it's idempotent) to add the new
-   `scout_picks` columns (`change_pct`, `data_source`, `kind`).
-2. In Vercel, set **`MARKET_DATA_API_KEY`** (Alpha Vantage free key) and
-   **`CRON_SECRET`**. Vercel automatically sends `CRON_SECRET` as a Bearer token
-   to cron routes; the route rejects anything else.
-3. `vercel.json` schedules `/api/cron/sweep` daily (`0 13 * * *`) — allowed on the
-   Hobby plan. Sub-daily needs Vercel Pro.
-4. On the **Radar**, flip **Auto-sweep daily** on (writes `scout_interval_minutes`
-   to your `settings`). The cron only touches users who've opted in.
-
-Test it without waiting for the schedule:
-
-```bash
-curl -H "Authorization: Bearer $CRON_SECRET" https://<your-app>/api/cron/sweep
-# → {"ok":true,"swept":N}; then reload the Radar to see "fresh finds".
-```
-
-> Honesty rule intact: the % move is real (from the provider, labelled "via
-> &lt;provider&gt;"); the model only adds qualitative "why / verify" context via web
-> search and never invents figures.
+- [`docs/design-system.md`](docs/design-system.md) — the UI contract
+- [`docs/pricing-and-unit-economics.md`](docs/pricing-and-unit-economics.md) — plans, costs, margins
+- [`docs/ios.md`](docs/ios.md) — the iOS app, App Store Connect, RevenueCat, review checklist
+- `reports/` — the earlier code, design, GTM, optimisation and positioning reviews
