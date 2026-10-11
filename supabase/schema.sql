@@ -978,3 +978,147 @@ create index if not exists forecasts_graded on forecasts (graded_at desc);
 alter table forecasts enable row level security;
 drop policy if exists "read forecasts" on forecasts;
 create policy "read forecasts" on forecasts for select using ((select auth.role()) = 'authenticated');
+
+-- ===========================================================================
+-- v1 product release: plans & billing, metering, persisted analyses, devices.
+--
+-- Everything below is idempotent and safe to re-run. The app tolerates every
+-- object here being absent (plan lookup falls back to "ungated", metering fails
+-- open), so the code can ship before this block is applied — but nothing is
+-- gated or billed until it is.
+-- ===========================================================================
+
+-- One row per account that has (or had) a paid plan. Written ONLY by the
+-- billing webhooks through the service role — there is deliberately no
+-- insert/update policy, so a client cannot grant itself a plan.
+create table if not exists subscriptions (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  plan text not null default 'free' check (plan in ('free', 'pro', 'desk')),
+  status text not null default 'active',          -- active | trialing | past_due | canceled | expired
+  provider text,                                  -- stripe | app_store | manual
+  provider_customer_id text,
+  provider_subscription_id text,
+  product_id text,
+  billing_interval text,                          -- month | year
+  current_period_end timestamptz,
+  cancel_at_period_end boolean not null default false,
+  updated_at timestamptz not null default now()
+);
+create index if not exists subscriptions_customer on subscriptions (provider, provider_customer_id);
+alter table subscriptions enable row level security;
+drop policy if exists "own subscription read" on subscriptions;
+create policy "own subscription read" on subscriptions for select using ((select auth.uid()) = user_id);
+
+-- Monthly allowance meter, one row per (user, meter, calendar month UTC).
+create table if not exists feature_usage (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  feature text not null,
+  period_start date not null,
+  used int not null default 0,
+  primary key (user_id, feature, period_start)
+);
+alter table feature_usage enable row level security;
+drop policy if exists "own feature_usage read" on feature_usage;
+create policy "own feature_usage read" on feature_usage for select using ((select auth.uid()) = user_id);
+
+-- Atomically consume one unit of a meter for the CALLER. Returns the units left
+-- after this one, or -1 if the allowance is already spent (nothing consumed).
+-- The limit comes from the server's plan catalog; a client calling this RPC
+-- directly can only ever raise its own counter, never lower it.
+create or replace function public.consume_feature(p_feature text, p_limit int)
+returns int language plpgsql security definer set search_path = '' as $$
+declare
+  v_used int;
+  v_period date := date_trunc('month', now() at time zone 'utc')::date;
+begin
+  if auth.uid() is null or p_limit is null or p_limit <= 0 then return -1; end if;
+  insert into public.feature_usage (user_id, feature, period_start, used)
+    values (auth.uid(), left(p_feature, 40), v_period, 1)
+    on conflict (user_id, feature, period_start) do update
+      set used = public.feature_usage.used + 1
+      where public.feature_usage.used < p_limit
+    returning used into v_used;
+  if v_used is null then return -1; end if;
+  return p_limit - v_used;
+end;
+$$;
+revoke execute on function public.consume_feature(text, int) from public, anon;
+grant  execute on function public.consume_feature(text, int) to authenticated;
+
+-- Give back one unit when the work it paid for failed (a stream that errored
+-- mid-flight). Service role only: a client able to call this could refill its
+-- own allowance indefinitely.
+create or replace function public.release_feature(p_user uuid, p_feature text)
+returns void language sql security definer set search_path = '' as $$
+  update public.feature_usage set used = greatest(used - 1, 0)
+  where user_id = p_user and feature = p_feature
+    and period_start = date_trunc('month', now() at time zone 'utc')::date;
+$$;
+revoke execute on function public.release_feature(uuid, text) from public, anon, authenticated;
+
+-- Everything the plan gate needs in ONE round trip: the subscription row, the
+-- account's age (for the reverse trial) and this month's usage. Security
+-- invoker — every read below is already RLS-scoped to the caller.
+create or replace function public.my_plan_state()
+returns jsonb language sql stable set search_path = '' as $$
+  select jsonb_build_object(
+    'subscription', (
+      select jsonb_build_object(
+        'plan', s.plan, 'status', s.status, 'provider', s.provider,
+        'current_period_end', s.current_period_end,
+        'cancel_at_period_end', s.cancel_at_period_end,
+        'billing_interval', s.billing_interval)
+      from public.subscriptions s where s.user_id = (select auth.uid())),
+    'created_at', (select p.created_at from public.profiles p where p.id = (select auth.uid())),
+    'usage', coalesce((
+      select jsonb_object_agg(u.feature, u.used) from public.feature_usage u
+      where u.user_id = (select auth.uid())
+        and u.period_start = date_trunc('month', now() at time zone 'utc')::date), '{}'::jsonb)
+  );
+$$;
+revoke execute on function public.my_plan_state() from public, anon;
+grant  execute on function public.my_plan_state() to authenticated;
+
+-- Persisted deep dives. Two jobs: (1) history — reopening an analysis is free
+-- and instant instead of a second billed web-search run; (2) a SHARED cache — a
+-- non-personal analysis of the same symbol from the last few hours is served to
+-- the next person who asks, at no cost to them or to us. `personal` marks runs
+-- whose prompt carried the account's own calibration / call history; those are
+-- never shared.
+create table if not exists analyses (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  symbol text not null,                 -- resolved, upper-case cache key
+  query text not null,                  -- what the user typed
+  asset_class text not null default 'Equity / Stock',
+  content text not null,                -- the raw delimited briefing
+  extras jsonb not null default '{}'::jsonb,   -- debate / personas / redteam / chain results
+  personal boolean not null default false,
+  shared_from uuid,                     -- set when this row is a cache hit of another
+  created_at timestamptz not null default now()
+);
+create index if not exists analyses_user_created on analyses (user_id, created_at desc);
+create index if not exists analyses_cache on analyses (symbol, asset_class, created_at desc) where not personal and shared_from is null;
+alter table analyses enable row level security;
+drop policy if exists "own analyses" on analyses;
+create policy "own analyses" on analyses for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+
+-- APNs device tokens for the iOS app.
+create table if not exists device_tokens (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  token text not null unique,
+  platform text not null default 'ios',
+  environment text not null default 'production',   -- sandbox | production
+  created_at timestamptz not null default now(),
+  last_seen_at timestamptz not null default now()
+);
+create index if not exists device_tokens_user on device_tokens (user_id);
+alter table device_tokens enable row level security;
+drop policy if exists "own device_tokens" on device_tokens;
+create policy "own device_tokens" on device_tokens for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+
+-- Preferences the product surfaces in Settings.
+alter table settings add column if not exists push_enabled boolean default true;
+alter table settings add column if not exists timezone text;
+alter table settings add column if not exists onboarded_at timestamptz;
