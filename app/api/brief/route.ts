@@ -10,7 +10,7 @@ import { recordCalls, horizonToDays, getCalibrationMemo } from "@/lib/calls";
 import { cleanTicker } from "@/lib/market";
 import { parseOpportunities } from "@/lib/parsers";
 import { opportunityBriefPrompt } from "@/lib/prompts";
-import { adviceEnabled } from "@/lib/advice";
+import { adviceFor, isHouseAccount } from "@/lib/advice";
 import { getForecasts } from "@/lib/forecast";
 import { getForecastMemo, recordForecasts } from "@/lib/forecastRecord";
 import { getCachedSeries } from "@/lib/priceCache";
@@ -71,10 +71,10 @@ async function latestLevels(sb: SupabaseClient, userId: string): Promise<Map<str
   return out;
 }
 
-async function readBrief(sb: SupabaseClient, userId: string) {
+async function readBrief(sb: SupabaseClient, userId: string, opts: { levels?: boolean } = {}) {
   const [picks, levels] = await Promise.all([
     sb.from("scout_picks").select(SCOUT_PICK_COLUMNS).eq("user_id", userId).in("kind", KINDS).order("created_at", { ascending: false }),
-    latestLevels(sb, userId),
+    opts.levels === false ? Promise.resolve(new Map<string, Levels>()) : latestLevels(sb, userId),
   ]);
   if (picks.error) throw new Error(picks.error.message);
   return assemble((picks.data ?? []) as ScoutPickRow[], levels);
@@ -94,13 +94,15 @@ export async function GET() {
   if (isResponse(auth)) return auth;
   const { sb, user } = auth;
 
-  const houseId = process.env.HOUSE_USER_ID;
-  if (houseId && houseId !== user.id) {
+  const houseId = (process.env.HOUSE_USER_ID ?? "").trim().toLowerCase();
+  if (houseId && !isHouseAccount(user.id)) {
     const state = await getPlanState(sb, user);
     const personal = state.source === "operator" || state.source === "fallback" || planHas(state.plan, "personal_brief");
     if (!personal) {
       try {
-        const brief = await readBrief(createAdminClient(), houseId);
+        // No advice-mode levels on the shared brief, even if an older house
+        // brief carried some: entry / stop / size are never broadcast.
+        const brief = await readBrief(createAdminClient(), houseId, { levels: false });
         if (brief.items.length) {
           return NextResponse.json({ brief, house: true }, { headers: { "Cache-Control": "private, no-store" } });
         }
@@ -191,7 +193,7 @@ export async function POST() {
     // (UNIT_COST_USD.sweep ≈ $0.06) assumes the bulk-model cost for on-demand
     // briefs too. On the frontier model each refresh would cost several times
     // what the allowance was priced at.
-    askStream(opportunityBriefPrompt(adviceEnabled(user.email)), [{ role: "user", content: bundle }], true, 1800, 6, { route: "brief", userId: user.id }, BULK_MODEL),
+    askStream(opportunityBriefPrompt(adviceFor(user.id, user.email)), [{ role: "user", content: bundle }], true, 1800, 6, { route: "brief", userId: user.id }, BULK_MODEL),
     async (full, ok) => {
       // Stream errored mid-flight — don't persist a truncated brief, and don't
       // charge for one.
