@@ -75,3 +75,14 @@ describe("isAdminEmail", () => {
     expect(isAdminEmail("ops@bacon.app")).toBe(false);
   });
 });
+
+describe("estimateCostUsd — 5.5 generation", () => {
+  it("prices Sonnet 5.5 and Opus 5.5 on their own rows, not their predecessors'", () => {
+    expect(estimateCostUsd("claude-sonnet-5-5", { input: 1_000_000, output: 1_000_000 }).costUsd).toBe(12);
+    expect(estimateCostUsd("claude-opus-5-5", { input: 1_000_000, output: 1_000_000 }).costUsd).toBe(24);
+  });
+  it("prices Haiku 5.5 on the short-prompt card, and 5x past 100K prompt tokens", () => {
+    expect(estimateCostUsd("claude-haiku-5-5", { input: 50_000, output: 10_000 }).costUsd).toBeCloseTo(0.01, 6);
+    expect(estimateCostUsd("claude-haiku-5-5", { input: 150_000, output: 10_000 }).costUsd).toBeCloseTo(0.1, 6);
+  });
+});
