@@ -6,7 +6,7 @@ import { todayLine } from "./prompts";
 // which is worth knowing before trusting this line — the ledger showed every
 // call still metering as claude-sonnet-4-6 long after the default here changed,
 // because the env var was set and silently won.
-export const MODEL = process.env.BACON_MODEL ?? "claude-sonnet-5";
+export const MODEL = process.env.BACON_MODEL ?? "claude-sonnet-5-5";
 
 /**
  * Bulk background work: the nightly brief and the kill-condition watch. Nobody
@@ -18,20 +18,61 @@ export const MODEL = process.env.BACON_MODEL ?? "claude-sonnet-5";
  * already set to something else — the exact way the last model change failed to
  * take effect.
  */
-export const BULK_MODEL = process.env.BACON_BULK_MODEL ?? "claude-haiku-4-5";
+export const BULK_MODEL = process.env.BACON_BULK_MODEL ?? "claude-haiku-5-5";
 
 /**
- * Capability is derived from the model, not assumed, because the cheap model is
- * an older generation and two request fields depend on that:
+ * Capability is derived from the model, not assumed, because the request fields
+ * that are valid differ by generation and a wrong one is a 400:
  *
- *  - `web_search_20260209` (dynamic filtering) needs Sonnet 4.6 / Sonnet 5 /
- *    Opus 4.6+. Haiku 4.5 must use the basic `web_search_20250305` or the
- *    request is rejected.
- *  - `thinking: {type:"disabled"}` is the 4.6+ form. Pre-4.6 models take
- *    `{type:"enabled", budget_tokens}` and have no thinking when the parameter
- *    is omitted — which is the behaviour we want, so it is simply left off.
+ *  - `web_search_20260209` (dynamic filtering) needs Sonnet 4.6+ or Opus 4.6+.
+ *    Haiku (4.5 and 5.5) takes the basic `web_search_20250305`.
  */
-const isCurrentGen = (model: string) => /(sonnet-(4-6|5)|opus-)/.test(model);
+const dynamicSearch = (model: string) => /(sonnet-(4-6|5)|opus-)/.test(model);
+
+type Effort = "low" | "medium" | "high";
+
+/**
+ * How little thinking each model can be asked for. Every call here wants a
+ * fast, formatted answer, not deliberation, so the aim everywhere is "thinking
+ * off" — but each generation spells that differently, and the wrong spelling
+ * is rejected:
+ *
+ *  - Sonnet 5.5: `disabled` is a 400; `between_tools` is its thinking-off
+ *    setting, valid only at effort `high` or below and with no other field.
+ *  - Haiku 5.5: thinking is ON by default (effort default `medium`); `disabled`
+ *    is accepted at `high` or below.
+ *  - Opus 5.5 / Fable / Mythos: thinking can't be turned off at all; the lowest
+ *    effort is the closest equivalent.
+ *  - Sonnet 4.6 / 5, Opus 4.6–5: `disabled`.
+ *  - Haiku 4.5 and older: no thinking unless asked, so the field is omitted.
+ *
+ * Effort is set explicitly rather than left to defaults, which differ by model.
+ */
+export function thinkingFor(model: string): { thinking?: { type: string }; output_config?: { effort: Effort } } {
+  const effort = (e: Effort) => ({ output_config: { effort: e } });
+  if (/sonnet-5-5/.test(model)) return { thinking: { type: "between_tools" }, ...effort("high") };
+  if (/haiku-5-5/.test(model)) return { thinking: { type: "disabled" }, ...effort("medium") };
+  if (/(opus-5-5|fable-|mythos-)/.test(model)) return effort("low");
+  if (/(sonnet-(4-6|5)|opus-)/.test(model)) return { thinking: { type: "disabled" } };
+  return {};
+}
+
+/**
+ * Haiku 5.5's tokenizer counts the same text as ~30% more tokens than Haiku
+ * 4.5's. The output caps in the routes were tuned on the old count; scaling
+ * them keeps the delimited brief from being cut off mid-item.
+ */
+export const outputCap = (model: string, n: number) => (/haiku-5-5/.test(model) ? Math.ceil(n * 1.3) : n);
+
+/**
+ * The 5.5 models run safety classifiers that can decline a request: HTTP 200,
+ * `stop_reason: "refusal"`, and little or no text. Treated as a failure so the
+ * route refunds the allowance and shows an error, instead of saving an empty
+ * analysis as if it had succeeded.
+ */
+export class RefusalError extends Error {
+  constructor() { super("The model declined this request — try rephrasing it."); this.name = "RefusalError"; }
+}
 
 /**
  * The stable half of every request. The system prompt is the only part that
@@ -59,7 +100,7 @@ const cachedSystem = (system: string) => [
  * extra search costing roughly 32,000 input tokens on the daily brief.
  */
 const searchTool = (model: string, maxSearches?: number) => ({
-  type: (isCurrentGen(model) ? "web_search_20260209" : "web_search_20250305") as
+  type: (dynamicSearch(model) ? "web_search_20260209" : "web_search_20250305") as
     "web_search_20260209" | "web_search_20250305",
   name: "web_search" as const,
   // max_uses bounds the search loop — it's what keeps latency and search spend
@@ -69,10 +110,6 @@ const searchTool = (model: string, maxSearches?: number) => ({
   // at 5x input, so turns are the expensive axis, not the search fee.
   ...(maxSearches ? { max_uses: maxSearches } : {}),
 });
-
-// `{type:"disabled"}` only exists on 4.6+; older models simply omit the field.
-const thinkingFor = (model: string) =>
-  isCurrentGen(model) ? { thinking: { type: "disabled" as const } } : {};
 
 // Lazily construct the client so importing this module (e.g. during `next build`,
 // when route handlers are traced) never throws on a missing key. The key is only
@@ -110,9 +147,9 @@ export async function ask(
   try {
     res = await getClient().messages.create({
       model,
-      max_tokens: maxTokens,
+      max_tokens: outputCap(model, maxTokens),
       system: cachedSystem(system),
-      ...thinkingFor(model),
+      ...(thinkingFor(model) as object),
       messages,
       ...(useSearch ? { tools: [searchTool(model, maxSearches)] } : {}),
     });
@@ -137,6 +174,7 @@ export async function ask(
       ms: Date.now() - t0,
     });
   }
+  if (res.stop_reason === "refusal") throw new RefusalError();
   return res.content
     .filter((b) => b.type === "text")
     .map((b) => (b as { type: "text"; text: string }).text)
@@ -160,12 +198,13 @@ export async function* askStream(
   const acc = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, webSearches: 0 };
   let served = model;
   let ok = false;
+  let refused = false;
   try {
     const stream = await getClient().messages.create({
       model,
-      max_tokens: maxTokens,
+      max_tokens: outputCap(model, maxTokens),
       system: cachedSystem(system),
-      ...thinkingFor(model),
+      ...(thinkingFor(model) as object),
       messages,
       stream: true,
       ...(useSearch ? { tools: [searchTool(model, maxSearches)] } : {}),
@@ -180,15 +219,17 @@ export async function* askStream(
       } else if (ev.type === "message_delta") {
         const u = ev.usage as RawUsage | undefined;
         if (u?.output_tokens != null) acc.output = u.output_tokens;
+        if (ev.delta.stop_reason === "refusal") refused = true;
         if (u?.server_tool_use?.web_search_requests != null) acc.webSearches = u.server_tool_use.web_search_requests;
       } else if (ev.type === "content_block_delta" && ev.delta.type === "text_delta") {
         yield ev.delta.text;
       }
     }
-    ok = true;
+    ok = !refused;
   } finally {
     // In `finally` so an aborted stream (client disconnect, deadline) still
     // meters the tokens already billed upstream.
     if (meta) meter({ ...meta, provider: "anthropic", model: served, usage: acc, ms: Date.now() - t0, ok });
   }
+  if (refused) throw new RefusalError();
 }

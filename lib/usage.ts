@@ -39,14 +39,19 @@ interface Rate { in: number; out: number; search: number }
 // Web search is $10 / 1,000 requests across models.
 const A = (i: number, o: number): Rate => ({ in: i, out: o, search: 0.01 });
 const ANTHROPIC_RATES: Record<string, Rate> = {
-  "claude-fable-5": A(10, 50),
+  "claude-fable-5": A(10, 50),          // also matches claude-fable-5-1
+  "claude-opus-5-5": A(4, 20),
   "claude-mythos-5": A(10, 50),
   "claude-opus-5": A(5, 25),
   "claude-opus-4-8": A(5, 25),
   "claude-opus-4-7": A(5, 25),
   "claude-opus-4-6": A(5, 25),
-  "claude-sonnet-5": A(3, 15),
+  "claude-sonnet-5-5": A(2, 10),
+  "claude-sonnet-5": A(2, 10),
   "claude-sonnet-4-6": A(3, 15),
+  // Haiku 5.5 has a second rate card ($0.50 / $2.50) for prompts over 100K
+  // tokens; see estimateCostUsd.
+  "claude-haiku-5-5": A(0.1, 0.5),
   "claude-haiku-4-5": A(1, 5),
 };
 
@@ -95,8 +100,11 @@ export interface CostResult { costUsd: number; priced: boolean }
  * so the three are summed, not overlapped.
  */
 export function estimateCostUsd(model: string, u: TokenUsage): CostResult {
-  const rate = rateFor(model);
+  let rate = rateFor(model);
   if (!rate) return { costUsd: 0, priced: false };
+  // Haiku 5.5 bills the whole request at 5x once the prompt passes 100K tokens.
+  const prompt = u.input + (u.cacheRead ?? 0) + (u.cacheWrite ?? 0);
+  if (model.toLowerCase().startsWith("claude-haiku-5-5") && prompt > 100_000) rate = { ...rate, in: rate.in * 5, out: rate.out * 5 };
   const M = 1_000_000;
   const cost =
     (u.input * rate.in +
