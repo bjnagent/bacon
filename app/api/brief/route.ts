@@ -190,7 +190,7 @@ export async function POST() {
   return textStreamResponse(
     // BULK_MODEL, not the frontier model: the nightly brief already runs on it,
     // the output is a delimited format rather than prose, and the plan pricing
-    // (UNIT_COST_USD.sweep ≈ $0.06) assumes the bulk-model cost for on-demand
+    // (UNIT_COST_USD.sweep ≈ $0.04) assumes the bulk-model cost for on-demand
     // briefs too. On the frontier model each refresh would cost several times
     // what the allowance was priced at.
     askStream(opportunityBriefPrompt(adviceFor(user.id, user.email)), [{ role: "user", content: bundle }], true, 1800, 6, { route: "brief", userId: user.id }, BULK_MODEL),

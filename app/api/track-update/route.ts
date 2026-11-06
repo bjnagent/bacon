@@ -35,7 +35,7 @@ export async function POST(req: Request) {
   try {
     // askCheap, not ask(): a refresh is a short, delimited monitoring note — the
     // same job the nightly sweep already runs on the bulk tier. The plan's unit
-    // economics budget ~$0.03 per "update" (lib/plans UNIT_COST_USD), and the
+    // economics budget ~$0.01 per "update" (lib/plans UNIT_COST_USD), and the
     // ai_events ledger had this route on Sonnet at ~$0.11 each, so every manual
     // refresh lost money. askCheap falls back to Claude on any empty/garbled
     // reply, so the output format never depends on the cheap provider.
