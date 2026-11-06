@@ -219,15 +219,21 @@ export function formatPrice(usd: number): string {
 
 /** Expected USD cost of one metered action (ledger mean, rounded up). */
 export const UNIT_COST_USD: Record<Meter, number> = {
-  analysis: 0.2,   // Sonnet + up to 6 web searches; ledger 0.126 (n=1) to 0.25 at p90 brief-sized inputs
-  deep: 0.13,      // debate/personas/redteam/chain; ledger debate mean 0.124
-  chat: 0.06,      // Sonnet streaming turn with ≤5 searches; ledger 0.059
-  sweep: 0.06,     // on-demand brief on the bulk model with the shared snapshot; ledger nightly 0.055
-  update: 0.03,    // scout/news/track refresh on the cheap tier, Claude fallback
+  // Sonnet 5.5 ($2/$10) + Haiku 5.5 ($0.10/$0.50) since Oct 2026. Web search is
+  // $0.01 a call on every model and is now about half of each user-initiated
+  // cost, so these move with the search caps more than with the model.
+  analysis: 0.12,  // Sonnet 5.5 + up to 6 searches; ledger repriced to 5.5: 0.085 (n=2)
+  deep: 0.11,      // debate/personas/redteam/chain; ledger debate repriced: 0.096 (n=2)
+  chat: 0.05,      // Sonnet 5.5 streaming turn with ≤5 searches; ledger repriced: 0.046 (n=1)
+  sweep: 0.04,     // on-demand brief on Haiku 5.5 with up to 6 searches; nightly brief call 0.012, p90 0.025
+  update: 0.01,    // scout/news/track refresh on the cheap tier (0.0007–0.0036), Haiku 5.5 fallback
 };
 
-/** Fixed cost of one personalised nightly sweep (brief + scouts + news + watch). */
-export const NIGHTLY_SWEEP_USD = 0.07;
+/**
+ * Fixed cost of one personalised nightly sweep (brief + scouts + news + watch).
+ * Ledger since the Haiku 5.5 switch: 0.021 per account-day, p90 0.035 (n=66).
+ */
+export const NIGHTLY_SWEEP_USD = 0.03;
 
 /** Worst-case AI cost of one reverse trial (every trial allowance + a week of nightly sweeps). */
 export function trialCostAtCap(): number {
